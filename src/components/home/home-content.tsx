@@ -108,19 +108,9 @@ export function HomeContent({ recentElements, favorites }: HomeContentProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-        <SidebarTrigger className="-ml-1" />
-        <Separator orientation="vertical" className="mr-2 h-4" />
-        <h1 className="text-lg font-semibold">Home</h1>
-      </header>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="mx-auto max-w-5xl space-y-8">
-          {/* Welcome + Quick Create */}
-          <div>
+    <div className="space-y-8">
+      {/* Quick Create */}
+      <div>
             <h2 className="text-3xl font-bold tracking-tight">Welcome to FlowSpace</h2>
             <p className="text-muted-foreground mt-1">
               Your personal workspace for organizing everything.
@@ -201,8 +191,6 @@ export function HomeContent({ recentElements, favorites }: HomeContentProps) {
               </div>
             )}
           </div>
-        </div>
-      </div>
     </div>
   )
 }

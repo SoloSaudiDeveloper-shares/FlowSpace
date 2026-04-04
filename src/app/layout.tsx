@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
+import { CommandPalette } from "@/components/layout/command-palette"
 import { getElements, getFavoriteElements } from "@/lib/actions/element-actions"
 
 const geistSans = Geist({
@@ -49,6 +50,7 @@ export default async function RootLayout({
             <SidebarProvider>
               <AppSidebar elements={allElements} favorites={favorites} />
               <SidebarInset>{children}</SidebarInset>
+              <CommandPalette />
             </SidebarProvider>
           </TooltipProvider>
         </ThemeProvider>
