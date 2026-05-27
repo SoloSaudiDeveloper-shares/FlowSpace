@@ -61,39 +61,35 @@ sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_token ON password_reset_to
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_user ON password_reset_tokens(user_id);`)
 
 // ─── One-time ownership backfill ───────────────────────────────────────
-// When the per-user workspace model rolled out, existing rows had owner
-// columns = NULL. If exactly ONE human user exists (the original owner),
-// claim everything for them. Idempotent — subsequent boots see 0 nulls
-// and skip. When >1 user exists, skip with a warning to avoid wrong
-// attribution.
+// Pre-isolation rows have NULL owner columns. They were created before
+// the per-user model existed, which means they all belong to whoever
+// the sole user was at the time — i.e. the oldest user (the original
+// owner). Assigning orphans to the OLDEST active user is safe: new
+// users (signed up after the isolation roll-out) have later created_at
+// and cannot have produced these rows. Idempotent.
 try {
-  const users = sqlite
-    .prepare(`SELECT id FROM users WHERE is_active = 1 ORDER BY created_at ASC LIMIT 2`)
-    .all() as { id: string }[]
+  const oldest = sqlite
+    .prepare(`SELECT id FROM users WHERE is_active = 1 ORDER BY created_at ASC LIMIT 1`)
+    .get() as { id: string } | undefined
 
-  const backfills: { table: string; column: string }[] = [
-    { table: "elements",       column: "created_by" },
-    { table: "notifications",  column: "user_id"   },
-    { table: "forms",          column: "created_by" },
-    { table: "templates",      column: "created_by" },
-    { table: "feed_events",    column: "actor_user_id" },
-  ]
+  if (oldest) {
+    const backfills: { table: string; column: string }[] = [
+      { table: "elements",       column: "created_by" },
+      { table: "notifications",  column: "user_id"   },
+      { table: "forms",          column: "created_by" },
+      { table: "templates",      column: "created_by" },
+      { table: "feed_events",    column: "actor_user_id" },
+    ]
 
-  for (const { table, column } of backfills) {
-    const orphanCount = (sqlite
-      .prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column} IS NULL`)
-      .get() as { n: number }).n
-    if (orphanCount === 0) continue
-
-    if (users.length === 1) {
+    for (const { table, column } of backfills) {
+      const orphanCount = (sqlite
+        .prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column} IS NULL`)
+        .get() as { n: number }).n
+      if (orphanCount === 0) continue
       sqlite
         .prepare(`UPDATE ${table} SET ${column} = ? WHERE ${column} IS NULL`)
-        .run(users[0].id)
-      console.log(`[migration] ${table}.${column}: assigned ${orphanCount} orphans to ${users[0].id}`)
-    } else if (users.length > 1) {
-      console.warn(
-        `[migration] ${table}.${column}: ${orphanCount} orphans but multiple users exist — skipped to avoid wrong attribution.`
-      )
+        .run(oldest.id)
+      console.log(`[migration] ${table}.${column}: assigned ${orphanCount} orphans to ${oldest.id} (oldest user)`)
     }
   }
 } catch (err) {
