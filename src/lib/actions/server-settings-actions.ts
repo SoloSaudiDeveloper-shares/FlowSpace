@@ -50,3 +50,27 @@ export async function setSignupsEnabled(enabled: boolean) {
   revalidatePath("/login")
   revalidatePath("/settings")
 }
+
+// ── Session duration ──────────────────────────────────────────────────
+
+/** Default: 7 days. Login uses this when minting new session cookies. */
+const DEFAULT_SESSION_MS = 7 * 24 * 60 * 60 * 1000
+
+// Bounds: 1 minute minimum, 90 days maximum.
+const MIN_SESSION_MS = 60 * 1000
+const MAX_SESSION_MS = 90 * 24 * 60 * 60 * 1000
+
+export async function getSessionDurationMs(): Promise<number> {
+  const raw = getRaw("sessionDurationMs")
+  if (!raw) return DEFAULT_SESSION_MS
+  const n = parseInt(raw, 10)
+  if (Number.isNaN(n) || n < MIN_SESSION_MS) return DEFAULT_SESSION_MS
+  return Math.min(n, MAX_SESSION_MS)
+}
+
+export async function setSessionDurationMs(ms: number) {
+  await requireOwner()
+  const clamped = Math.min(Math.max(ms, MIN_SESSION_MS), MAX_SESSION_MS)
+  setRaw("sessionDurationMs", String(clamped))
+  revalidatePath("/settings")
+}

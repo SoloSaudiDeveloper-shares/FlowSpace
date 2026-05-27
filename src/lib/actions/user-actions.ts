@@ -6,7 +6,7 @@ import type { User } from "@/lib/db/schema"
 import { createId } from "@/lib/utils/ids"
 import { eq, and, desc, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import crypto from "node:crypto"
 import bcrypt from "bcrypt"
 
@@ -200,11 +200,15 @@ export async function login(
     return { success: false, error: "Invalid username or password" }
   }
 
-  // Create session
+  // Create session — duration comes from the admin-configurable setting
+  // (defaults to 7 days). Setting it to e.g. 3 minutes is allowed but UX
+  // will be painful; the owner toggle exposes a slider so they can pick.
+  const { getSessionDurationMs } = await import("./server-settings-actions")
+  const durationMs = await getSessionDurationMs()
   const sessionId = createId()
   const token = crypto.randomBytes(32).toString("hex")
   const now = new Date()
-  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days
+  const expiresAt = new Date(now.getTime() + durationMs)
 
   await db.insert(sessions).values({
     id: sessionId,
@@ -220,11 +224,21 @@ export async function login(
     .set({ lastActiveAt: now.toISOString() })
     .where(eq(users.id, user.id))
 
-  // Set cookie
+  // Decide whether to set the cookie's `secure` flag. We can't blindly
+  // use NODE_ENV=production because the VM serves over plain HTTP (no
+  // TLS yet) — `secure:true` would make the browser drop the cookie on
+  // every HTTP request, breaking refresh. Detect TLS from the actual
+  // request instead.
+  const h = await headers()
+  const proto =
+    h.get("x-forwarded-proto") ||
+    (h.get("host")?.startsWith("localhost") ? "http" : "http")
+  const isHttps = proto === "https"
+
   const cookieStore = await cookies()
   cookieStore.set("flowspace-session", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isHttps,
     sameSite: "lax",
     path: "/",
     expires: expiresAt,

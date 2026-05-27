@@ -63,6 +63,11 @@ export function LoginForm({ signupsEnabled }: LoginFormProps) {
         if (!loginResult.success) {
           setError(loginResult.error ?? "Account created — please sign in.")
         } else {
+          // refresh() invalidates the cached layout payload so the parent
+          // RootLayout re-runs with the new session and renders the sidebar.
+          // Without this, the layout keeps its unauth render and you see
+          // the SidebarInset with no AppSidebar — looks like a black page.
+          router.refresh()
           router.push("/")
         }
       } catch {
@@ -77,6 +82,11 @@ export function LoginForm({ signupsEnabled }: LoginFormProps) {
         if (!result.success) {
           setError(result.error ?? "Invalid credentials")
         } else {
+          // refresh() invalidates the cached layout payload so the parent
+          // RootLayout re-runs with the new session and renders the sidebar.
+          // Without this, the layout keeps its unauth render and you see
+          // the SidebarInset with no AppSidebar — looks like a black page.
+          router.refresh()
           router.push("/")
         }
       } catch {

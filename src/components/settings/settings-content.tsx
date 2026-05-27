@@ -84,12 +84,16 @@ export function SettingsContent() {
   const isOwner = user?.role === "owner"
   const [signupsEnabled, setSignupsEnabledLocal] = useState<boolean | null>(null)
   const [signupsSaving, setSignupsSaving] = useState(false)
+  // Session duration is stored in ms server-side; UI works in minutes.
+  const [sessionMinutes, setSessionMinutes] = useState<number | null>(null)
+  const [sessionSaving, setSessionSaving] = useState(false)
 
-  // Load signupsEnabled once for owners
+  // Load admin settings once for owners
   useEffect(() => {
     if (!isOwner) return
-    import("@/lib/actions/server-settings-actions").then(({ getSignupsEnabled }) => {
-      getSignupsEnabled().then(setSignupsEnabledLocal).catch(() => setSignupsEnabledLocal(false))
+    import("@/lib/actions/server-settings-actions").then((mod) => {
+      mod.getSignupsEnabled().then(setSignupsEnabledLocal).catch(() => setSignupsEnabledLocal(false))
+      mod.getSessionDurationMs().then((ms) => setSessionMinutes(Math.round(ms / 60_000))).catch(() => setSessionMinutes(7 * 24 * 60))
     })
   }, [isOwner])
 
@@ -105,6 +109,20 @@ export function SettingsContent() {
       toast.error("Failed to update signups setting")
     } finally {
       setSignupsSaving(false)
+    }
+  }
+
+  async function saveSessionDuration() {
+    if (!isOwner || sessionMinutes === null) return
+    setSessionSaving(true)
+    try {
+      const { setSessionDurationMs } = await import("@/lib/actions/server-settings-actions")
+      await setSessionDurationMs(sessionMinutes * 60_000)
+      toast.success(`Sessions now last ${formatDuration(sessionMinutes)}`)
+    } catch {
+      toast.error("Failed to update session duration")
+    } finally {
+      setSessionSaving(false)
     }
   }
 
@@ -157,6 +175,23 @@ export function SettingsContent() {
 
   const hasChanges = JSON.stringify(preferences) !== JSON.stringify(DEFAULT_PREFERENCES)
 
+  function formatDuration(minutes: number): string {
+    if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`
+    if (minutes < 1440) {
+      const h = Math.round(minutes / 60 * 10) / 10
+      return `${h} hour${h === 1 ? "" : "s"}`
+    }
+    const d = Math.round(minutes / 1440 * 10) / 10
+    return `${d} day${d === 1 ? "" : "s"}`
+  }
+  const SESSION_PRESETS = [
+    { label: "3 minutes", min: 3 },
+    { label: "1 hour", min: 60 },
+    { label: "1 day", min: 1440 },
+    { label: "7 days (default)", min: 7 * 1440 },
+    { label: "30 days", min: 30 * 1440 },
+  ]
+
   return (
     <div className="space-y-10">
       {/* ─── Workspace (owner only) ────────────────────────────────── */}
@@ -200,6 +235,57 @@ export function SettingsContent() {
                   }`}
                 />
               </button>
+            </div>
+          </div>
+
+          {/* Session duration */}
+          <div className="px-4 py-3 rounded-lg border bg-card mt-3">
+            <div className="flex items-center gap-2 mb-1">
+              <ClockIcon className="size-3.5" />
+              <span className="text-sm font-medium">Session length</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              How long users stay signed in after logging in. Applies to new
+              logins only — existing sessions keep their original expiry.
+              {sessionMinutes !== null && (
+                <span className="ml-1 text-foreground/80">
+                  Currently <strong>{formatDuration(sessionMinutes)}</strong>.
+                </span>
+              )}
+            </p>
+            <div className="space-y-3">
+              <input
+                type="range"
+                min={1}
+                max={30 * 1440}
+                step={1}
+                value={sessionMinutes ?? 7 * 1440}
+                onChange={(e) => setSessionMinutes(parseInt(e.target.value, 10))}
+                onMouseUp={saveSessionDuration}
+                onTouchEnd={saveSessionDuration}
+                disabled={sessionMinutes === null || sessionSaving}
+                className="w-full"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {SESSION_PRESETS.map((p) => {
+                  const active = sessionMinutes === p.min
+                  return (
+                    <button
+                      key={p.min}
+                      type="button"
+                      onClick={() => { setSessionMinutes(p.min); setTimeout(saveSessionDuration, 0) }}
+                      disabled={sessionMinutes === null || sessionSaving}
+                      className={`px-2.5 py-1 rounded-md text-xs border transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-input hover:bg-accent"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </section>
