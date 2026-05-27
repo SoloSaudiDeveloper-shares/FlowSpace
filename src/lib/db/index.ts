@@ -96,6 +96,22 @@ try {
   console.error("[migration] backfill failed:", err)
 }
 
+// ─── Showcase templates seed ───────────────────────────────────────────
+// One-time. Owned by the oldest user. Skipped if already seeded.
+try {
+  const oldestForSeed = sqlite
+    .prepare(`SELECT id FROM users WHERE is_active = 1 ORDER BY created_at ASC LIMIT 1`)
+    .get() as { id: string } | undefined
+  if (oldestForSeed) {
+    // Lazy require keeps top-of-file imports identical for build-time pruning.
+    const { seedShowcaseTemplates } = await import("./seed-showcase-templates")
+    const count = seedShowcaseTemplates(sqlite, oldestForSeed.id)
+    if (count > 0) console.log(`[seed] showcase templates: ${count} inserted for ${oldestForSeed.id}`)
+  }
+} catch (err) {
+  console.error("[seed] showcase templates failed:", err)
+}
+
 // ─── FTS5 Full-Text Search ─────────────────────────────────────────────
 // Create virtual table for full-text search on elements
 sqlite.exec(`
