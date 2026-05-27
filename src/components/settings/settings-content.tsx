@@ -32,6 +32,8 @@ import {
   Eye,
   EyeOff,
   Rss,
+  UserPlus,
+  Lock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -61,6 +63,7 @@ import {
 import { useSpeechRecognition } from "@/lib/hooks/use-speech-recognition"
 import { WEBAI_SPEECH_MODELS } from "@/lib/speech/types"
 import { useAI } from "@/lib/hooks/use-ai"
+import { useAuth } from "@/lib/hooks/use-auth"
 import { aiManager } from "@/lib/ai/ai-manager"
 import {
   AI_LLM_MODELS,
@@ -77,6 +80,33 @@ export function SettingsContent() {
   const ai = useAI()
   const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([])
   const [ttsTesting, setTtsTesting] = useState(false)
+  const { user } = useAuth()
+  const isOwner = user?.role === "owner"
+  const [signupsEnabled, setSignupsEnabledLocal] = useState<boolean | null>(null)
+  const [signupsSaving, setSignupsSaving] = useState(false)
+
+  // Load signupsEnabled once for owners
+  useEffect(() => {
+    if (!isOwner) return
+    import("@/lib/actions/server-settings-actions").then(({ getSignupsEnabled }) => {
+      getSignupsEnabled().then(setSignupsEnabledLocal).catch(() => setSignupsEnabledLocal(false))
+    })
+  }, [isOwner])
+
+  async function toggleSignups() {
+    if (!isOwner || signupsEnabled === null) return
+    setSignupsSaving(true)
+    try {
+      const { setSignupsEnabled } = await import("@/lib/actions/server-settings-actions")
+      await setSignupsEnabled(!signupsEnabled)
+      setSignupsEnabledLocal(!signupsEnabled)
+      toast.success(!signupsEnabled ? "Signups opened" : "Signups closed")
+    } catch {
+      toast.error("Failed to update signups setting")
+    } finally {
+      setSignupsSaving(false)
+    }
+  }
 
   // Load browser TTS voices (they may load async)
   useEffect(() => {
@@ -129,6 +159,52 @@ export function SettingsContent() {
 
   return (
     <div className="space-y-10">
+      {/* ─── Workspace (owner only) ────────────────────────────────── */}
+      {isOwner && (
+        <section>
+          <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
+            <Shield className="size-4" />
+            Workspace administration
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Visible to workspace owners only. Controls who can join.
+          </p>
+          <div className="px-4 py-3 rounded-lg border bg-card">
+            <div className="flex items-start gap-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  {signupsEnabled ? <UserPlus className="size-3.5 text-emerald-500" /> : <Lock className="size-3.5 text-muted-foreground" />}
+                  <span className="text-sm font-medium">Allow new account signups</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {signupsEnabled === null
+                    ? "Loading…"
+                    : signupsEnabled
+                      ? "Anyone visiting the login page can create their own private workspace."
+                      : "The login page only shows Sign in. New signups are blocked."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={toggleSignups}
+                disabled={signupsEnabled === null || signupsSaving}
+                role="switch"
+                aria-checked={signupsEnabled ?? false}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors disabled:opacity-50 ${
+                  signupsEnabled ? "bg-primary" : "bg-muted"
+                }`}
+              >
+                <span
+                  className={`inline-block size-5 rounded-full bg-background shadow transform transition-transform ${
+                    signupsEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ─── Data Export ───────────────────────────────────────────── */}
       <section>
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">

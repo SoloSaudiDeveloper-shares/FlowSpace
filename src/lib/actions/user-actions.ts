@@ -42,6 +42,18 @@ export async function createUser(data: {
   password: string
   role?: User["role"]
 }): Promise<{ id: string; error?: string }> {
+  // Signup gate: anyone can create the FIRST account (initial owner
+  // setup), but additional accounts are only allowed when the owner has
+  // explicitly enabled signups.
+  const userCount = (await db.select({ id: users.id }).from(users).limit(1)).length
+  if (userCount > 0) {
+    const { getSignupsEnabled } = await import("./server-settings-actions")
+    const signupsEnabled = await getSignupsEnabled()
+    if (!signupsEnabled) {
+      return { id: "", error: "Signups are closed. Ask the owner to enable them." }
+    }
+  }
+
   const existing = await db
     .select()
     .from(users)

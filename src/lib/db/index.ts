@@ -24,6 +24,15 @@ sqlite.pragma("foreign_keys = ON")
 // reference these tables.
 sqlite.exec(BOOTSTRAP_SCHEMA_SQL)
 
+// ─── Server settings (key-value config store) ──────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS server_settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+
 // ─── One-time ownership backfill ───────────────────────────────────────
 // When the per-user workspace model rolled out, existing rows had
 // created_by = NULL. If exactly one human user exists (the admin),
