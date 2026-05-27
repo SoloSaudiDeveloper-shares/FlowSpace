@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname, useRouter } from "next/navigation"
-import { useState, useEffect, type ReactNode } from "react"
+import { useState, useEffect, useRef, type ReactNode } from "react"
 import {
   FolderKanban,
   FileText,
@@ -42,6 +42,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
   type DropAnimation,
 } from "@dnd-kit/core"
@@ -343,28 +344,52 @@ function SidebarDragGhost({ el }: { el: Element }) {
   )
 }
 
+/**
+ * Thin horizontal insertion line, Figma-style. Positioned at the top or
+ * bottom edge of the parent item via absolute positioning. Includes a
+ * small dot on the left so it reads more like an "I-beam".
+ */
+function DropIndicatorLine({ position }: { position: "above" | "below" }) {
+  return (
+    <div
+      aria-hidden
+      className={`pointer-events-none absolute left-1.5 right-1.5 h-0.5 bg-primary rounded-full z-50 ${
+        position === "above" ? "-top-px" : "-bottom-px"
+      }`}
+    >
+      <span className="absolute -left-1 -top-[3px] size-2 rounded-full bg-primary ring-2 ring-sidebar" />
+    </div>
+  )
+}
+
 function SortableElementItem({
   el,
   href,
   isActive,
   onOpen,
   onContextMenu,
+  dropTarget,
 }: {
   el: Element
   href: string
   isActive: boolean
   onOpen: () => void
   onContextMenu: (e: React.MouseEvent) => void
+  dropTarget: { overId: string; position: "above" | "below" } | null
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+  const { attributes, listeners, setNodeRef, transition, isDragging } =
     useSortable({ id: el.id })
+  // Deliberately do NOT apply `transform` here — Figma-style means rows stay
+  // put and only the insertion line moves. The dragged item itself is shown
+  // via <DragOverlay> following the cursor.
   const style = {
-    transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : undefined,
+    opacity: isDragging ? 0.4 : undefined,
   }
+  const indicator = dropTarget?.overId === el.id ? dropTarget.position : null
   return (
-    <SidebarMenuItem ref={setNodeRef} style={style}>
+    <SidebarMenuItem ref={setNodeRef} style={style} className="relative">
+      {indicator === "above" && <DropIndicatorLine position="above" />}
       <SidebarMenuButton
         isActive={isActive}
         onClick={onOpen}
@@ -384,6 +409,7 @@ function SortableElementItem({
         </span>
         <span className="truncate">{el.title}</span>
       </SidebarMenuButton>
+      {indicator === "below" && <DropIndicatorLine position="below" />}
     </SidebarMenuItem>
   )
 }
@@ -407,6 +433,7 @@ function SortableProjectItem({
   onToggleExpanded,
   onAddChild,
   children,
+  dropTarget,
 }: {
   project: Element
   isActive: boolean
@@ -417,16 +444,20 @@ function SortableProjectItem({
   onToggleExpanded: () => void
   onAddChild: () => void
   children?: React.ReactNode
+  dropTarget: { overId: string; position: "above" | "below" } | null
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+  const { attributes, listeners, setNodeRef, transition, isDragging } =
     useSortable({ id: project.id })
+  // Figma-style: no `transform` — siblings stay put; only the indicator
+  // line moves between rows. Source row dims to mark the lift.
   const style = {
-    transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : undefined,
+    opacity: isDragging ? 0.4 : undefined,
   }
+  const indicator = dropTarget?.overId === project.id ? dropTarget.position : null
   return (
-    <SidebarMenuItem ref={setNodeRef} style={style}>
+    <SidebarMenuItem ref={setNodeRef} style={style} className="relative">
+      {indicator === "above" && <DropIndicatorLine position="above" />}
       <SidebarMenuButton
         isActive={isActive}
         onClick={onOpen}
@@ -467,6 +498,7 @@ function SortableProjectItem({
         </div>
       </SidebarMenuButton>
       {children}
+      {indicator === "below" && <DropIndicatorLine position="below" />}
     </SidebarMenuItem>
   )
 }
@@ -482,6 +514,12 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   // Tracks the id of the row currently being dragged, so we can render a
   // floating preview via <DragOverlay>. Cleared on drop or cancel.
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  // Figma-style insertion indicator: which row the cursor is hovering over,
+  // and whether the dragged row will land above or below it. The current
+  // SortableContext items list is stashed so handleDragOver can compute the
+  // direction.
+  const [dropTarget, setDropTarget] = useState<{ overId: string; position: "above" | "below" } | null>(null)
+  const activeItemsRef = useRef<string[]>([])
 
   // dnd-kit sensors — pointer for mouse/touch, keyboard for accessibility
   const sensors = useSensors(
@@ -687,16 +725,44 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
 
   function handleDragStart(e: DragStartEvent) {
     setActiveDragId(e.active.id as string)
+    setDropTarget(null)
   }
 
   function handleDragCancel() {
     setActiveDragId(null)
+    setDropTarget(null)
+  }
+
+  /**
+   * Updates the Figma-style insertion-line target as the user drags.
+   * "above" / "below" is derived from the active vs. over indices in the
+   * current sortable list: if active was originally above over, the drop
+   * lands BELOW over (cursor moved down past it), and vice versa.
+   */
+  function handleDragOver(e: DragOverEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) {
+      setDropTarget(null)
+      return
+    }
+    const ids = activeItemsRef.current
+    const activeIdx = ids.indexOf(active.id as string)
+    const overIdx = ids.indexOf(over.id as string)
+    if (activeIdx === -1 || overIdx === -1) {
+      setDropTarget(null)
+      return
+    }
+    setDropTarget({
+      overId: over.id as string,
+      position: activeIdx < overIdx ? "below" : "above",
+    })
   }
 
   // Per-section item drag handler. Optimistic — calls reorderElements server action.
   function handleItemDragEnd(typeKey: ElementType) {
     return async (e: DragEndEvent) => {
       setActiveDragId(null)
+      setDropTarget(null)
       const { active, over } = e
       if (!over || active.id === over.id) return
       const items = grouped[typeKey] || []
@@ -717,6 +783,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   // Sub-projects retain their position inside their parent.
   async function handleProjectDragEnd(e: DragEndEvent) {
     setActiveDragId(null)
+    setDropTarget(null)
     const { active, over } = e
     if (!over || active.id === over.id) return
     const ids = rootProjects.map((p) => p.id)
@@ -876,7 +943,11 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
-                  onDragStart={handleDragStart}
+                  onDragStart={(e) => {
+                    activeItemsRef.current = rootProjects.map((p) => p.id)
+                    handleDragStart(e)
+                  }}
+                  onDragOver={handleDragOver}
                   onDragEnd={handleProjectDragEnd}
                   onDragCancel={handleDragCancel}
                 >
@@ -896,6 +967,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                           isActive={pathname === href}
                           hasChildren={hasChildren}
                           isExpanded={isExpanded}
+                          dropTarget={dropTarget}
                           onOpen={() => router.push(href)}
                           onContextMenu={(e) => handleElementContextMenu(e, project)}
                           onToggleExpanded={() => toggleExpanded(project.id)}
@@ -1032,7 +1104,11 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
-                  onDragStart={handleDragStart}
+                  onDragStart={(e) => {
+                    activeItemsRef.current = items.map((it) => it.id)
+                    handleDragStart(e)
+                  }}
+                  onDragOver={handleDragOver}
                   onDragEnd={handleItemDragEnd(typeKey)}
                   onDragCancel={handleDragCancel}
                 >
@@ -1048,6 +1124,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                           el={el}
                           href={href}
                           isActive={pathname === href}
+                          dropTarget={dropTarget}
                           onOpen={() => router.push(href)}
                           onContextMenu={(e) => handleElementContextMenu(e, el)}
                         />
