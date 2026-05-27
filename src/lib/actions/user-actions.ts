@@ -8,29 +8,67 @@ import { eq, and, desc, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 import crypto from "node:crypto"
+import bcrypt from "bcrypt"
 
 // ─── Password Utilities ────────────────────────────────────────────────
+//
+// Storage format: bcrypt's standard `$2b$12$...` strings. Older accounts
+// created before this commit are stored as `<salt-hex>:<sha256-hex>` —
+// verifyPassword detects that and accepts both, transparently re-hashing
+// to bcrypt on the next successful login (see verifyPasswordAndMaybeUpgrade
+// below).
+
+const BCRYPT_COST = 12
 
 export async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.randomBytes(8).toString("hex")
-  const hash = crypto
-    .createHash("sha256")
-    .update(salt + password)
-    .digest("hex")
-  return `${salt}:${hash}`
+  return bcrypt.hash(password, BCRYPT_COST)
 }
 
+/**
+ * Plain compare. Use this from non-login contexts (e.g. password-change
+ * forms confirming the old password). Login itself calls
+ * verifyPasswordAndMaybeUpgrade to opportunistically migrate legacy hashes.
+ */
 export async function verifyPassword(
   password: string,
   storedHash: string
 ): Promise<boolean> {
+  if (storedHash.startsWith("$2")) {
+    return bcrypt.compare(password, storedHash)
+  }
+  // Legacy SHA-256 fallback (pre-bcrypt accounts)
   const [salt, hash] = storedHash.split(":")
   if (!salt || !hash) return false
-  const computed = crypto
-    .createHash("sha256")
-    .update(salt + password)
-    .digest("hex")
+  const computed = crypto.createHash("sha256").update(salt + password).digest("hex")
   return computed === hash
+}
+
+/**
+ * Verifies the password and silently upgrades the stored hash to bcrypt
+ * if the stored value is still in the legacy SHA-256 format. Safe to call
+ * on every login.
+ */
+async function verifyPasswordAndMaybeUpgrade(
+  userId: string,
+  password: string,
+  storedHash: string
+): Promise<boolean> {
+  const ok = await verifyPassword(password, storedHash)
+  if (!ok) return false
+  if (!storedHash.startsWith("$2")) {
+    // Upgrade silently — user keeps their password, we just store a stronger hash.
+    try {
+      const newHash = await bcrypt.hash(password, BCRYPT_COST)
+      await db
+        .update(users)
+        .set({ passwordHash: newHash, updatedAt: new Date().toISOString() })
+        .where(eq(users.id, userId))
+    } catch {
+      // Don't fail login just because the upgrade write failed — log and continue.
+      // The next successful login will retry.
+    }
+  }
+  return true
 }
 
 // ─── User CRUD ─────────────────────────────────────────────────────────
@@ -157,7 +195,7 @@ export async function login(
     return { success: false, error: "Account is deactivated" }
   }
 
-  const valid = await verifyPassword(password, user.passwordHash)
+  const valid = await verifyPasswordAndMaybeUpgrade(user.id, password, user.passwordHash)
   if (!valid) {
     return { success: false, error: "Invalid username or password" }
   }
