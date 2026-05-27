@@ -1,13 +1,26 @@
 import { getSignupsEnabled } from "@/lib/actions/server-settings-actions"
+import { isGoogleConfigured } from "@/lib/auth/google"
 import { LoginForm } from "./login-form"
 
 /**
- * Server component wrapper: reads the `signupsEnabled` server setting and
- * passes it as an initial prop to the client-side form. Keeps the toggle
- * server-authoritative (a client that flips the flag in DevTools can't
- * bypass it — createUser still enforces it).
+ * Server wrapper for the login form. Passes server-authoritative flags
+ * (signupsEnabled, googleConfigured) so the client can't fake them. Any
+ * server action / route called from the form also re-checks the same
+ * flags before mutating anything.
  */
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; from?: string }>
+}) {
+  const params = await searchParams
   const signupsEnabled = await getSignupsEnabled().catch(() => false)
-  return <LoginForm signupsEnabled={signupsEnabled} />
+  const googleConfigured = isGoogleConfigured()
+  return (
+    <LoginForm
+      signupsEnabled={signupsEnabled}
+      googleConfigured={googleConfigured}
+      initialError={params.error}
+    />
+  )
 }

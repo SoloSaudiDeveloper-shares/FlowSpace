@@ -150,6 +150,50 @@ If you later set up HTTPS + a domain (Part 5), update `PUBLIC_APP_URL` in
 `~/.flowspace.env` to your `https://...` URL so the links in emails point
 to the right place.
 
+## Part 4.7 — (Optional) Enable "Continue with Google" sign-in
+
+Without these env vars the Google button is hidden. The username/password flow still works.
+
+### Create a Google OAuth client
+1. Go to https://console.cloud.google.com/ and create a project (or pick one).
+2. Sidebar → **APIs & Services → OAuth consent screen**.
+   - User type: External (anyone with a Google account)
+   - Fill in app name, support email, developer email — that's enough for now
+   - Add scopes: `openid`, `email`, `profile`
+   - Add a test user (your own Google email) if you keep the app in "Testing"
+3. Sidebar → **APIs & Services → Credentials → Create credentials → OAuth client ID**
+   - Application type: **Web application**
+   - Name: "FlowSpace"
+   - **Authorized JavaScript origins**: `http://145.241.153.186:3737` (no trailing slash)
+   - **Authorized redirect URIs**: `http://145.241.153.186:3737/api/auth/google/callback`
+   - Copy the **Client ID** and **Client secret** Google gives you.
+
+### Put credentials on the VM
+Append to `~/.flowspace.env`:
+```
+GOOGLE_CLIENT_ID=xxxxxxxxxxxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-yyyyyyyyyyyyyyyy
+```
+
+Then re-deploy:
+```bash
+./oracle-deploy.sh https://github.com/SoloSaudiDeveloper-shares/FlowSpace.git
+```
+
+### How signups interact with the "signups closed" toggle
+- Owner toggle = closed → Google sign-in works for **existing** users only.
+  New Google emails get bounced with "Signups are closed. Ask the owner for an invite."
+- Owner toggle = open → Anyone with a Google account can sign in; on first
+  sign-in they get a fresh local user (role "editor") and their own workspace.
+- An existing local user with a matching email gets their Google account
+  silently **linked** on their first Google sign-in. From then on either
+  method works.
+
+### Moving to a custom domain
+If you set up Caddy + HTTPS (Part 5), update both:
+- Google Cloud Console → your OAuth client → swap the URLs to the new domain
+- `~/.flowspace.env` → bump `PUBLIC_APP_URL` to the new origin
+
 ## Part 5 — (Optional) HTTPS + a domain
 
 For a real domain like `flowspace.yourname.com`:

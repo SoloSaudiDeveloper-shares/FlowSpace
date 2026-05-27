@@ -33,6 +33,19 @@ sqlite.exec(`
   );
 `)
 
+// ─── Google OAuth column on users ──────────────────────────────────────
+// SQLite doesn't have ALTER TABLE ... ADD COLUMN IF NOT EXISTS. Check first.
+try {
+  const cols = sqlite.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]
+  if (!cols.some((c) => c.name === "google_id")) {
+    sqlite.exec(`ALTER TABLE users ADD COLUMN google_id TEXT`)
+    sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL`)
+    console.log("[migration] users.google_id column added")
+  }
+} catch (err) {
+  console.error("[migration] google_id column add failed:", err)
+}
+
 // ─── Password reset tokens ─────────────────────────────────────────────
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS password_reset_tokens (
