@@ -14,16 +14,25 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Google sign-in is not configured on this server.", { status: 503 })
   }
 
-  const h = await headers()
-  const proto = h.get("x-forwarded-proto") || (h.get("host")?.startsWith("localhost") ? "http" : "http")
-  const host = h.get("host") || "localhost:3000"
-  const callbackUrl = `${proto}://${host}/api/auth/google/callback`
+  // Build the callback URL. Prefer PUBLIC_APP_URL (the canonical origin
+  // configured by the operator) — Google's OAuth client validates the
+  // redirect_uri exactly, so it has to match what's whitelisted in the
+  // Cloud Console regardless of which host the user typed in their browser.
+  // Fall back to the request's host header for dev convenience.
+  let baseUrl = process.env.PUBLIC_APP_URL?.replace(/\/$/, "")
+  if (!baseUrl) {
+    const h = await headers()
+    const proto = h.get("x-forwarded-proto") || "http"
+    const host = h.get("host") || "localhost:3000"
+    baseUrl = `${proto}://${host}`
+  }
+  const callbackUrl = `${baseUrl}/api/auth/google/callback`
   const redirectTo = request.nextUrl.searchParams.get("from") || "/"
 
   const { authorizeUrl, state, codeVerifier } = buildOAuthStart({ callbackUrl, redirectTo })
 
   const cookieStore = await cookies()
-  const isHttps = proto === "https"
+  const isHttps = baseUrl.startsWith("https://")
   const baseCookie = {
     httpOnly: true,
     secure: isHttps,

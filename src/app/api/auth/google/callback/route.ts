@@ -46,13 +46,20 @@ export async function GET(request: NextRequest) {
   cookieStore.delete("oauth-state")
   cookieStore.delete("oauth-code-verifier")
 
-  // Build callback URL the same way as in /route.ts so the token exchange uses
-  // the identical redirect_uri (Google validates this exactly).
-  const h = await headers()
-  const proto = h.get("x-forwarded-proto") || (h.get("host")?.startsWith("localhost") ? "http" : "http")
-  const host = h.get("host") || "localhost:3000"
-  const callbackUrl = `${proto}://${host}/api/auth/google/callback`
-  const isHttps = proto === "https"
+  // Build callback URL the same way as in /route.ts so the token exchange
+  // uses the identical redirect_uri (Google validates this byte-for-byte).
+  let baseUrl = process.env.PUBLIC_APP_URL?.replace(/\/$/, "")
+  let isHttps = false
+  if (baseUrl) {
+    isHttps = baseUrl.startsWith("https://")
+  } else {
+    const h = await headers()
+    const proto = h.get("x-forwarded-proto") || "http"
+    const host = h.get("host") || "localhost:3000"
+    baseUrl = `${proto}://${host}`
+    isHttps = proto === "https"
+  }
+  const callbackUrl = `${baseUrl}/api/auth/google/callback`
 
   let profile
   try {
