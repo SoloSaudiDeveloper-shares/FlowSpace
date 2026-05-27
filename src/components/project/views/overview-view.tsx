@@ -338,7 +338,7 @@ export function OverviewView({ projectId, statuses, tasks, progress, projectDesc
     .filter(Boolean) as CardDef[]
 
   return (
-    <div className="p-6">
+    <div className="p-6 min-w-0 max-w-full">
       {/* Toolbar */}
       <div className="flex items-center justify-end mb-5">
         <Button size="sm" onClick={() => setPickerOpen(true)} className="gap-1.5 h-8 text-xs">
@@ -350,7 +350,7 @@ export function OverviewView({ projectId, statuses, tasks, progress, projectDesc
       {/* Card grid */}
       <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={layout.ids} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-4 gap-4 auto-rows-auto">
+          <div className="grid grid-cols-4 gap-4 auto-rows-auto min-w-0">
             {cards.map((card) => {
               const size = layout.sizes[card.id] ?? getDefaultSize(card.id)
               return (
@@ -570,6 +570,7 @@ function SortableCard({
     transform: CSS.Transform.toString(transform),
     transition,
     gridColumn: `span ${colSpan}`,
+    minWidth: 0,  // allow grid item to shrink below content's intrinsic width
     ...(height ? { height } : {}),
     opacity: isDragging ? 0.5 : 1,
     ...(borderColor ? { borderColor, borderWidth: 2 } : {}),
@@ -609,8 +610,8 @@ function SortableCard({
         </div>
       </div>
 
-      {/* Card content */}
-      <div className="overflow-auto" style={height ? { height: height - 56 } : undefined}>
+      {/* Card content — scroll vertically only, never horizontally */}
+      <div className="overflow-y-auto overflow-x-hidden min-w-0" style={height ? { height: height - 56 } : undefined}>
         {children}
       </div>
 

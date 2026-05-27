@@ -129,7 +129,7 @@ export function ElementLinker({ elementId, links }: ElementLinkerProps) {
 
   return (
     <div
-      className="flex items-center gap-1.5 px-4 py-1.5 border-b bg-muted/30 overflow-x-auto scrollbar-thin"
+      className="flex flex-wrap items-center gap-1.5 px-4 py-1.5 border-b bg-muted/30 min-w-0"
       data-slot="element-links-bar"
     >
       {/* Label — only shown when there's content to label */}
