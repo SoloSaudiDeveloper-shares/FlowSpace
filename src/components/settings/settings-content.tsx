@@ -71,6 +71,7 @@ import {
   AI_VISION_MODELS,
 } from "@/lib/ai/types"
 import { CustomFieldsSettings } from "@/components/settings/custom-fields-settings"
+import { AIProviderSection } from "@/components/settings/ai-provider-section"
 
 export function SettingsContent() {
   const [exporting, setExporting] = useState(false)
@@ -1064,6 +1065,9 @@ export function SettingsContent() {
 
           {preferences.aiEnabled && (
             <>
+              {/* ── Provider selector ─────────────────────────── */}
+              <AIProviderSection />
+
               {/* Ollama Server Connection */}
               <div className="px-4 py-3 rounded-lg border bg-card">
                 <h3 className="text-sm font-medium mb-2 flex items-center gap-2">

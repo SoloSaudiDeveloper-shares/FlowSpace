@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react"
 import { aiManager, type OllamaInstalledModel } from "@/lib/ai/ai-manager"
+import { openaiGenerate, openaiEmbeddings } from "@/lib/ai/openai-client"
 import type {
   AIModelState,
   LLMGenerateOptions,
@@ -85,6 +86,12 @@ export function AIProvider({ children }: { children: ReactNode }) {
   const embeddingsModel = preferences.aiEmbeddingsModel ?? "nomic-embed-text"
   const visionModel = preferences.aiVisionModel ?? "llava:7b"
   const ollamaUrl = preferences.ollamaUrl ?? "http://localhost:11434"
+  const provider = preferences.aiProvider ?? "ollama"
+  const openaiConfig = {
+    baseUrl: preferences.aiOpenAIBaseUrl ?? "",
+    apiKey: preferences.aiOpenAIApiKey ?? "",
+    model: preferences.aiOpenAIModel ?? "",
+  }
 
   const [modelStates, setModelStates] = useState<Map<string, AIModelState>>(new Map())
   const [connected, setConnected] = useState(false)
@@ -119,9 +126,15 @@ export function AIProvider({ children }: { children: ReactNode }) {
 
   const generateText = useCallback(
     async (options: LLMGenerateOptions): Promise<LLMGenerateResult> => {
+      // Route through the configured provider. The OpenAI-compat path
+      // works for OpenAI, Gemini (compat layer), LM Studio, Ollama's v1
+      // shim, and any custom endpoint that speaks the OpenAI wire format.
+      if (provider === "openai-compat" && openaiConfig.baseUrl && openaiConfig.model) {
+        return openaiGenerate(openaiConfig, options)
+      }
       return aiManager.generateText(llmModel, options)
     },
-    [llmModel],
+    [provider, openaiConfig.baseUrl, openaiConfig.apiKey, openaiConfig.model, llmModel],
   )
 
   const analyzeImage = useCallback(
@@ -151,9 +164,12 @@ export function AIProvider({ children }: { children: ReactNode }) {
 
   const embed = useCallback(
     async (options: EmbeddingsOptions): Promise<EmbeddingsResult> => {
+      if (provider === "openai-compat" && openaiConfig.baseUrl && openaiConfig.model) {
+        return openaiEmbeddings(openaiConfig, options)
+      }
       return aiManager.embed(embeddingsModel, options)
     },
-    [embeddingsModel],
+    [provider, openaiConfig.baseUrl, openaiConfig.apiKey, openaiConfig.model, embeddingsModel],
   )
 
   const preloadModel = useCallback(

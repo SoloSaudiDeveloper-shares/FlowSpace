@@ -66,6 +66,17 @@ export interface Preferences {
   aiEmbeddingsModel: string
   aiVisionModel: string
   ollamaUrl: string
+  /** Which AI transport to use. "ollama" hits the existing local client;
+   * "openai-compat" routes through the generic OpenAI-style chat API. */
+  aiProvider: "ollama" | "openai-compat"
+  /** Base URL for the OpenAI-compatible endpoint, e.g.
+   * https://api.openai.com/v1, https://generativelanguage.googleapis.com/v1beta/openai,
+   * http://localhost:1234/v1 (LM Studio), http://localhost:11434/v1 (Ollama v1 shim). */
+  aiOpenAIBaseUrl: string
+  /** API key for the OpenAI-compat endpoint. Empty for local endpoints. */
+  aiOpenAIApiKey: string
+  /** Model name for the OpenAI-compat endpoint. */
+  aiOpenAIModel: string
   aiSystemPrompts: Record<string, string>
   // Sidebar customisation
   sidebarVisible: Record<SidebarSectionKey, boolean>
@@ -94,6 +105,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   aiEmbeddingsModel: "nomic-embed-text",
   aiVisionModel: "llava:7b",
   ollamaUrl: "http://localhost:11434",
+  aiProvider: "ollama",
+  aiOpenAIBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+  aiOpenAIApiKey: "",
+  aiOpenAIModel: "gemini-2.5-flash",
   aiSystemPrompts: {
     summarize: "You are a concise summarizer. Provide a brief summary in 1-3 sentences.",
     expand: "You are a writing assistant. Expand the given text with more detail while keeping the same tone.",
