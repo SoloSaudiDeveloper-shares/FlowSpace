@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 
 export interface ContextMenuItem {
   label: string
@@ -64,13 +65,17 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     }
   }, [onClose])
 
-  const menuWidth = 200
+  const menuWidth = 240
   const menuItemHeight = 34
   const estimatedHeight = items.length * menuItemHeight + 8
   const adjustedX = Math.min(x, window.innerWidth - menuWidth - 8)
   const adjustedY = Math.min(y, window.innerHeight - estimatedHeight - 8)
 
-  return (
+  // Portal to <body> so the menu escapes ancestor overflow:hidden / transforms
+  // (e.g. the feed ticker's marquee mask).
+  if (typeof document === "undefined") return null
+
+  return createPortal(
     <>
       <div className="fixed inset-0 z-[60]" onContextMenu={(e) => { e.preventDefault(); onClose() }} />
       <div
@@ -163,7 +168,8 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
           )
         })}
       </div>
-    </>
+    </>,
+    document.body
   )
 }
 
