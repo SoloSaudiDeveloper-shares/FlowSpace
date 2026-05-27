@@ -17,7 +17,7 @@ import { TaskTimerWidget } from "@/components/layout/task-timer-widget"
 import { MainShell } from "@/components/layout/main-shell"
 import { Toaster } from "sonner"
 import { getElements, getFavoriteElements } from "@/lib/actions/element-actions"
-import { getCurrentUser, getUsers } from "@/lib/actions/user-actions"
+import { getCurrentUser, hasAnyUsers } from "@/lib/actions/user-actions"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,9 +54,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const [currentUser, allUsers] = await Promise.all([
+  const [currentUser, anyUsers] = await Promise.all([
     getCurrentUser().catch(() => null),
-    getUsers().catch(() => []),
+    hasAnyUsers().catch(() => false),
   ])
 
   // Only fetch sidebar data when the user is actually authenticated. Anyone
@@ -66,7 +66,7 @@ export default async function RootLayout({
     ? await Promise.all([getElements(), getFavoriteElements()])
     : [[], []]
 
-  const needsSetup = allUsers.length === 0
+  const needsSetup = !anyUsers
 
   return (
     <html

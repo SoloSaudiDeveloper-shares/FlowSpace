@@ -4,7 +4,7 @@ import { db } from "@/lib/db"
 import { users, sessions, teams, teamMembers } from "@/lib/db/schema"
 import type { User } from "@/lib/db/schema"
 import { createId } from "@/lib/utils/ids"
-import { eq, and, desc, sql } from "drizzle-orm"
+import { eq, and, desc, sql, or, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { cookies, headers } from "next/headers"
 import crypto from "node:crypto"
@@ -125,8 +125,63 @@ export async function createUser(data: {
   return { id }
 }
 
+/**
+ * Owner-only directory of every user in the workspace. Throws "Forbidden"
+ * if the caller isn't the owner — defense in depth in case anything other
+ * than the admin panel imports this. Other callers should use
+ * getVisibleUsers() which scopes to the caller's own teams.
+ */
 export async function getUsers() {
+  const me = await getCurrentUser()
+  if (!me || me.role !== "owner") throw new Error("Forbidden")
   return db.select().from(users).orderBy(desc(users.createdAt))
+}
+
+/**
+ * Cheap "does any user exist?" probe used by the layout to decide whether
+ * to force initial setup. Doesn't return any user data.
+ */
+export async function hasAnyUsers(): Promise<boolean> {
+  const row = await db.select({ id: users.id }).from(users).limit(1)
+  return row.length > 0
+}
+
+/**
+ * What the current user is allowed to see on the People page. Default
+ * behaviour: only themselves. Once teams are wired up they'll also see
+ * everyone in any team they're a member of. No global directory leak.
+ */
+export async function getVisibleUsers() {
+  const me = await getCurrentUser()
+  if (!me) return []
+
+  // Collect every user id that shares a team with `me`.
+  const teamIds = (
+    await db
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, me.id))
+  ).map((r) => r.teamId)
+
+  if (teamIds.length === 0) {
+    // Solo user — see only yourself.
+    return db.select().from(users).where(eq(users.id, me.id))
+  }
+
+  const memberIds = (
+    await db
+      .select({ userId: teamMembers.userId })
+      .from(teamMembers)
+      .where(inArray(teamMembers.teamId, teamIds))
+  ).map((r) => r.userId)
+
+  // De-dup and always include self
+  const idSet = new Set<string>([me.id, ...memberIds])
+  return db
+    .select()
+    .from(users)
+    .where(inArray(users.id, Array.from(idSet)))
+    .orderBy(desc(users.createdAt))
 }
 
 export async function getUser(id: string) {
@@ -326,8 +381,28 @@ export async function createTeam(data: {
   return id
 }
 
+/**
+ * Returns only teams the current user is a member of. Owner role sees
+ * all teams since they administer the whole workspace.
+ */
 export async function getTeams() {
-  return db.select().from(teams).orderBy(desc(teams.createdAt))
+  const me = await getCurrentUser()
+  if (!me) return []
+  if (me.role === "owner") {
+    return db.select().from(teams).orderBy(desc(teams.createdAt))
+  }
+  const myTeamIds = (
+    await db
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, me.id))
+  ).map((r) => r.teamId)
+  if (myTeamIds.length === 0) return []
+  return db
+    .select()
+    .from(teams)
+    .where(inArray(teams.id, myTeamIds))
+    .orderBy(desc(teams.createdAt))
 }
 
 export async function getTeam(id: string) {

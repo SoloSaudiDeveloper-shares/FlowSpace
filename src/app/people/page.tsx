@@ -1,13 +1,13 @@
-import { getUsers } from "@/lib/actions/user-actions"
-import { getTeams } from "@/lib/actions/user-actions"
+import { getVisibleUsers, getTeams } from "@/lib/actions/user-actions"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Users } from "lucide-react"
 import { PeopleContent } from "@/components/people/people-content"
 
 export default async function PeoplePage() {
+  // Scoped to people in your teams (plus yourself). No global directory leak.
   const [users, teams] = await Promise.all([
-    getUsers(),
+    getVisibleUsers(),
     getTeams(),
   ])
 

@@ -1,5 +1,5 @@
 import { getApprovals } from "@/lib/actions/approval-actions"
-import { getUsers } from "@/lib/actions/user-actions"
+import { getVisibleUsers } from "@/lib/actions/user-actions"
 import { ApprovalsContent } from "@/components/approvals/approvals-content"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator"
 export default async function ApprovalsPage() {
   const [allApprovals, allUsers] = await Promise.all([
     getApprovals("all"),
-    getUsers(),
+    getVisibleUsers(),
   ])
 
   return (
