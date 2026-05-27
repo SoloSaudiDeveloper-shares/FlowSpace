@@ -87,6 +87,7 @@ import {
   deleteElement,
 } from "@/lib/actions/element-actions"
 import { toast } from "sonner"
+import { createFeedEvent } from "@/lib/actions/feed-actions"
 import type { Element, ElementType } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 import { useAuth } from "@/lib/hooks/use-auth"
@@ -618,6 +619,28 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
         label: el.isFavorite ? "Unpin from Favorites" : "Pin to Favorites",
         icon: el.isFavorite ? PinOff : Pin,
         onClick: () => toggleFavorite(el.id),
+      },
+      {
+        label: "Post to feed",
+        icon: Rss,
+        onClick: async () => {
+          const note = window.prompt(`Add a note for the feed (optional):`, "")
+          if (note === null) return  // user cancelled
+          try {
+            await createFeedEvent({
+              type: "project_milestone",
+              subjectElementId: el.id,
+              projectId: el.type === "project" ? el.id : undefined,
+              title: el.title,
+              summary: note.trim() || `${el.type.replace(/_/g, " ")} highlighted`,
+              priority: "normal",
+              sourceType: "manual",
+            })
+            toast.success("Posted to feed")
+          } catch {
+            toast.error("Couldn't post to feed")
+          }
+        },
       },
       {
         colors: true,

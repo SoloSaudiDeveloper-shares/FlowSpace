@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache"
 import { cookies, headers } from "next/headers"
 import crypto from "node:crypto"
 import bcrypt from "bcrypt"
+import { checkLoginRateLimit, recordFailedLogin, clearLoginAttempts } from "@/lib/auth/rate-limit"
 
 // ─── Password Utilities ────────────────────────────────────────────────
 //
@@ -241,19 +242,39 @@ export async function login(
   username: string,
   password: string
 ): Promise<{ success: boolean; error?: string; user?: User }> {
+  // Pull the caller's IP from the request headers (proxied behind Caddy)
+  const h = await headers()
+  const ip =
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    "unknown"
+
+  // Block first — never reveal whether the username exists when throttled
+  const limit = checkLoginRateLimit(ip, username)
+  if (limit.blocked) {
+    return { success: false, error: limit.reason }
+  }
+
   const user = await getUserByUsername(username)
   if (!user) {
+    recordFailedLogin(ip, username)
     return { success: false, error: "Invalid username or password" }
   }
 
   if (!user.isActive) {
+    recordFailedLogin(ip, username)
     return { success: false, error: "Account is deactivated" }
   }
 
   const valid = await verifyPasswordAndMaybeUpgrade(user.id, password, user.passwordHash)
   if (!valid) {
+    recordFailedLogin(ip, username)
     return { success: false, error: "Invalid username or password" }
   }
+
+  // Successful login — clear the per-(IP,username) record so the user
+  // doesn't carry forward fail counts after they finally typed the right pw.
+  clearLoginAttempts(ip, username)
 
   // Create session — duration comes from the admin-configurable setting
   // (defaults to 7 days). Setting it to e.g. 3 minutes is allowed but UX
@@ -280,11 +301,9 @@ export async function login(
     .where(eq(users.id, user.id))
 
   // Decide whether to set the cookie's `secure` flag. We can't blindly
-  // use NODE_ENV=production because the VM serves over plain HTTP (no
-  // TLS yet) — `secure:true` would make the browser drop the cookie on
-  // every HTTP request, breaking refresh. Detect TLS from the actual
-  // request instead.
-  const h = await headers()
+  // use NODE_ENV=production because the VM may serve over plain HTTP —
+  // `secure:true` would make the browser drop the cookie on every HTTP
+  // request, breaking refresh. Detect TLS from the actual request.
   const proto =
     h.get("x-forwarded-proto") ||
     (h.get("host")?.startsWith("localhost") ? "http" : "http")
