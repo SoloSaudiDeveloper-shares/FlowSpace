@@ -16,10 +16,29 @@ import {
 import { createId } from "@/lib/utils/ids"
 import { eq, and, asc, desc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { currentUserId } from "@/lib/auth/scope"
+
+/**
+ * Returns true iff the current authenticated user owns the given project
+ * (element). Used to gate task reads — a user navigating to /projects/X
+ * can only see tasks for projects they created. Direct API calls with a
+ * guessed project ID return empty rather than throwing.
+ */
+async function ownsProject(projectId: string): Promise<boolean> {
+  const uid = await currentUserId()
+  if (!uid) return false
+  const rows = await db
+    .select({ id: elements.id })
+    .from(elements)
+    .where(and(eq(elements.id, projectId), eq(elements.createdBy, uid)))
+    .limit(1)
+  return rows.length > 0
+}
 
 // ─── Task Statuses ──────────────────────────────────────────────────────
 
 export async function getTaskStatuses(projectId: string) {
+  if (!(await ownsProject(projectId))) return []
   return db
     .select()
     .from(taskStatuses)
@@ -68,6 +87,7 @@ export async function deleteTaskStatus(id: string, projectId: string) {
 // ─── Tasks ──────────────────────────────────────────────────────────────
 
 export async function getTasksByProject(projectId: string) {
+  if (!(await ownsProject(projectId))) return []
   return db
     .select()
     .from(tasks)
@@ -191,6 +211,7 @@ export async function moveTask(
 }
 
 export async function getProjectData(projectId: string) {
+  if (!(await ownsProject(projectId))) return null
   const projectResult = await db
     .select()
     .from(projects)
@@ -367,6 +388,13 @@ export async function deleteChecklistItem(id: string, projectId: string) {
 // ─── Task Enrichment (batch metadata for cards) ──────────────────────
 
 export async function getTaskCardMetadata(projectId: string) {
+  if (!(await ownsProject(projectId))) {
+    return {
+      subtaskCounts: {} as Record<string, { total: number; done: number }>,
+      labelsByTask: {} as Record<string, typeof taskLabels.$inferSelect[]>,
+      checklistByTask: {} as Record<string, { total: number; done: number }>,
+    }
+  }
   // Get all subtask counts grouped by parent
   const allTasks = await db
     .select()

@@ -61,32 +61,42 @@ sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_token ON password_reset_to
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_user ON password_reset_tokens(user_id);`)
 
 // ─── One-time ownership backfill ───────────────────────────────────────
-// When the per-user workspace model rolled out, existing rows had
-// created_by = NULL. If exactly one human user exists (the admin),
-// claim everything for them. Idempotent: subsequent boots find 0 NULLs
-// and skip.
+// When the per-user workspace model rolled out, existing rows had owner
+// columns = NULL. If exactly ONE human user exists (the original owner),
+// claim everything for them. Idempotent — subsequent boots see 0 nulls
+// and skip. When >1 user exists, skip with a warning to avoid wrong
+// attribution.
 try {
-  const orphanCount = (sqlite
-    .prepare(`SELECT COUNT(*) AS n FROM elements WHERE created_by IS NULL`)
-    .get() as { n: number }).n
-  if (orphanCount > 0) {
-    const users = sqlite
-      .prepare(`SELECT id FROM users WHERE is_active = 1 ORDER BY created_at ASC LIMIT 2`)
-      .all() as { id: string }[]
+  const users = sqlite
+    .prepare(`SELECT id FROM users WHERE is_active = 1 ORDER BY created_at ASC LIMIT 2`)
+    .all() as { id: string }[]
+
+  const backfills: { table: string; column: string }[] = [
+    { table: "elements",       column: "created_by" },
+    { table: "notifications",  column: "user_id"   },
+    { table: "forms",          column: "created_by" },
+    { table: "templates",      column: "created_by" },
+    { table: "feed_events",    column: "actor_user_id" },
+  ]
+
+  for (const { table, column } of backfills) {
+    const orphanCount = (sqlite
+      .prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column} IS NULL`)
+      .get() as { n: number }).n
+    if (orphanCount === 0) continue
+
     if (users.length === 1) {
       sqlite
-        .prepare(`UPDATE elements SET created_by = ? WHERE created_by IS NULL`)
+        .prepare(`UPDATE ${table} SET ${column} = ? WHERE ${column} IS NULL`)
         .run(users[0].id)
-      console.log(`[migration] Assigned ${orphanCount} orphaned elements to ${users[0].id}`)
+      console.log(`[migration] ${table}.${column}: assigned ${orphanCount} orphans to ${users[0].id}`)
     } else if (users.length > 1) {
       console.warn(
-        `[migration] Found ${orphanCount} orphaned elements but multiple users exist; ` +
-        `manual assignment required. Backfill skipped to avoid wrong attribution.`
+        `[migration] ${table}.${column}: ${orphanCount} orphans but multiple users exist — skipped to avoid wrong attribution.`
       )
     }
   }
 } catch (err) {
-  // Don't fail startup over migration — log and continue.
   console.error("[migration] backfill failed:", err)
 }
 

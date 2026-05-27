@@ -17,6 +17,7 @@ import {
 import { createId } from "@/lib/utils/ids"
 import { eq, desc, and } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { currentUserId, requireAuth } from "@/lib/auth/scope"
 
 // ─── Template CRUD ──────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ export async function createTemplate(data: {
   content?: string
   createdBy?: string
 }) {
+  const user = await requireAuth()
   const id = createId()
   const now = new Date().toISOString()
 
@@ -40,7 +42,7 @@ export async function createTemplate(data: {
     icon: data.icon ?? null,
     color: data.color ?? null,
     content: data.content ?? null,
-    createdBy: data.createdBy ?? null,
+    createdBy: data.createdBy ?? user.id,
     createdAt: now,
     updatedAt: now,
   })
@@ -50,12 +52,15 @@ export async function createTemplate(data: {
 }
 
 export async function getTemplates(type?: string) {
+  const uid = await currentUserId()
+  if (!uid) return []
   if (type) {
     return db
       .select()
       .from(templates)
       .where(
         and(
+          eq(templates.createdBy, uid),
           eq(templates.isPublished, true),
           eq(templates.type, type as typeof templates.$inferSelect["type"])
         )
@@ -66,15 +71,17 @@ export async function getTemplates(type?: string) {
   return db
     .select()
     .from(templates)
-    .where(eq(templates.isPublished, true))
+    .where(and(eq(templates.createdBy, uid), eq(templates.isPublished, true)))
     .orderBy(desc(templates.usageCount), desc(templates.createdAt))
 }
 
 export async function getTemplate(id: string) {
+  const uid = await currentUserId()
+  if (!uid) return null
   const result = await db
     .select()
     .from(templates)
-    .where(eq(templates.id, id))
+    .where(and(eq(templates.id, id), eq(templates.createdBy, uid)))
     .limit(1)
 
   const template = result[0] ?? null

@@ -13,6 +13,7 @@ import {
 import { createId } from "@/lib/utils/ids"
 import { eq, desc, and } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { currentUserId, requireAuth } from "@/lib/auth/scope"
 
 // ─── Forms ──────────────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ export async function createForm(data: {
   confirmationMessage?: string
   createdBy?: string
 }) {
+  const user = await requireAuth()
   const id = createId()
   const now = new Date().toISOString()
 
@@ -38,7 +40,7 @@ export async function createForm(data: {
     type: data.type,
     isAnonymous: data.isAnonymous ?? false,
     confirmationMessage: data.confirmationMessage ?? null,
-    createdBy: data.createdBy ?? null,
+    createdBy: data.createdBy ?? user.id,
     createdAt: now,
     updatedAt: now,
   })
@@ -48,17 +50,22 @@ export async function createForm(data: {
 }
 
 export async function getForms() {
+  const uid = await currentUserId()
+  if (!uid) return []
   return db
     .select()
     .from(forms)
+    .where(eq(forms.createdBy, uid))
     .orderBy(desc(forms.updatedAt))
 }
 
 export async function getForm(id: string) {
+  const uid = await currentUserId()
+  if (!uid) return null
   const formResult = await db
     .select()
     .from(forms)
-    .where(eq(forms.id, id))
+    .where(and(eq(forms.id, id), eq(forms.createdBy, uid)))
     .limit(1)
 
   if (formResult.length === 0) return null

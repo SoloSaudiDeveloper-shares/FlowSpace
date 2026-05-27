@@ -14,8 +14,9 @@ import {
   teams,
 } from "@/lib/db/schema"
 import { createId } from "@/lib/utils/ids"
-import { eq, and, desc, or, inArray, sql, like } from "drizzle-orm"
+import { eq, and, desc, or, inArray, sql, like, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { currentUserId } from "@/lib/auth/scope"
 
 // ─── Feed Event Types ────────────────────────────────────────────────────
 
@@ -83,6 +84,9 @@ export async function getGlobalFeed(options?: {
   priority?: FeedPriority
   sourceType?: FeedSourceType
 }) {
+  const uid = await currentUserId()
+  if (!uid) return []
+
   const limit = options?.limit ?? 50
   const offset = options?.offset ?? 0
 
@@ -101,7 +105,26 @@ export async function getGlobalFeed(options?: {
     conditions.push(eq(feedEvents.sourceType, options.sourceType))
   }
 
-  const whereClause = conditions.length > 0 ? and(...conditions) : undefined
+  // Visibility: the user sees an event if any of the following hold:
+  //   - they were the actor
+  //   - the subject element belongs to them
+  //   - the project belongs to them
+  //   - the parent element belongs to them
+  // Compute the user's owned element ids once, then OR them across the
+  // three element-id columns on feed_events plus the actor column.
+  const ownedRows = await db
+    .select({ id: elements.id })
+    .from(elements)
+    .where(eq(elements.createdBy, uid))
+  const ownedIds = ownedRows.map((r) => r.id)
+
+  const visibilityOptions = [eq(feedEvents.actorUserId, uid)]
+  if (ownedIds.length > 0) {
+    visibilityOptions.push(inArray(feedEvents.subjectElementId, ownedIds))
+    visibilityOptions.push(inArray(feedEvents.projectId, ownedIds))
+    visibilityOptions.push(inArray(feedEvents.parentElementId, ownedIds))
+  }
+  conditions.push(or(...visibilityOptions)!)
 
   const results = await db
     .select({
@@ -111,7 +134,7 @@ export async function getGlobalFeed(options?: {
     })
     .from(feedEvents)
     .leftJoin(users, eq(feedEvents.actorUserId, users.id))
-    .where(whereClause)
+    .where(and(...conditions))
     .orderBy(desc(feedEvents.createdAt))
     .limit(limit)
     .offset(offset)
