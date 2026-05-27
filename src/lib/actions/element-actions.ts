@@ -25,7 +25,7 @@ const ELEMENT_COLORS: Record<ElementType, string> = {
   process: "#ec4899",
 }
 
-export async function createElement(type: ElementType, title?: string) {
+export async function createElement(type: ElementType, title?: string, parentId?: string) {
   const id = createId()
   const now = new Date().toISOString()
 
@@ -35,6 +35,7 @@ export async function createElement(type: ElementType, title?: string) {
     title: title || "Untitled",
     icon: ELEMENT_ICONS[type],
     color: ELEMENT_COLORS[type],
+    parentId: parentId ?? null,
     createdAt: now,
     updatedAt: now,
   })
@@ -141,6 +142,24 @@ export async function updateElement(
   revalidatePath("/")
 }
 
+/**
+ * Bulk-update sort_order for the given element ids. Order in the array
+ * determines the new position (first element gets sort_order=0, etc.).
+ * Used by the sidebar drag-to-reorder. Caller is responsible for passing
+ * a coherent set (e.g. all siblings of the same type / same parent).
+ */
+export async function reorderElements(orderedIds: string[]) {
+  if (orderedIds.length === 0) return
+  const updatedAt = new Date().toISOString()
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db
+      .update(elements)
+      .set({ sortOrder: i, updatedAt })
+      .where(eq(elements.id, orderedIds[i]))
+  }
+  revalidatePath("/")
+}
+
 export async function deleteElement(id: string) {
   await db
     .update(elements)
@@ -163,6 +182,42 @@ export async function archiveElement(id: string) {
     .where(eq(elements.id, id))
 
   revalidatePath("/")
+}
+
+export async function restoreElement(id: string) {
+  await db
+    .update(elements)
+    .set({
+      isDeleted: false,
+      isArchived: false,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(elements.id, id))
+
+  revalidatePath("/")
+  revalidatePath("/trash")
+}
+
+export async function permanentlyDeleteElement(id: string) {
+  await db.delete(elements).where(eq(elements.id, id))
+  revalidatePath("/")
+  revalidatePath("/trash")
+}
+
+export async function getDeletedElements() {
+  return db
+    .select()
+    .from(elements)
+    .where(eq(elements.isDeleted, true))
+    .orderBy(desc(elements.updatedAt))
+}
+
+export async function getArchivedElements() {
+  return db
+    .select()
+    .from(elements)
+    .where(and(eq(elements.isArchived, true), eq(elements.isDeleted, false)))
+    .orderBy(desc(elements.updatedAt))
 }
 
 export async function toggleFavorite(id: string) {

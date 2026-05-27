@@ -1,6 +1,8 @@
 import { getElement } from "@/lib/actions/element-actions"
 import { getPageContent } from "@/lib/actions/page-actions"
 import { getLinksForElement } from "@/lib/actions/link-actions"
+import { isWatching, getWatcherCount } from "@/lib/actions/watcher-actions"
+import { getCurrentUser } from "@/lib/actions/user-actions"
 import { notFound } from "next/navigation"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
@@ -8,6 +10,8 @@ import { FileText } from "lucide-react"
 import { InlineTitle } from "@/components/shared/inline-title"
 import { PageEditor } from "@/components/editor/page-editor"
 import { ElementLinker } from "@/components/shared/element-linker"
+import { PageContextMenu } from "@/components/shared/page-context-menu"
+import { WatchButton } from "@/components/shared/watch-button"
 
 export default async function PageDetailPage({
   params,
@@ -15,12 +19,18 @@ export default async function PageDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [element, page, links] = await Promise.all([
+  const [element, page, links, currentUser] = await Promise.all([
     getElement(id),
     getPageContent(id),
     getLinksForElement(id),
+    getCurrentUser(),
   ])
   if (!element || element.type !== "page") notFound()
+
+  const [watching, watcherCount] = await Promise.all([
+    currentUser ? isWatching(id, currentUser.id) : false,
+    getWatcherCount(id),
+  ])
 
   return (
     <div className="flex flex-col h-full">
@@ -31,8 +41,15 @@ export default async function PageDetailPage({
           <FileText className="size-4" />
         </span>
         <span className="text-sm font-medium truncate">{element.title}</span>
+        <div className="ml-auto">
+          <WatchButton
+            elementId={element.id}
+            initialWatching={watching}
+            initialCount={watcherCount}
+          />
+        </div>
       </header>
-      <div className="flex-1 overflow-auto">
+      <PageContextMenu className="flex-1 overflow-auto">
         <div className="mx-auto max-w-4xl px-6 py-10">
           <InlineTitle elementId={element.id} initialTitle={element.title} />
           <div className="mt-2 mb-4">
@@ -40,7 +57,7 @@ export default async function PageDetailPage({
           </div>
           <PageEditor pageId={element.id} initialContent={page?.content} />
         </div>
-      </div>
+      </PageContextMenu>
     </div>
   )
 }

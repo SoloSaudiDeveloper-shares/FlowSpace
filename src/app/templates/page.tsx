@@ -1,0 +1,27 @@
+import { getTemplates, getFavoriteTemplates, getRecentTemplates } from "@/lib/actions/template-actions"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Separator } from "@/components/ui/separator"
+import { BookTemplate } from "lucide-react"
+import { TemplatesContent } from "@/components/templates/templates-content"
+
+export default async function TemplatesPage() {
+  const [allTemplates, favorites, recent] = await Promise.all([
+    getTemplates(),
+    getFavoriteTemplates(),
+    getRecentTemplates(5),
+  ])
+
+  return (
+    <div className="flex flex-col h-screen">
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarTrigger className="-ml-1" />
+        <Separator orientation="vertical" className="mr-2 h-4" />
+        <BookTemplate className="size-4 text-primary" />
+        <h1 className="text-sm font-semibold">Templates</h1>
+      </header>
+      <div className="flex-1 overflow-auto p-6">
+        <TemplatesContent templates={allTemplates} favorites={favorites} recent={recent} />
+      </div>
+    </div>
+  )
+}

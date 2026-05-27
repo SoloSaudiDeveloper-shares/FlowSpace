@@ -1,7 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Handle, Position, type NodeProps, type Node } from "@xyflow/react"
+import { Handle, Position, NodeResizer, type NodeProps, type Node } from "@xyflow/react"
+import { SpeechButton } from "@/components/shared/speech-button"
+import { TTSButton } from "@/components/shared/tts-button"
+import { AIActionButton } from "@/components/shared/ai-action-button"
 
 type StickyData = { label?: string; color?: string }
 type StickyNodeType = Node<StickyData, "sticky_note">
@@ -15,22 +18,51 @@ export function StickyNoteNode({ data, selected }: NodeProps<StickyNodeType>) {
 
   return (
     <div
-      className={`rounded-md shadow-md min-w-[180px] min-h-[150px] ${
+      className={`rounded-md shadow-md w-full h-full ${
         selected ? "ring-2 ring-primary" : ""
       }`}
       style={{ backgroundColor: color }}
     >
-      <Handle type="target" position={Position.Top} className="!bg-gray-600 !w-2 !h-2" />
-      <div className="p-3 h-full">
-        <textarea
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value)
-            data.label = e.target.value
-          }}
-          placeholder="Write something..."
-          className="w-full h-full bg-transparent text-sm text-gray-800 outline-none resize-none min-h-[120px] placeholder:text-gray-400"
-        />
+      <NodeResizer minWidth={160} minHeight={120} isVisible={selected} />
+      <Handle type="source" position={Position.Top} id="src-top" className="!bg-gray-600 !w-2 !h-2" />
+
+      {/* AI toolbar — outside the node, above it */}
+      {selected && (
+        <div className="absolute -top-9 right-0 flex gap-0.5 nodrag nopan z-10">
+          <AIActionButton
+            text={text}
+            onResult={(result, action) => {
+              if (action === "continue" || action === "expand") {
+                const v = text ? `${text}\n\n${result}` : result; setText(v); data.label = v
+              } else {
+                setText(result); data.label = result
+              }
+            }}
+            actions={["summarize", "expand", "fix_grammar", "improve", "continue"]}
+            size="sm"
+          />
+          <TTSButton text={text} size="sm" tooltip="Read aloud" />
+          <SpeechButton
+            onTranscript={(t) => { const v = text ? `${text} ${t}` : t; setText(v); data.label = v }}
+            size="sm"
+            showPulse={false}
+            tooltip="Dictate"
+          />
+        </div>
+      )}
+
+      <div className="p-3 h-full flex flex-col">
+        <div className="flex-1">
+          <textarea
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value)
+              data.label = e.target.value
+            }}
+            placeholder="Write something..."
+            className="w-full h-full bg-transparent text-sm text-gray-800 outline-none resize-none placeholder:text-gray-400"
+          />
+        </div>
       </div>
       {selected && (
         <div className="absolute -bottom-8 left-0 flex gap-1">
@@ -49,9 +81,9 @@ export function StickyNoteNode({ data, selected }: NodeProps<StickyNodeType>) {
           ))}
         </div>
       )}
-      <Handle type="source" position={Position.Bottom} className="!bg-gray-600 !w-2 !h-2" />
-      <Handle type="source" position={Position.Right} id="right" className="!bg-gray-600 !w-2 !h-2" />
-      <Handle type="target" position={Position.Left} id="left" className="!bg-gray-600 !w-2 !h-2" />
+      <Handle type="source" position={Position.Bottom} id="src-bottom" className="!bg-gray-600 !w-2 !h-2" />
+      <Handle type="source" position={Position.Right} id="src-right" className="!bg-gray-600 !w-2 !h-2" />
+      <Handle type="source" position={Position.Left} id="src-left" className="!bg-gray-600 !w-2 !h-2" />
     </div>
   )
 }

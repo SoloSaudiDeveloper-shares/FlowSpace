@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useId } from "react"
 import {
   DndContext,
   DragOverlay,
@@ -18,17 +18,11 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { useDroppable } from "@dnd-kit/core"
-import { Plus, MoreHorizontal, Trash2 } from "lucide-react"
+import { Plus, Trash2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { TaskCard } from "./task-card"
 import { TaskDetailSheet } from "./task-detail-sheet"
 import {
@@ -36,8 +30,12 @@ import {
   moveTask,
   createTaskStatus,
   deleteTaskStatus,
+  updateTaskStatus,
 } from "@/lib/actions/task-actions"
-import type { tasks, taskStatuses } from "@/lib/db/schema"
+import { toast } from "sonner"
+import type { tasks, taskStatuses, taskLabels } from "@/lib/db/schema"
+import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
+import type { TaskCardMeta } from "./project-views"
 
 type Task = typeof tasks.$inferSelect
 type TaskStatus = typeof taskStatuses.$inferSelect
@@ -47,6 +45,7 @@ interface TaskBoardProps {
   statuses: TaskStatus[]
   tasks: Task[]
   progress: number
+  taskMeta?: TaskCardMeta
 }
 
 function StatusColumn({
@@ -54,14 +53,17 @@ function StatusColumn({
   tasks: columnTasks,
   projectId,
   onTaskClick,
+  taskMeta,
 }: {
   status: TaskStatus
   tasks: Task[]
   projectId: string
   onTaskClick: (task: Task) => void
+  taskMeta?: TaskCardMeta
 }) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
+  const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
 
   const { setNodeRef, isOver } = useDroppable({
     id: status.id,
@@ -75,14 +77,46 @@ function StatusColumn({
     setIsAdding(false)
   }
 
+  function handleHeaderContextMenu(e: React.MouseEvent) {
+    const items: ContextMenuEntry[] = [
+      {
+        label: "Add Task",
+        icon: Plus,
+        onClick: () => setIsAdding(true),
+      },
+      {
+        label: "Rename",
+        icon: Pencil,
+        onClick: async () => {
+          const name = window.prompt("Rename column to:", status.name)
+          if (name && name.trim()) {
+            await updateTaskStatus(status.id, projectId, { name: name.trim() })
+          }
+        },
+      },
+      { separator: true },
+      {
+        label: "Delete Column",
+        icon: Trash2,
+        variant: "destructive",
+        onClick: () => deleteTaskStatus(status.id, projectId),
+      },
+    ]
+    openCtx(e, items)
+  }
+
   return (
+    <>
     <div
       className={`flex flex-col w-72 shrink-0 rounded-lg border bg-muted/30 ${
         isOver ? "ring-2 ring-primary/50" : ""
       }`}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b">
+      <div
+        className="flex items-center justify-between px-3 py-2 border-b"
+        onContextMenu={handleHeaderContextMenu}
+      >
         <div className="flex items-center gap-2">
           <span
             className="size-2.5 rounded-full"
@@ -102,20 +136,6 @@ function StatusColumn({
           >
             <Plus className="size-3.5" />
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center justify-center size-6 rounded-md hover:bg-accent">
-              <MoreHorizontal className="size-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => deleteTaskStatus(status.id, projectId)}
-              >
-                <Trash2 className="size-4 mr-2" />
-                Delete column
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 
@@ -130,6 +150,11 @@ function StatusColumn({
               key={task.id}
               task={task}
               onClick={() => onTaskClick(task)}
+              labels={taskMeta?.labelsByTask[task.id]}
+              subtaskCount={taskMeta?.subtaskCounts[task.id]?.total}
+              subtaskDoneCount={taskMeta?.subtaskCounts[task.id]?.done}
+              checklistTotal={taskMeta?.checklistByTask[task.id]?.total}
+              checklistDone={taskMeta?.checklistByTask[task.id]?.done}
             />
           ))}
         </SortableContext>
@@ -180,16 +205,27 @@ function StatusColumn({
         </button>
       )}
     </div>
+
+    {ctxMenu && (
+      <ContextMenu
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        items={ctxMenu.items}
+        onClose={closeCtx}
+      />
+    )}
+    </>
   )
 }
 
-export function TaskBoard({ projectId, statuses, tasks: allTasks, progress }: TaskBoardProps) {
+export function TaskBoard({ projectId, statuses, tasks: allTasks, progress, taskMeta }: TaskBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [isAddingColumn, setIsAddingColumn] = useState(false)
   const [newColumnName, setNewColumnName] = useState("")
 
+  const dndId = useId()
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
@@ -272,6 +308,7 @@ export function TaskBoard({ projectId, statuses, tasks: allTasks, progress }: Ta
 
       {/* Board */}
       <DndContext
+        id={dndId}
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
@@ -285,6 +322,7 @@ export function TaskBoard({ projectId, statuses, tasks: allTasks, progress }: Ta
               tasks={tasksByStatus[status.id] || []}
               projectId={projectId}
               onTaskClick={handleTaskClick}
+              taskMeta={taskMeta}
             />
           ))}
 

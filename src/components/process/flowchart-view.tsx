@@ -11,7 +11,7 @@ import {
   Position,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
-import { useTheme } from "next-themes"
+import { useTheme } from "@/components/theme-provider"
 import type { processSteps } from "@/lib/db/schema"
 
 type ProcessStep = typeof processSteps.$inferSelect

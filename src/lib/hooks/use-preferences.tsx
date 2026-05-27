@@ -1,0 +1,315 @@
+"use client"
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  type ReactNode,
+} from "react"
+
+// ─── Types ────────────────────────────────────────────────────────────────
+
+export type FontFamily = "geist" | "inter" | "jakarta" | "dm-sans"
+export type FontSize = "small" | "default" | "large"
+export type AccentColor = "neutral" | "blue" | "violet" | "rose" | "green" | "orange" | "teal"
+export type BorderRadius = "none" | "small" | "default" | "large" | "full"
+export type GanttTooltipField = "status" | "priority" | "dates" | "completion"
+
+// Sidebar section keys — match the group keys used in app-sidebar.tsx
+export type SidebarSectionKey =
+  | "favorites"
+  | "projects"
+  | "type:page"
+  | "type:canvas"
+  | "type:todo_list"
+  | "type:reminder"
+  | "type:process"
+  | "platform"
+
+export interface ClockPreferences {
+  show: boolean
+  format24: boolean
+  showSeconds: boolean
+  showDate: boolean
+  secondTimezoneLabel: string  // empty = none; e.g. "UTC" or "America/Los_Angeles"
+}
+
+export interface Preferences {
+  fontFamily: FontFamily
+  fontSize: FontSize
+  accentColor: AccentColor
+  borderRadius: BorderRadius
+  ganttTooltipFields: GanttTooltipField[]
+  speechEnabled: boolean
+  aiEnabled: boolean
+  aiLLMModel: string
+  aiTTSModel: string
+  aiTTSVoice: string
+  aiEmbeddingsModel: string
+  aiVisionModel: string
+  ollamaUrl: string
+  aiSystemPrompts: Record<string, string>
+  // Sidebar customisation
+  sidebarVisible: Record<SidebarSectionKey, boolean>
+  sidebarOrder: SidebarSectionKey[]
+  // Top-bar clock
+  clock: ClockPreferences
+}
+
+// ─── Defaults ─────────────────────────────────────────────────────────────
+
+export const DEFAULT_PREFERENCES: Preferences = {
+  fontFamily: "geist",
+  fontSize: "default",
+  accentColor: "neutral",
+  borderRadius: "default",
+  ganttTooltipFields: ["status", "priority", "dates", "completion"],
+  speechEnabled: true,
+  aiEnabled: false,
+  aiLLMModel: "llama3.1:8b",
+  aiTTSModel: "",
+  aiTTSVoice: "",
+  aiEmbeddingsModel: "nomic-embed-text",
+  aiVisionModel: "llava:7b",
+  ollamaUrl: "http://localhost:11434",
+  aiSystemPrompts: {
+    summarize: "You are a concise summarizer. Provide a brief summary in 1-3 sentences.",
+    expand: "You are a writing assistant. Expand the given text with more detail while keeping the same tone.",
+    fix_grammar: "You are a proofreader. Fix grammar and spelling errors. Return only the corrected text, no explanations.",
+    improve: "You are a writing assistant. Improve the clarity and flow of the text. Return only the improved text.",
+    continue: "You are a writing assistant. Continue the text naturally, matching the style and tone. Write 2-3 more sentences.",
+    generate_todos: "You are a task planner. Given a goal or description, generate a concise numbered list of actionable todo items (3-7 items). Return only the numbered list.",
+  },
+  sidebarVisible: {
+    favorites: true,
+    projects: true,
+    "type:page": true,
+    "type:canvas": true,
+    "type:todo_list": true,
+    "type:reminder": true,
+    "type:process": true,
+    platform: true,
+  },
+  sidebarOrder: [
+    "favorites",
+    "projects",
+    "type:page",
+    "type:canvas",
+    "type:todo_list",
+    "type:reminder",
+    "type:process",
+    "platform",
+  ],
+  clock: {
+    show: true,
+    format24: true,
+    showSeconds: false,
+    showDate: true,
+    secondTimezoneLabel: "",
+  },
+}
+
+// Friendly labels for the sidebar sections (used in Settings UI)
+export const SIDEBAR_SECTION_LABELS: Record<SidebarSectionKey, string> = {
+  favorites: "Favorites",
+  projects: "Projects",
+  "type:page": "Pages",
+  "type:canvas": "Canvases",
+  "type:todo_list": "Todo Lists",
+  "type:reminder": "Reminders",
+  "type:process": "Processes",
+  platform: "Platform",
+}
+
+// ─── Labels & metadata ───────────────────────────────────────────────────
+
+export const FONT_OPTIONS: {
+  value: FontFamily
+  label: string
+  description: string
+  preview: string
+}[] = [
+  {
+    value: "geist",
+    label: "Geist",
+    description: "Modern and minimal",
+    preview: "The quick brown fox jumps over the lazy dog",
+  },
+  {
+    value: "inter",
+    label: "Inter",
+    description: "Clean and highly readable",
+    preview: "The quick brown fox jumps over the lazy dog",
+  },
+  {
+    value: "jakarta",
+    label: "Jakarta Sans",
+    description: "Friendly and rounded",
+    preview: "The quick brown fox jumps over the lazy dog",
+  },
+  {
+    value: "dm-sans",
+    label: "DM Sans",
+    description: "Geometric and precise",
+    preview: "The quick brown fox jumps over the lazy dog",
+  },
+]
+
+export const FONT_CSS: Record<FontFamily, string> = {
+  geist: "var(--font-geist-sans), 'Geist', system-ui, sans-serif",
+  inter: "var(--font-inter), 'Inter', system-ui, sans-serif",
+  jakarta: "var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif",
+  "dm-sans": "var(--font-dm-sans), 'DM Sans', system-ui, sans-serif",
+}
+
+export const FONT_SIZE_OPTIONS: { value: FontSize; label: string; size: string }[] = [
+  { value: "small", label: "Small", size: "14px" },
+  { value: "default", label: "Default", size: "16px" },
+  { value: "large", label: "Large", size: "18px" },
+]
+
+export const ACCENT_COLORS: { value: AccentColor; label: string; hex: string }[] = [
+  { value: "neutral", label: "Neutral", hex: "#737373" },
+  { value: "blue", label: "Blue", hex: "#3b82f6" },
+  { value: "violet", label: "Violet", hex: "#8b5cf6" },
+  { value: "rose", label: "Rose", hex: "#f43f5e" },
+  { value: "green", label: "Green", hex: "#10b981" },
+  { value: "orange", label: "Orange", hex: "#f97316" },
+  { value: "teal", label: "Teal", hex: "#14b8a6" },
+]
+
+export const RADIUS_OPTIONS: { value: BorderRadius; label: string; css: string; px: number }[] = [
+  { value: "none", label: "None", css: "0rem", px: 0 },
+  { value: "small", label: "Small", css: "0.25rem", px: 4 },
+  { value: "default", label: "Default", css: "0.625rem", px: 10 },
+  { value: "large", label: "Large", css: "1rem", px: 16 },
+  { value: "full", label: "Full", css: "1.5rem", px: 24 },
+]
+
+export const GANTT_TOOLTIP_FIELDS: { value: GanttTooltipField; label: string }[] = [
+  { value: "status", label: "Status" },
+  { value: "priority", label: "Priority" },
+  { value: "dates", label: "Date Range" },
+  { value: "completion", label: "Completion" },
+]
+
+// ─── Context ──────────────────────────────────────────────────────────────
+
+interface PreferencesContextValue {
+  preferences: Preferences
+  updatePreference: <K extends keyof Preferences>(key: K, value: Preferences[K]) => void
+  resetPreferences: () => void
+}
+
+const PreferencesContext = createContext<PreferencesContextValue>({
+  preferences: DEFAULT_PREFERENCES,
+  updatePreference: () => {},
+  resetPreferences: () => {},
+})
+
+// ─── Provider ─────────────────────────────────────────────────────────────
+
+export function PreferencesProvider({ children }: { children: ReactNode }) {
+  const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES)
+  const [mounted, setMounted] = useState(false)
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("flowspace-preferences")
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        // Migrate WebAI.js model IDs → Ollama model IDs
+        const webaiLLMs = [
+          "smollm2-135m-instruct", "smollm2-360m-instruct",
+          "gemma-3-270m-it", "gemma-3-270m-instruct",
+        ]
+        if (webaiLLMs.includes(parsed.aiLLMModel)) {
+          parsed.aiLLMModel = "llama3.1:8b"
+        }
+        const webaiTTS = ["kokoro-tts", "kokoro-tts-82m"]
+        if (webaiTTS.includes(parsed.aiTTSModel)) {
+          parsed.aiTTSModel = ""
+        }
+        if (parsed.aiEmbeddingsModel === "all-minilm-l6-v2") {
+          parsed.aiEmbeddingsModel = "nomic-embed-text"
+        }
+        // Migrate old Piper TTS voice IDs to empty (browser default)
+        const piperVoices = [
+          "en_US-amy-medium", "en_US-danny-low", "en_US-lessac-medium",
+          "en_GB-alan-medium", "en_GB-alba-medium",
+        ]
+        if (piperVoices.includes(parsed.aiTTSVoice)) {
+          parsed.aiTTSVoice = ""
+        }
+        // Add ollamaUrl default if missing
+        if (!parsed.ollamaUrl) {
+          parsed.ollamaUrl = "http://localhost:11434"
+        }
+        setPreferences((prev) => ({ ...prev, ...parsed }))
+      }
+    } catch {
+      // ignore parse errors
+    }
+    setMounted(true)
+  }, [])
+
+  // Apply preferences to DOM
+  useEffect(() => {
+    if (!mounted) return
+    const root = document.documentElement
+
+    // Font family
+    root.style.setProperty("--font-sans", FONT_CSS[preferences.fontFamily])
+
+    // Font size on html
+    root.style.fontSize = FONT_SIZE_OPTIONS.find((o) => o.value === preferences.fontSize)?.size ?? "16px"
+
+    // Border radius
+    const radius = RADIUS_OPTIONS.find((o) => o.value === preferences.borderRadius)?.css ?? "0.625rem"
+    root.style.setProperty("--radius", radius)
+
+    // Accent color via data attribute (CSS handles the rest)
+    root.dataset.accent = preferences.accentColor
+  }, [preferences, mounted])
+
+  // Persist to localStorage
+  useEffect(() => {
+    if (!mounted) return
+    try {
+      localStorage.setItem("flowspace-preferences", JSON.stringify(preferences))
+    } catch {
+      // ignore
+    }
+  }, [preferences, mounted])
+
+  const updatePreference = useCallback(
+    <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
+      setPreferences((prev) => ({ ...prev, [key]: value }))
+    },
+    [],
+  )
+
+  const resetPreferences = useCallback(() => {
+    setPreferences(DEFAULT_PREFERENCES)
+    try {
+      localStorage.removeItem("flowspace-preferences")
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  return (
+    <PreferencesContext.Provider value={{ preferences, updatePreference, resetPreferences }}>
+      {children}
+    </PreferencesContext.Provider>
+  )
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────
+
+export function usePreferences() {
+  return useContext(PreferencesContext)
+}

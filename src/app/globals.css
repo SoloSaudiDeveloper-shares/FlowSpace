@@ -2,6 +2,106 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Keep Tailwind's content scanner out of the SQLite WAL/shm files in data/
+   — reading data/app.db-shm while it's locked crashes Turbopack. */
+@source not "../../data/**";
+@source not "../../*.db";
+@source not "../../*.db-shm";
+@source not "../../*.db-wal";
+
+/* ─── Sidebar refinement ─────────────────────────────────────────────
+   Editorial / refined-minimal aesthetic: uppercase section labels with
+   tracked letter-spacing, a thin left-accent on the active item, custom
+   scrollbar that fades on idle, and a subtle gradient sheen on the
+   workspace header tile. */
+[data-slot="sidebar-content"] {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, currentColor 18%, transparent) transparent;
+}
+[data-slot="sidebar-content"]::-webkit-scrollbar { width: 6px; }
+[data-slot="sidebar-content"]::-webkit-scrollbar-track { background: transparent; }
+[data-slot="sidebar-content"]::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, currentColor 14%, transparent);
+  border-radius: 999px;
+  transition: background 200ms ease;
+}
+[data-slot="sidebar-content"]:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, currentColor 28%, transparent);
+}
+[data-slot="sidebar-content"]::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, currentColor 42%, transparent);
+}
+
+/* Section labels: editorial typography */
+[data-slot="sidebar-group-label"] {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.6875rem;        /* 11px */
+  font-weight: 600;
+  color: color-mix(in oklab, currentColor 55%, transparent);
+}
+[data-slot="sidebar-group-label"]:hover {
+  color: color-mix(in oklab, currentColor 80%, transparent);
+}
+
+/* Active-item left accent bar — replaces the generic bg-only highlight */
+[data-slot="sidebar-menu-button"][data-active="true"] {
+  position: relative;
+}
+[data-slot="sidebar-menu-button"][data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: -0.25rem;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  width: 2px;
+  background: var(--sidebar-primary);
+  border-radius: 999px;
+}
+
+/* Workspace header tile: subtle gradient + texture */
+[data-slot="sidebar-header"] [data-slot="sidebar-menu-button"] {
+  background: linear-gradient(135deg,
+    color-mix(in oklab, var(--sidebar-primary) 14%, transparent),
+    transparent 60%);
+  border: 1px solid color-mix(in oklab, var(--sidebar-border) 100%, transparent);
+  border-radius: var(--radius-md);
+  transition: background 250ms ease, border-color 250ms ease;
+}
+[data-slot="sidebar-header"] [data-slot="sidebar-menu-button"]:hover {
+  background: linear-gradient(135deg,
+    color-mix(in oklab, var(--sidebar-primary) 22%, transparent),
+    transparent 70%);
+  border-color: color-mix(in oklab, var(--sidebar-primary) 30%, transparent);
+}
+
+/* Sub-project indent guide */
+[data-slot="sidebar-menu-sub"] {
+  position: relative;
+}
+[data-slot="sidebar-menu-sub"]::before {
+  content: "";
+  position: absolute;
+  left: 0.875rem;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom,
+    transparent,
+    color-mix(in oklab, currentColor 18%, transparent) 12%,
+    color-mix(in oklab, currentColor 18%, transparent) 88%,
+    transparent);
+}
+
+/* Smooth item entrance — staggered slight slide */
+@keyframes sidebar-item-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+[data-slot="sidebar-group-content"] [data-slot="sidebar-menu-item"] {
+  animation: sidebar-item-in 240ms ease-out both;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -126,5 +226,176 @@
   }
   html {
     @apply font-sans;
+    --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   }
+}
+
+/* ─── Accent Color Overrides ─────────────────────────────────────────── */
+
+html[data-accent="blue"] {
+  --primary: oklch(0.546 0.245 262.881);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.546 0.245 262.881);
+  --sidebar-primary: oklch(0.546 0.245 262.881);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+html.dark[data-accent="blue"] {
+  --primary: oklch(0.623 0.214 259.815);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.623 0.214 259.815);
+  --sidebar-primary: oklch(0.623 0.214 259.815);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+
+html[data-accent="violet"] {
+  --primary: oklch(0.541 0.281 293.009);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.541 0.281 293.009);
+  --sidebar-primary: oklch(0.541 0.281 293.009);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+html.dark[data-accent="violet"] {
+  --primary: oklch(0.606 0.25 292.717);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.606 0.25 292.717);
+  --sidebar-primary: oklch(0.606 0.25 292.717);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+
+html[data-accent="rose"] {
+  --primary: oklch(0.586 0.253 17.585);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.586 0.253 17.585);
+  --sidebar-primary: oklch(0.586 0.253 17.585);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+html.dark[data-accent="rose"] {
+  --primary: oklch(0.645 0.246 16.439);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.645 0.246 16.439);
+  --sidebar-primary: oklch(0.645 0.246 16.439);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+
+html[data-accent="green"] {
+  --primary: oklch(0.596 0.145 163.225);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.596 0.145 163.225);
+  --sidebar-primary: oklch(0.596 0.145 163.225);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+html.dark[data-accent="green"] {
+  --primary: oklch(0.696 0.17 162.48);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.696 0.17 162.48);
+  --sidebar-primary: oklch(0.696 0.17 162.48);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+
+html[data-accent="orange"] {
+  --primary: oklch(0.646 0.222 41.116);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.646 0.222 41.116);
+  --sidebar-primary: oklch(0.646 0.222 41.116);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+html.dark[data-accent="orange"] {
+  --primary: oklch(0.705 0.213 47.604);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.705 0.213 47.604);
+  --sidebar-primary: oklch(0.705 0.213 47.604);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+
+html[data-accent="teal"] {
+  --primary: oklch(0.582 0.138 181.364);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.582 0.138 181.364);
+  --sidebar-primary: oklch(0.582 0.138 181.364);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+html.dark[data-accent="teal"] {
+  --primary: oklch(0.704 0.14 182.503);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.704 0.14 182.503);
+  --sidebar-primary: oklch(0.704 0.14 182.503);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+}
+
+/* Page enter animations */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes stagger-item {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: page-enter 0.3s ease-out;
+}
+
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.2s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-from-right 0.2s ease-out;
+}
+
+/* Staggered list item animation */
+.stagger-item {
+  animation: stagger-item 0.25s ease-out both;
+}
+
+.stagger-item:nth-child(1) { animation-delay: 0ms; }
+.stagger-item:nth-child(2) { animation-delay: 30ms; }
+.stagger-item:nth-child(3) { animation-delay: 60ms; }
+.stagger-item:nth-child(4) { animation-delay: 90ms; }
+.stagger-item:nth-child(5) { animation-delay: 120ms; }
+.stagger-item:nth-child(6) { animation-delay: 150ms; }
+.stagger-item:nth-child(7) { animation-delay: 180ms; }
+.stagger-item:nth-child(8) { animation-delay: 210ms; }
+.stagger-item:nth-child(9) { animation-delay: 240ms; }
+.stagger-item:nth-child(10) { animation-delay: 270ms; }
+
+/* Smooth transitions for interactive elements */
+.transition-smooth {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }

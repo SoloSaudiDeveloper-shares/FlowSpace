@@ -6,7 +6,32 @@
       "Bash(npx create-next-app@latest flowspace --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --turbopack)",
       "Bash(taskkill //F //IM node.exe)",
       "mcp__Claude_Preview__preview_start",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx next:*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -rn asChild 'C:/Users/malfa/OneDrive/سطح المكتب/New Project/node_modules/@base-ui/react/' --include=*.js)",
+      "Bash(node -e \"const Database = require\\(''better-sqlite3''\\); const db = new Database\\(''data/app.db''\\); const rows = db.prepare\\(\"\"SELECT id FROM elements WHERE type=''canvas'' LIMIT 3\"\"\\).all\\(\\); console.log\\(JSON.stringify\\(rows\\)\\)\")",
+      "WebSearch",
+      "WebFetch(domain:help.clickup.com)",
+      "WebFetch(domain:clickup.com)",
+      "Bash(node -e \"const Database = require\\(''better-sqlite3''\\); const db = new Database\\(''C:/Users/malfa/OneDrive/\\\\u0633\\\\u0637\\\\u062d \\\\u0627\\\\u0644\\\\u0645\\\\u0643\\\\u062a\\\\u0628/New Project/data/app.db''\\); const rows = db.prepare\\(\"\"SELECT id FROM elements WHERE type=''project'' LIMIT 3\"\"\\).all\\(\\); console.log\\(JSON.stringify\\(rows\\)\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(ls \"C:\\\\Users\\\\malfa\\\\OneDrive\\\\سطح المكتب\\\\New folder \\(4\\)\")",
+      "WebFetch(domain:taylormonroe.co)",
+      "WebFetch(domain:databox.com)",
+      "WebFetch(domain:consultevo.com)",
+      "Bash(fuser -k 3000/tcp)",
+      "Bash(node -e \":*)",
+      "Bash(cd 'C:/Users/malfa/OneDrive/سطح المكتب/New Project' echo \"=== ACTION FILES ===\" ls -1 src/lib/actions/*.ts)",
+      "Bash(sort echo:*)",
+      "Bash(fuser -k 3001/tcp)",
+      "Bash(taskkill //PID 47476 //F)",
+      "Bash(grep -r export.*approval /c/Users/malfa/OneDrive/سطح المكتب/New Project/src --include=*.ts --include=*.tsx)",
+      "Bash(grep -rn approvals. /c/Users/malfa/OneDrive/سطح المكتب/New Project/src/lib --include=*.ts)",
+      "Bash(claude mcp *)",
+      "Bash(ls *.md)",
+      "Bash(ls src/**/*.md)",
+      "Bash(find . -maxdepth 3 -name \"*.md\" -not -path \"./node_modules/*\" -not -path \"./.next/*\" -not -path \"./.git/*\")"
     ]
   }
 }

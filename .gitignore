@@ -40,7 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# database
-data/*.db
-data/*.db-journal
-data/*.db-wal
+# database & user-data — ignore the entire data dir so SQLite WAL/SHM files,
+# uploads, and backups aren't picked up by tools that scan the project root
+# (Tailwind v4 content scanner, Turbopack, etc.).
+/data/
+flowspace.db
+flowspace.db-*

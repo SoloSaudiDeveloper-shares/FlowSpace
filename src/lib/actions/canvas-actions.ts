@@ -38,7 +38,7 @@ export async function saveCanvasNodes(
       nodes.map((n) => ({
         id: n.id,
         canvasId,
-        type: n.type as "card" | "sticky_note" | "element_embed" | "text" | "image" | "group",
+        type: n.type as "card" | "sticky_note" | "element_embed" | "text" | "image" | "group" | "shape",
         positionX: n.positionX,
         positionY: n.positionY,
         width: n.width,

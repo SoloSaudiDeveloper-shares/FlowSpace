@@ -3,9 +3,17 @@
   "configurations": [
     {
       "name": "flowspace",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev", "--turbopack"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "flowspace-standalone",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".next/standalone/server.js"],
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }

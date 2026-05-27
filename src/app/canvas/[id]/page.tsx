@@ -1,11 +1,15 @@
 import { getElement } from "@/lib/actions/element-actions"
 import { getCanvasData } from "@/lib/actions/canvas-actions"
+import { isWatching, getWatcherCount } from "@/lib/actions/watcher-actions"
+import { getCurrentUser } from "@/lib/actions/user-actions"
 import { notFound } from "next/navigation"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Layout } from "lucide-react"
 import { InlineTitle } from "@/components/shared/inline-title"
 import { CanvasEditor } from "@/components/canvas/canvas-editor"
+import { PageContextMenu } from "@/components/shared/page-context-menu"
+import { WatchButton } from "@/components/shared/watch-button"
 import type { Node, Edge, Viewport } from "@xyflow/react"
 
 export default async function CanvasPage({
@@ -14,19 +18,24 @@ export default async function CanvasPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [element, canvasData] = await Promise.all([
+  const [element, canvasData, currentUser] = await Promise.all([
     getElement(id),
     getCanvasData(id),
+    getCurrentUser(),
   ])
   if (!element || element.type !== "canvas") notFound()
+
+  const [watching, watcherCount] = await Promise.all([
+    currentUser ? isWatching(id, currentUser.id) : false,
+    getWatcherCount(id),
+  ])
 
   const initialNodes: Node[] = canvasData.nodes.map((n) => ({
     id: n.id,
     type: n.type,
     position: { x: n.positionX, y: n.positionY },
     data: n.data ? JSON.parse(n.data) : { label: "" },
-    width: n.width ?? undefined,
-    height: n.height ?? undefined,
+    ...(n.width && n.height ? { style: { width: n.width, height: n.height } } : {}),
   }))
 
   const initialEdges: Edge[] = canvasData.edges.map((e) => ({
@@ -59,15 +68,22 @@ export default async function CanvasPage({
           initialTitle={element.title}
           className="!text-lg !font-semibold"
         />
+        <div className="ml-auto">
+          <WatchButton
+            elementId={element.id}
+            initialWatching={watching}
+            initialCount={watcherCount}
+          />
+        </div>
       </header>
-      <div className="flex-1">
+      <PageContextMenu className="flex-1">
         <CanvasEditor
           canvasId={element.id}
           initialNodes={initialNodes}
           initialEdges={initialEdges}
           initialViewport={initialViewport}
         />
-      </div>
+      </PageContextMenu>
     </div>
   )
 }

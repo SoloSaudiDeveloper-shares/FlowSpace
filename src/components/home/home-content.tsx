@@ -14,10 +14,11 @@ import {
   MoreHorizontal,
   Trash2,
   Archive,
+  Sparkles,
+  Volume2,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
+import { TTSButton } from "@/components/shared/tts-button"
+import { AIActionButton } from "@/components/shared/ai-action-button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ import {
   archiveElement,
 } from "@/lib/actions/element-actions"
 import type { Element, ElementType } from "@/lib/db/schema"
+import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 
 const TYPE_ICONS: Record<ElementType, React.ComponentType<{ className?: string }>> = {
   project: FolderKanban,
@@ -203,15 +205,45 @@ function ElementCard({
   onClick: () => void
 }) {
   const Icon = TYPE_ICONS[element.type]
+  const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
+
+  function handleContextMenu(e: React.MouseEvent) {
+    const items: ContextMenuEntry[] = [
+      {
+        label: "Open",
+        onClick,
+      },
+      {
+        label: element.isFavorite ? "Remove from Favorites" : "Add to Favorites",
+        icon: Star,
+        onClick: () => toggleFavorite(element.id),
+      },
+      {
+        label: "Archive",
+        icon: Archive,
+        onClick: () => archiveElement(element.id),
+      },
+      { separator: true },
+      {
+        label: "Delete",
+        icon: Trash2,
+        variant: "destructive",
+        onClick: () => deleteElement(element.id),
+      },
+    ]
+    openCtx(e, items)
+  }
 
   return (
+    <>
     <div
       className="group relative flex items-start gap-3 rounded-lg border p-4 transition-colors hover:bg-accent cursor-pointer"
       onClick={onClick}
+      onContextMenu={handleContextMenu}
     >
       <div
         className="flex size-9 shrink-0 items-center justify-center rounded-md"
-        style={{ backgroundColor: (element.color ?? "#888") + "20", color: element.color ?? undefined }}
+        style={{ backgroundColor: `${element.color ?? "#888"}20`, color: element.color ?? undefined }}
       >
         <Icon className="size-4" />
       </div>
@@ -222,6 +254,26 @@ function ElementCard({
           <span>·</span>
           <span>{formatDate(element.updatedAt)}</span>
         </p>
+      </div>
+
+      {/* AI buttons */}
+      <div
+        className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mr-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <TTSButton
+          text={element.title + (element.description ? `. ${element.description}` : "")}
+          size="sm"
+          tooltip="Read aloud"
+        />
+        <AIActionButton
+          text={element.title + (element.description ? `. ${element.description}` : "")}
+          onResult={(result) => {
+            navigator.clipboard.writeText(result)
+          }}
+          actions={["summarize", "expand", "improve"]}
+          size="sm"
+        />
       </div>
 
       {/* Actions */}
@@ -268,5 +320,15 @@ function ElementCard({
         <Star className="absolute top-2 right-2 size-3 text-yellow-500 fill-yellow-500 group-hover:hidden" />
       )}
     </div>
+
+    {ctxMenu && (
+      <ContextMenu
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        items={ctxMenu.items}
+        onClose={closeCtx}
+      />
+    )}
+    </>
   )
 }
