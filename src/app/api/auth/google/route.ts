@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies, headers } from "next/headers"
+import { headers } from "next/headers"
 import { buildOAuthStart, isGoogleConfigured } from "@/lib/auth/google"
 
 /**
  * GET /api/auth/google[?from=/path]
  *
- * Generates a PKCE state + verifier, stashes them in short-lived cookies,
- * then 302s to Google's authorize endpoint. The callback route picks the
- * cookies back up to verify state and exchange the code.
+ * Generates a PKCE state + verifier, attaches them to the redirect response
+ * as short-lived cookies, then 302s to Google's authorize endpoint. The
+ * callback route picks the cookies back up to verify state and exchange the
+ * code.
  */
 export async function GET(request: NextRequest) {
   if (!isGoogleConfigured()) {
@@ -15,10 +16,9 @@ export async function GET(request: NextRequest) {
   }
 
   // Build the callback URL. Prefer PUBLIC_APP_URL (the canonical origin
-  // configured by the operator) — Google's OAuth client validates the
-  // redirect_uri exactly, so it has to match what's whitelisted in the
-  // Cloud Console regardless of which host the user typed in their browser.
-  // Fall back to the request's host header for dev convenience.
+  // configured by the operator). Google validates the redirect_uri byte-for-
+  // byte against the Cloud Console allowlist, so it MUST match exactly
+  // regardless of which host the user typed in their browser.
   let baseUrl = process.env.PUBLIC_APP_URL?.replace(/\/$/, "")
   if (!baseUrl) {
     const h = await headers()
@@ -31,17 +31,20 @@ export async function GET(request: NextRequest) {
 
   const { authorizeUrl, state, codeVerifier } = buildOAuthStart({ callbackUrl, redirectTo })
 
-  const cookieStore = await cookies()
+  // Set the state + verifier cookies DIRECTLY on the response, not via the
+  // ambient cookies() helper. In Next.js 16 route handlers that return a
+  // custom NextResponse, cookies set via cookies().set() are not reliably
+  // attached — leading to "OAuth state mismatch" errors on the callback.
   const isHttps = baseUrl.startsWith("https://")
-  const baseCookie = {
+  const cookieOptions = {
     httpOnly: true,
     secure: isHttps,
     sameSite: "lax" as const,
     path: "/",
-    maxAge: 10 * 60, // 10 minutes — plenty for the user to click "Continue"
+    maxAge: 10 * 60, // 10 minutes
   }
-  cookieStore.set("oauth-state", state, baseCookie)
-  cookieStore.set("oauth-code-verifier", codeVerifier, baseCookie)
-
-  return NextResponse.redirect(authorizeUrl)
+  const res = NextResponse.redirect(authorizeUrl)
+  res.cookies.set("oauth-state", state, cookieOptions)
+  res.cookies.set("oauth-code-verifier", codeVerifier, cookieOptions)
+  return res
 }
