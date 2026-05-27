@@ -54,12 +54,17 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const [allElements, favorites, currentUser, allUsers] = await Promise.all([
-    getElements(),
-    getFavoriteElements(),
+  const [currentUser, allUsers] = await Promise.all([
     getCurrentUser().catch(() => null),
     getUsers().catch(() => []),
   ])
+
+  // Only fetch sidebar data when the user is actually authenticated. Anyone
+  // hitting /login or another public route should never see workspace
+  // content leak through the sidebar.
+  const [allElements, favorites] = currentUser
+    ? await Promise.all([getElements(), getFavoriteElements()])
+    : [[], []]
 
   const needsSetup = allUsers.length === 0
 
@@ -76,15 +81,29 @@ export default async function RootLayout({
             <SpeechProvider>
             <AIProvider>
             <TooltipProvider>
+              {/* SidebarProvider is always present so pages using
+                  useSidebar() (e.g. SidebarTrigger) don't crash at
+                  prerender time. The sidebar + floating widgets only
+                  render when the user is actually signed in. */}
               <SidebarProvider>
-                <AppSidebar elements={allElements} favorites={favorites} />
+                {currentUser && (
+                  <AppSidebar elements={allElements} favorites={favorites} />
+                )}
                 <SidebarInset>
-                  <MainShell>{children}</MainShell>
+                  {currentUser ? (
+                    <MainShell>{children}</MainShell>
+                  ) : (
+                    children
+                  )}
                 </SidebarInset>
-                <TopbarClock />
-                <TaskTimerWidget />
-                <CommandPalette />
-                <KeyboardShortcuts />
+                {currentUser && (
+                  <>
+                    <TopbarClock />
+                    <TaskTimerWidget />
+                    <CommandPalette />
+                    <KeyboardShortcuts />
+                  </>
+                )}
               </SidebarProvider>
               <Toaster richColors position="bottom-right" />
             </TooltipProvider>
