@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 // Public paths that don't require authentication
-const PUBLIC_PATHS = ["/login", "/api/auth", "/forgot-password", "/reset-password"]
+const PUBLIC_PATHS = ["/login", "/api/auth", "/forgot-password", "/reset-password", "/verify-email"]
 // Static asset patterns
 const STATIC_PATTERNS = [
   "/_next",

@@ -133,6 +133,17 @@ export async function createUser(data: {
     console.error("[signup] template seed failed for", id, err)
   }
 
+  // Send an email verification link in the background. Only if the user
+  // gave an email AND SMTP is configured on the server. Doesn't block.
+  if (data.email) {
+    try {
+      const { requestEmailVerification } = await import("./email-verification-actions")
+      await requestEmailVerification(id)
+    } catch (err) {
+      console.error("[signup] verification email failed for", id, err)
+    }
+  }
+
   revalidatePath("/settings")
   return { id }
 }

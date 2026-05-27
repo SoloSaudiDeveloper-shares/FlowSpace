@@ -82,7 +82,9 @@ export async function GET(request: NextRequest) {
     if (byEmail.length > 0) {
       if (!byEmail[0].isActive) return errorRedirect(baseUrl, "Account is deactivated.")
       userId = byEmail[0].id
-      sqlite.prepare(`UPDATE users SET google_id = ? WHERE id = ?`).run(profile.sub, userId)
+      sqlite
+        .prepare(`UPDATE users SET google_id = ?, email_verified = 1 WHERE id = ?`)
+        .run(profile.sub, userId)
     } else {
       const userCount = (await db.select({ id: users.id }).from(users).limit(1)).length
       const signupsEnabled = userCount === 0 ? true : await getSignupsEnabled()
@@ -107,7 +109,11 @@ export async function GET(request: NextRequest) {
         createdAt: now,
         updatedAt: now,
       })
-      sqlite.prepare(`UPDATE users SET google_id = ? WHERE id = ?`).run(profile.sub, id)
+      // Google already verified the email — mark our column too so
+      // the user doesn't see a "verify your email" banner.
+      sqlite
+        .prepare(`UPDATE users SET google_id = ?, email_verified = 1 WHERE id = ?`)
+        .run(profile.sub, id)
 
       // Seed showcase templates into the new Google user's workspace.
       try {

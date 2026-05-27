@@ -33,17 +33,24 @@ sqlite.exec(`
   );
 `)
 
-// ─── Google OAuth column on users ──────────────────────────────────────
+// ─── Google OAuth + email-verified columns on users ────────────────────
 // SQLite doesn't have ALTER TABLE ... ADD COLUMN IF NOT EXISTS. Check first.
 try {
   const cols = sqlite.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]
-  if (!cols.some((c) => c.name === "google_id")) {
+  const colNames = new Set(cols.map((c) => c.name))
+  if (!colNames.has("google_id")) {
     sqlite.exec(`ALTER TABLE users ADD COLUMN google_id TEXT`)
     sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL`)
     console.log("[migration] users.google_id column added")
   }
+  if (!colNames.has("email_verified")) {
+    sqlite.exec(`ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0`)
+    // Existing users (predate verification) are grandfathered in as verified.
+    sqlite.exec(`UPDATE users SET email_verified = 1 WHERE email_verified = 0`)
+    console.log("[migration] users.email_verified column added (existing users grandfathered)")
+  }
 } catch (err) {
-  console.error("[migration] google_id column add failed:", err)
+  console.error("[migration] users column adds failed:", err)
 }
 
 // ─── Password reset tokens ─────────────────────────────────────────────
@@ -59,6 +66,20 @@ sqlite.exec(`
 `)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_token ON password_reset_tokens(token);`)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_user ON password_reset_tokens(user_id);`)
+
+// ─── Email verification tokens ─────────────────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email      TEXT NOT NULL,
+    token      TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    used_at    TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_email_verify_token ON email_verification_tokens(token);`)
 
 // ─── One-time ownership backfill ───────────────────────────────────────
 // Pre-isolation rows have NULL owner columns. They were created before
