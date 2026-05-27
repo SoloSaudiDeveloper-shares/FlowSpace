@@ -24,6 +24,36 @@ sqlite.pragma("foreign_keys = ON")
 // reference these tables.
 sqlite.exec(BOOTSTRAP_SCHEMA_SQL)
 
+// ─── One-time ownership backfill ───────────────────────────────────────
+// When the per-user workspace model rolled out, existing rows had
+// created_by = NULL. If exactly one human user exists (the admin),
+// claim everything for them. Idempotent: subsequent boots find 0 NULLs
+// and skip.
+try {
+  const orphanCount = (sqlite
+    .prepare(`SELECT COUNT(*) AS n FROM elements WHERE created_by IS NULL`)
+    .get() as { n: number }).n
+  if (orphanCount > 0) {
+    const users = sqlite
+      .prepare(`SELECT id FROM users WHERE is_active = 1 ORDER BY created_at ASC LIMIT 2`)
+      .all() as { id: string }[]
+    if (users.length === 1) {
+      sqlite
+        .prepare(`UPDATE elements SET created_by = ? WHERE created_by IS NULL`)
+        .run(users[0].id)
+      console.log(`[migration] Assigned ${orphanCount} orphaned elements to ${users[0].id}`)
+    } else if (users.length > 1) {
+      console.warn(
+        `[migration] Found ${orphanCount} orphaned elements but multiple users exist; ` +
+        `manual assignment required. Backfill skipped to avoid wrong attribution.`
+      )
+    }
+  }
+} catch (err) {
+  // Don't fail startup over migration — log and continue.
+  console.error("[migration] backfill failed:", err)
+}
+
 // ─── FTS5 Full-Text Search ─────────────────────────────────────────────
 // Create virtual table for full-text search on elements
 sqlite.exec(`
