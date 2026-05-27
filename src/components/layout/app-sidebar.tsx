@@ -34,12 +34,16 @@ import {
 } from "lucide-react"
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
+  defaultDropAnimationSideEffects,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
+  type DropAnimation,
 } from "@dnd-kit/core"
 import {
   SortableContext,
@@ -318,6 +322,27 @@ function SortableCollapsibleSectionInner({
 }
 
 /** Single draggable element row inside a typed section (Pages, Canvases, …). */
+/**
+ * Floating preview rendered under the cursor while a sidebar row is dragged.
+ * Plain element name + matching icon, styled like the original row but with
+ * a stronger shadow and a slight rotation so it reads as "lifted off the page".
+ */
+function SidebarDragGhost({ el }: { el: Element }) {
+  const Icon = ELEMENT_TYPE_CONFIG[el.type]?.icon ?? FolderKanban
+  return (
+    <div
+      className="inline-flex items-center gap-2 w-56 px-3 py-2 rounded-md bg-sidebar text-sidebar-foreground border border-sidebar-border shadow-xl text-sm cursor-grabbing"
+      style={{ transform: "rotate(-1deg)" }}
+    >
+      <GripVertical className="size-3 text-muted-foreground shrink-0" />
+      <span className="shrink-0" style={{ color: el.color ?? undefined }}>
+        <Icon className="size-4" />
+      </span>
+      <span className="truncate font-medium">{el.title}</span>
+    </div>
+  )
+}
+
 function SortableElementItem({
   el,
   href,
@@ -454,11 +479,27 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   const { preferences, updatePreference } = usePreferences()
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
 
+  // Tracks the id of the row currently being dragged, so we can render a
+  // floating preview via <DragOverlay>. Cleared on drop or cancel.
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
+
   // dnd-kit sensors — pointer for mouse/touch, keyboard for accessibility
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
+
+  // Subtle "snap into place" animation when the user drops a row.
+  const dropAnimation: DropAnimation = {
+    sideEffects: defaultDropAnimationSideEffects({
+      styles: { active: { opacity: "0.4" } },
+    }),
+  }
+
+  // Resolve the active drag id back to a renderable item (project or other element)
+  const activeDragItem = activeDragId
+    ? elements.find((el) => el.id === activeDragId) ?? null
+    : null
 
   // Gate dnd-kit until after hydration — it generates incrementing
   // aria-describedby IDs that don't match between SSR and CSR.
@@ -644,9 +685,18 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
     updatePreference("sidebarOrder", next)
   }
 
+  function handleDragStart(e: DragStartEvent) {
+    setActiveDragId(e.active.id as string)
+  }
+
+  function handleDragCancel() {
+    setActiveDragId(null)
+  }
+
   // Per-section item drag handler. Optimistic — calls reorderElements server action.
   function handleItemDragEnd(typeKey: ElementType) {
     return async (e: DragEndEvent) => {
+      setActiveDragId(null)
       const { active, over } = e
       if (!over || active.id === over.id) return
       const items = grouped[typeKey] || []
@@ -666,6 +716,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   // Root-project drag handler. Reorders only the top-level projects.
   // Sub-projects retain their position inside their parent.
   async function handleProjectDragEnd(e: DragEndEvent) {
+    setActiveDragId(null)
     const { active, over } = e
     if (!over || active.id === over.id) return
     const ids = rootProjects.map((p) => p.id)
@@ -825,7 +876,9 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
                   onDragEnd={handleProjectDragEnd}
+                  onDragCancel={handleDragCancel}
                 >
                   <SortableContext
                     items={rootProjects.map((p) => p.id)}
@@ -873,6 +926,9 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                       )
                     })}
                   </SortableContext>
+                  <DragOverlay dropAnimation={dropAnimation}>
+                    {activeDragItem ? <SidebarDragGhost el={activeDragItem} /> : null}
+                  </DragOverlay>
                 </DndContext>
               ) : (
                 rootProjects.map((project) => renderProjectItem(project))
@@ -976,7 +1032,9 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
                   onDragEnd={handleItemDragEnd(typeKey)}
+                  onDragCancel={handleDragCancel}
                 >
                   <SortableContext
                     items={items.map((it) => it.id)}
@@ -996,6 +1054,9 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                       )
                     })}
                   </SortableContext>
+                  <DragOverlay dropAnimation={dropAnimation}>
+                    {activeDragItem ? <SidebarDragGhost el={activeDragItem} /> : null}
+                  </DragOverlay>
                 </DndContext>
               ) : (
                 items.map((el) => {
