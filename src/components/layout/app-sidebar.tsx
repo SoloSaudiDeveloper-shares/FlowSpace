@@ -29,6 +29,8 @@ import {
   Zap,
   ShieldCheck,
   GripVertical,
+  Pin,
+  PinOff,
 } from "lucide-react"
 import {
   DndContext,
@@ -120,6 +122,27 @@ function getElementHref(element: Element): string {
 interface AppSidebarProps {
   elements: Element[]
   favorites: Element[]
+}
+
+/** Color presets used by the sidebar right-click color picker. */
+const SIDEBAR_COLOR_OPTIONS: { value: string; label: string }[] = [
+  { value: "#737373", label: "Neutral" },
+  { value: "#3b82f6", label: "Blue" },
+  { value: "#8b5cf6", label: "Violet" },
+  { value: "#f43f5e", label: "Rose" },
+  { value: "#10b981", label: "Green" },
+  { value: "#f97316", label: "Orange" },
+  { value: "#14b8a6", label: "Teal" },
+]
+
+function sidebarRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  const diffSec = Math.max(0, (Date.now() - then) / 1000)
+  if (diffSec < 60) return "just now"
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`
+  if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`
+  return new Date(iso).toLocaleDateString()
 }
 
 /**
@@ -401,7 +424,19 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
 
   function handleElementContextMenu(e: React.MouseEvent, el: Element) {
     const href = getElementHref(el)
+    const typeLabel =
+      ELEMENT_TYPE_CONFIG[el.type]?.label.replace(/s$/, "") ?? el.type
+    const lastEdited = el.updatedAt ? sidebarRelativeTime(el.updatedAt) : null
     const items: ContextMenuEntry[] = [
+      {
+        header: true,
+        title: el.title,
+        subtitle: [typeLabel, lastEdited ? `edited ${lastEdited}` : null]
+          .filter(Boolean)
+          .join(" · "),
+        icon: ELEMENT_TYPE_CONFIG[el.type]?.icon,
+      },
+      { separator: true },
       {
         label: "Open",
         icon: ExternalLink,
@@ -418,9 +453,17 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
         },
       },
       {
-        label: el.isFavorite ? "Remove from Favorites" : "Add to Favorites",
-        icon: Star,
+        label: el.isFavorite ? "Unpin from Favorites" : "Pin to Favorites",
+        icon: el.isFavorite ? PinOff : Pin,
         onClick: () => toggleFavorite(el.id),
+      },
+      {
+        colors: true,
+        options: SIDEBAR_COLOR_OPTIONS,
+        selected: el.color ?? undefined,
+        onPick: async (val: string) => {
+          await updateElement(el.id, { color: val || undefined })
+        },
       },
       ...(el.type === "project"
         ? [
@@ -474,6 +517,20 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   // Visibility from preferences (default true if missing)
   const isVisible = (key: SidebarSectionKey) =>
     preferences.sidebarVisible?.[key] !== false
+
+  // Resolve a section's display label — user override falls back to default.
+  const DEFAULT_LABELS: Record<SidebarSectionKey, string> = {
+    favorites: "Favorites",
+    projects: "Projects",
+    "type:page": "Pages",
+    "type:canvas": "Canvases",
+    "type:todo_list": "Todo Lists",
+    "type:reminder": "Reminders",
+    "type:process": "Processes",
+    platform: "Platform",
+  }
+  const labelFor = (key: SidebarSectionKey) =>
+    preferences.sidebarLabels?.[key]?.trim() || DEFAULT_LABELS[key]
 
   // Section order from preferences, falling back to default order
   const DEFAULT_ORDER: SidebarSectionKey[] = [
@@ -614,7 +671,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
             key="favorites"
             sectionKey="favorites"
             icon={Star}
-            label="Favorites"
+            label={labelFor("favorites")}
             count={favorites.length}
             collapsed={isCollapsed("favorites")}
             onToggle={toggleGroup}
@@ -648,7 +705,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
             key="projects"
             sectionKey="projects"
             icon={FolderKanban}
-            label="Projects"
+            label={labelFor("projects")}
             count={rootProjects.length}
             collapsed={isCollapsed("projects")}
             onToggle={toggleGroup}
@@ -676,7 +733,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
           <CollapsibleSection sortable={dndReady}
             key="platform"
             sectionKey="platform"
-            label="Platform"
+            label={labelFor("platform")}
             collapsed={isCollapsed("platform")}
             onToggle={toggleGroup}
           >
@@ -746,7 +803,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
             key={key}
             sectionKey={key}
             icon={config.icon}
-            label={config.label}
+            label={labelFor(key)}
             count={items.length}
             collapsed={isCollapsed(key)}
             onToggle={toggleGroup}

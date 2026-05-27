@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import {
-  Play, Pause, Square, Plus, Timer, Pencil, Palette, Move,
+  Play, Pause, Square, Plus, Timer, Pencil, Palette, Move, GripVertical,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -134,21 +134,30 @@ export function TaskTimerWidget() {
       <>
         <div
           ref={drag.containerRef}
-          style={drag.style}
-          onPointerDown={drag.onPointerDown}
           onContextMenu={handleContextMenu}
-          className={`z-30 ${drag.isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+          className="z-30 group/fab inline-flex items-stretch rounded-full border border-border/40 bg-card/70 backdrop-blur-md text-xs font-medium text-muted-foreground shadow-[0_2px_8px_-2px_rgb(0_0_0/0.1)] hover:bg-card hover:text-foreground hover:border-border hover:shadow-[0_8px_24px_-6px_rgb(0_0_0/0.18)] transition-[background,border-color,box-shadow] duration-300"
           data-slot="timer-widget-fab"
+          style={{ ...drag.style, borderColor: `${accent}66` }}
         >
+          {/* drag grip — visible on hover */}
+          <span
+            onPointerDown={drag.onPointerDown}
+            className={`flex items-center pl-2 pr-0.5 opacity-0 group-hover/fab:opacity-60 hover:!opacity-100 transition-opacity ${
+              drag.isDragging ? "cursor-grabbing opacity-100" : "cursor-grab"
+            }`}
+            title="Drag to move (right-click for options)"
+            aria-label="Drag timer"
+          >
+            <GripVertical className="size-3" />
+          </span>
           <button
             type="button"
             data-no-drag
             onClick={() => setPickerOpen(true)}
-            className="group inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-card/70 backdrop-blur-md px-3.5 py-2 text-xs font-medium text-muted-foreground shadow-[0_2px_8px_-2px_rgb(0_0_0/0.1)] hover:bg-card hover:text-foreground hover:border-border hover:shadow-[0_8px_24px_-6px_rgb(0_0_0/0.18)] transition-all duration-300"
-            aria-label="Start a focus timer (right-click for options)"
-            style={{ borderColor: `${accent}66` }}
+            className="inline-flex items-center gap-1.5 pr-3.5 pl-1 py-2"
+            aria-label="Start a focus timer"
           >
-            <Timer className="size-3.5 transition-transform duration-500 group-hover:rotate-180" style={{ color: accent }} />
+            <Timer className="size-3.5 transition-transform duration-500 group-hover/fab:rotate-180" style={{ color: accent }} />
             <span className="tracking-wide">Start timer</span>
           </button>
         </div>

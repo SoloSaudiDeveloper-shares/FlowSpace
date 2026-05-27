@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Rss, X } from "lucide-react"
-import { usePreferences } from "@/lib/hooks/use-preferences"
+import { Rss, X, ExternalLink, EyeOff, BellOff } from "lucide-react"
+import { usePreferences, DEFAULT_PREFERENCES } from "@/lib/hooks/use-preferences"
 import { getGlobalFeed } from "@/lib/actions/feed-actions"
+import {
+  ContextMenu,
+  useContextMenu,
+  type ContextMenuEntry,
+} from "@/components/shared/context-menu"
 
 interface TickerItem {
   id: string
@@ -25,12 +30,55 @@ interface TickerItem {
  */
 export function FeedTicker() {
   const router = useRouter()
-  const { preferences } = usePreferences()
+  const { preferences, updatePreference } = usePreferences()
   const cfg = preferences.feedTicker ?? {
     show: true, position: "top" as const, direction: "rtl" as const, speedSec: 90,
   }
   const [items, setItems] = useState<TickerItem[]>([])
   const [dismissed, setDismissed] = useState(false)
+  const ctx = useContextMenu()
+
+  function openItemMenu(e: React.MouseEvent, item: TickerItem) {
+    const items: ContextMenuEntry[] = [
+      {
+        header: true,
+        title: item.title,
+        subtitle: [
+          item.type.replace(/_/g, " "),
+          relativeTime(item.createdAt),
+        ].join(" · "),
+        icon: Rss,
+      },
+      { separator: true },
+      {
+        label: "Open subject",
+        icon: ExternalLink,
+        onClick: () => item.subjectElementId && router.push(elementHref(item.subjectElementId, item.type)),
+        disabled: !item.subjectElementId,
+      },
+      {
+        label: "Open Feed page",
+        icon: Rss,
+        onClick: () => router.push("/feed"),
+      },
+      { separator: true },
+      {
+        label: "Hide ticker for this session",
+        icon: EyeOff,
+        onClick: () => setDismissed(true),
+      },
+      {
+        label: "Hide ticker permanently",
+        icon: BellOff,
+        onClick: () => {
+          const next = { ...(preferences.feedTicker ?? DEFAULT_PREFERENCES.feedTicker) }
+          next.show = false
+          updatePreference("feedTicker", next)
+        },
+      },
+    ]
+    ctx.open(e, items)
+  }
 
   // Fetch on mount + refresh every 2 min
   useEffect(() => {
@@ -67,15 +115,16 @@ export function FeedTicker() {
   // animation-direction `normal` = translateX(0) → -50% (content moves left → RTL feel)
   // animation-direction `reverse` = -50% → 0 (content moves right → LTR feel)
   const animDir = cfg.direction === "rtl" ? "normal" : "reverse"
+  // sticky to the appropriate edge of the SidebarInset content area
   const pos =
     cfg.position === "bottom"
-      ? "bottom-0 border-t"
-      : "top-0 border-b"
+      ? "sticky bottom-0 border-t order-last"
+      : "sticky top-0 border-b"
 
   return (
     <div
       data-slot="feed-ticker"
-      className={`fixed inset-x-0 ${pos} z-20 h-7 overflow-hidden bg-background/70 backdrop-blur-md border-border/40 group`}
+      className={`relative ${pos} z-20 h-7 shrink-0 overflow-hidden bg-background/70 backdrop-blur-md border-border/40 group`}
     >
       <div className="absolute inset-y-0 left-0 z-10 flex items-center gap-1.5 px-2.5 bg-background/90 backdrop-blur-md border-r border-border/40">
         <Rss className="size-3 text-muted-foreground" />
@@ -95,9 +144,11 @@ export function FeedTicker() {
             key={`${item.id}-${i}`}
             type="button"
             onClick={() => item.subjectElementId && router.push(elementHref(item.subjectElementId, item.type))}
-            className="inline-flex items-center gap-2 mr-8 hover:text-foreground transition-colors text-muted-foreground"
+            onContextMenu={(e) => openItemMenu(e, item)}
+            className="group/item inline-flex items-center gap-2 mr-8 px-2 py-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+            title="Click to open · Right-click for options"
           >
-            <span className="inline-block size-1.5 rounded-full bg-primary/60" />
+            <span className="inline-block size-1.5 rounded-full bg-primary/60 group-hover/item:bg-primary transition-colors" />
             <span className="font-medium text-foreground/90">{item.title}</span>
             {item.summary && <span className="text-muted-foreground/70 truncate max-w-md">— {item.summary}</span>}
             <span className="text-muted-foreground/40 text-[10px] uppercase tracking-wider">{relativeTime(item.createdAt)}</span>
@@ -113,6 +164,7 @@ export function FeedTicker() {
       >
         <X className="size-3" />
       </button>
+      {ctx.menu && <ContextMenu x={ctx.menu.x} y={ctx.menu.y} items={ctx.menu.items} onClose={ctx.close} />}
     </div>
   )
 }

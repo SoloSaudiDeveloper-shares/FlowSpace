@@ -414,6 +414,56 @@ export function SettingsContent() {
             </Button>
           </div>
         </div>
+
+        {/* Rename labels */}
+        <div className="px-4 py-3 rounded-lg border bg-card mt-3">
+          <h3 className="text-sm font-medium mb-3">Custom category names</h3>
+          <p className="text-xs text-muted-foreground mb-3">
+            Rename a category to whatever fits your workflow. Leave blank to
+            use the default.
+          </p>
+          <div className="space-y-2">
+            {(Object.keys(SIDEBAR_SECTION_LABELS) as SidebarSectionKey[]).map((key) => {
+              const defaultLabel = SIDEBAR_SECTION_LABELS[key]
+              const value = preferences.sidebarLabels?.[key] ?? ""
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-24 shrink-0 truncate">
+                    {defaultLabel}
+                  </span>
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => {
+                      const next = { ...(preferences.sidebarLabels ?? {}) }
+                      const v = e.target.value
+                      if (v.trim()) next[key] = v
+                      else delete next[key]
+                      updatePreference("sidebarLabels", next)
+                    }}
+                    placeholder={defaultLabel}
+                    className="flex-1 h-8 rounded-md border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
+              )
+            })}
+          </div>
+          {Object.keys(preferences.sidebarLabels ?? {}).length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  updatePreference("sidebarLabels", {})
+                  toast.success("Custom names cleared")
+                }}
+              >
+                <RotateCcw className="size-3.5 mr-1.5" />
+                Reset all names
+              </Button>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* ─── Clock ────────────────────────────────────────────────── */}

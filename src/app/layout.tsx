@@ -14,7 +14,7 @@ import { CommandPalette } from "@/components/layout/command-palette"
 import { KeyboardShortcuts } from "@/components/layout/keyboard-shortcuts"
 import { TopbarClock } from "@/components/layout/topbar-clock"
 import { TaskTimerWidget } from "@/components/layout/task-timer-widget"
-import { FeedTicker } from "@/components/layout/feed-ticker"
+import { MainShell } from "@/components/layout/main-shell"
 import { Toaster } from "sonner"
 import { getElements, getFavoriteElements } from "@/lib/actions/element-actions"
 import { getCurrentUser, getUsers } from "@/lib/actions/user-actions"
@@ -78,8 +78,9 @@ export default async function RootLayout({
             <TooltipProvider>
               <SidebarProvider>
                 <AppSidebar elements={allElements} favorites={favorites} />
-                <SidebarInset>{children}</SidebarInset>
-                <FeedTicker />
+                <SidebarInset>
+                  <MainShell>{children}</MainShell>
+                </SidebarInset>
                 <TopbarClock />
                 <TaskTimerWidget />
                 <CommandPalette />

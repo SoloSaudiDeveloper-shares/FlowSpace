@@ -116,6 +116,9 @@
   animation-play-state: paused !important;
 }
 
+/* FeedTicker is now rendered as a sticky in-flow sibling at top (or bottom)
+   of the SidebarInset content area — no padding hack needed. */
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

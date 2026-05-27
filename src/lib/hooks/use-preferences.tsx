@@ -61,6 +61,8 @@ export interface Preferences {
   // Sidebar customisation
   sidebarVisible: Record<SidebarSectionKey, boolean>
   sidebarOrder: SidebarSectionKey[]
+  /** User-renamed section labels. Empty / missing keys fall back to defaults. */
+  sidebarLabels: Partial<Record<SidebarSectionKey, string>>
   // Top-bar clock
   clock: ClockPreferences
   // Scrolling feed ticker
@@ -111,6 +113,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
     "type:process",
     "platform",
   ],
+  sidebarLabels: {},
   clock: {
     show: true,
     format24: true,
