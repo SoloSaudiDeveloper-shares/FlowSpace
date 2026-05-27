@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { useAuth } from "@/lib/hooks/use-auth"
 import { createUser } from "@/lib/actions/user-actions"
 import { useRouter } from "next/navigation"
@@ -217,6 +218,17 @@ export function LoginForm({ signupsEnabled }: LoginFormProps) {
                 ? (effectiveMode === "register" ? "Creating account..." : "Signing in...")
                 : (effectiveMode === "register" ? "Create Account" : "Sign In")}
             </button>
+
+            {effectiveMode === "login" && !isSetupMode && (
+              <div className="text-center pt-1">
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            )}
           </form>
         </div>
 

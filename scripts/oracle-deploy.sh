@@ -73,11 +73,21 @@ sudo docker volume create "$DATA_VOLUME" >/dev/null
 if sudo docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
   sudo docker rm -f "$CONTAINER_NAME"
 fi
+# Per-host runtime env (Gmail SMTP creds, PUBLIC_APP_URL, etc.) lives in
+# ~/.flowspace.env. The file is only consulted when present; format is the
+# standard KEY=VALUE line-per-var.
+ENV_FILE="$HOME/.flowspace.env"
+ENV_FILE_ARG=""
+if [ -f "$ENV_FILE" ]; then
+  ENV_FILE_ARG="--env-file $ENV_FILE"
+  echo "    using $ENV_FILE"
+fi
 sudo docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
   -p "${PORT_HOST}:3000" \
   -v "${DATA_VOLUME}:/data" \
+  $ENV_FILE_ARG \
   "$IMAGE_NAME"
 
 echo "==> [6/6] Wiring systemd hook (so reboots restart the container)"

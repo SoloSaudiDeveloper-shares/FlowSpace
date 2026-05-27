@@ -113,6 +113,43 @@ sudo docker exec -it flowspace node scripts/bootstrap-admin.mjs
 ```
 That creates an `admin` user — same flow as desktop.
 
+## Part 4.5 — (Optional) Enable password reset emails via Gmail
+
+Without this, the password-reset flow renders but the email never sends.
+The UI warns you about that visibly, so it's safe to skip until you want it.
+
+### Get a Gmail App Password
+1. Make sure 2-Step Verification is on for your Google account.
+2. Visit https://myaccount.google.com/apppasswords
+3. Pick "Mail" / "Other (Custom name)" → name it "FlowSpace" → generate.
+4. Copy the 16-character password Google shows you (it's only shown once).
+
+### Put credentials on the VM
+
+```bash
+ssh -i path/to/key ubuntu@<your-ip>
+cat > ~/.flowspace.env <<EOF
+GMAIL_USER=your.address@gmail.com
+GMAIL_APP_PASSWORD=the16characterapppwd
+PUBLIC_APP_URL=http://<your-ip>:3737
+MAIL_FROM_NAME=FlowSpace
+EOF
+chmod 600 ~/.flowspace.env
+```
+
+### Apply
+
+```bash
+./oracle-deploy.sh https://github.com/SoloSaudiDeveloper-shares/FlowSpace.git
+```
+
+The installer detects `~/.flowspace.env` and passes it into the container as
+`--env-file`. The forgot-password / reset-password pages now send real emails.
+
+If you later set up HTTPS + a domain (Part 5), update `PUBLIC_APP_URL` in
+`~/.flowspace.env` to your `https://...` URL so the links in emails point
+to the right place.
+
 ## Part 5 — (Optional) HTTPS + a domain
 
 For a real domain like `flowspace.yourname.com`:

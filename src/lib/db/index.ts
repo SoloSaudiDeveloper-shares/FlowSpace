@@ -33,6 +33,20 @@ sqlite.exec(`
   );
 `)
 
+// ─── Password reset tokens ─────────────────────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token      TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    used_at    TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_token ON password_reset_tokens(token);`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_user ON password_reset_tokens(user_id);`)
+
 // ─── One-time ownership backfill ───────────────────────────────────────
 // When the per-user workspace model rolled out, existing rows had
 // created_by = NULL. If exactly one human user exists (the admin),
