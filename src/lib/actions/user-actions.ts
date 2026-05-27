@@ -161,6 +161,54 @@ export async function getUsers() {
 }
 
 /**
+ * Change the current user's password. Verifies the old password first,
+ * hashes the new one with bcrypt (cost 12), wipes all OTHER sessions
+ * for this user so a stale device can't keep its session with the old
+ * credential context.
+ */
+export async function changeMyPassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const me = await getCurrentUser()
+  if (!me) return { ok: false, error: "Not signed in" }
+  if (!newPassword || newPassword.length < 8) {
+    return { ok: false, error: "New password must be at least 8 characters" }
+  }
+  if (currentPassword === newPassword) {
+    return { ok: false, error: "Pick a different password than your current one" }
+  }
+  const stored = await db.select().from(users).where(eq(users.id, me.id)).limit(1)
+  if (stored.length === 0) return { ok: false, error: "User not found" }
+  const ok = await verifyPassword(currentPassword, stored[0].passwordHash)
+  if (!ok) return { ok: false, error: "Current password is incorrect" }
+
+  const newHash = await bcrypt.hash(newPassword, 12)
+  await db
+    .update(users)
+    .set({ passwordHash: newHash, updatedAt: new Date().toISOString() })
+    .where(eq(users.id, me.id))
+
+  // Invalidate other sessions but keep the current one alive so the user
+  // doesn't get bounced out mid-flow. Best-effort.
+  try {
+    const cookieStore = await cookies()
+    const currentToken = cookieStore.get("flowspace-session")?.value
+    if (currentToken) {
+      await db.delete(sessions).where(
+        and(eq(sessions.userId, me.id), sql`token != ${currentToken}`)
+      )
+    } else {
+      await db.delete(sessions).where(eq(sessions.userId, me.id))
+    }
+  } catch {
+    // non-fatal
+  }
+
+  return { ok: true }
+}
+
+/**
  * Cheap "does any user exist?" probe used by the layout to decide whether
  * to force initial setup. Doesn't return any user data.
  */
