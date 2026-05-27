@@ -102,6 +102,20 @@
   animation: sidebar-item-in 240ms ease-out both;
 }
 
+/* ─── Feed ticker marquee ───────────────────────────────────────────
+   The track contains a doubled list; translating from 0% to -50% loops
+   seamlessly. Pause on hover so the user can read. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+[data-slot="feed-ticker"] .marquee-track {
+  will-change: transform;
+}
+[data-slot="feed-ticker"]:hover .marquee-track {
+  animation-play-state: paused !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

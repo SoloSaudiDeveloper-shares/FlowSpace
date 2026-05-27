@@ -36,6 +36,13 @@ export interface ClockPreferences {
   secondTimezoneLabel: string  // empty = none; e.g. "UTC" or "America/Los_Angeles"
 }
 
+export interface FeedTickerPreferences {
+  show: boolean
+  position: "top" | "bottom"
+  direction: "ltr" | "rtl"
+  speedSec: number   // time for one full loop (lower = faster)
+}
+
 export interface Preferences {
   fontFamily: FontFamily
   fontSize: FontSize
@@ -56,6 +63,8 @@ export interface Preferences {
   sidebarOrder: SidebarSectionKey[]
   // Top-bar clock
   clock: ClockPreferences
+  // Scrolling feed ticker
+  feedTicker: FeedTickerPreferences
 }
 
 // ─── Defaults ─────────────────────────────────────────────────────────────
@@ -108,6 +117,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
     showSeconds: false,
     showDate: true,
     secondTimezoneLabel: "",
+  },
+  feedTicker: {
+    show: true,
+    position: "top",
+    direction: "rtl",   // common for news tickers: enters from the right
+    speedSec: 90,
   },
 }
 

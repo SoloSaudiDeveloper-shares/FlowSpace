@@ -46,3 +46,6 @@ next-env.d.ts
 /data/
 flowspace.db
 flowspace.db-*
+
+# Local data backups produced by `node scripts/backup-data.mjs`
+/backups/

@@ -31,6 +31,7 @@ import {
   Clock as ClockIcon,
   Eye,
   EyeOff,
+  Rss,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -476,6 +477,121 @@ export function SettingsContent() {
             <p className="text-[11px] text-muted-foreground mt-1">
               Uses IANA timezone names. Leave empty to show only your local time.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Feed Ticker ──────────────────────────────────────────── */}
+      <section>
+        <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
+          <Rss className="size-4" />
+          Feed Ticker
+        </h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Horizontal scrolling news bar that surfaces the latest activity across
+          your workspace.
+        </p>
+        <div className="px-4 py-3 rounded-lg border bg-card space-y-3">
+          {/* Show toggle */}
+          <label className="flex items-center gap-3 py-1.5 px-2 rounded-md cursor-pointer hover:bg-accent/30 transition-colors">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={preferences.feedTicker?.show !== false}
+              onClick={() => {
+                const next = { ...(preferences.feedTicker ?? DEFAULT_PREFERENCES.feedTicker) }
+                next.show = !(preferences.feedTicker?.show !== false)
+                updatePreference("feedTicker", next)
+              }}
+              className={`size-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                preferences.feedTicker?.show !== false
+                  ? "bg-primary border-primary"
+                  : "border-muted-foreground/30 hover:border-primary"
+              }`}
+            >
+              {preferences.feedTicker?.show !== false && <Check className="size-3 text-primary-foreground" />}
+            </button>
+            <span className="text-sm">Show feed ticker</span>
+          </label>
+
+          {/* Position */}
+          <div className="pt-1">
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Position</label>
+            <div className="flex gap-1.5">
+              {(["top", "bottom"] as const).map((p) => {
+                const active = (preferences.feedTicker?.position ?? "top") === p
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      const next = { ...(preferences.feedTicker ?? DEFAULT_PREFERENCES.feedTicker) }
+                      next.position = p
+                      updatePreference("feedTicker", next)
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${
+                      active ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"
+                    }`}
+                  >
+                    {p === "top" ? "Top of page" : "Bottom of page"}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Direction */}
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Direction</label>
+            <div className="flex gap-1.5">
+              {([
+                { v: "rtl" as const, label: "Right → Left", hint: "Items enter from the right" },
+                { v: "ltr" as const, label: "Left → Right", hint: "Items enter from the left" },
+              ]).map((d) => {
+                const active = (preferences.feedTicker?.direction ?? "rtl") === d.v
+                return (
+                  <button
+                    key={d.v}
+                    type="button"
+                    title={d.hint}
+                    onClick={() => {
+                      const next = { ...(preferences.feedTicker ?? DEFAULT_PREFERENCES.feedTicker) }
+                      next.direction = d.v
+                      updatePreference("feedTicker", next)
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${
+                      active ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Speed */}
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              Speed: one full loop in {preferences.feedTicker?.speedSec ?? 90}s
+            </label>
+            <input
+              type="range"
+              min={30}
+              max={240}
+              step={10}
+              value={preferences.feedTicker?.speedSec ?? 90}
+              onChange={(e) => {
+                const next = { ...(preferences.feedTicker ?? DEFAULT_PREFERENCES.feedTicker) }
+                next.speedSec = parseInt(e.target.value, 10)
+                updatePreference("feedTicker", next)
+              }}
+              className="w-full"
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground/60 mt-0.5">
+              <span>Fast</span>
+              <span>Slow</span>
+            </div>
           </div>
         </div>
       </section>

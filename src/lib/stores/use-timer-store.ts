@@ -14,6 +14,19 @@ import { persist, createJSONStorage } from "zustand/middleware"
  *   - When paused: paused=true, pausedAt set; getRemaining freezes
  *   - On expiration the widget calls stop() and fires a toast (handled there).
  */
+export type TimerColor =
+  | "neutral" | "blue" | "violet" | "rose" | "green" | "orange" | "teal"
+
+export const TIMER_COLOR_HEX: Record<TimerColor, string> = {
+  neutral: "#737373",
+  blue:    "#3b82f6",
+  violet:  "#8b5cf6",
+  rose:    "#f43f5e",
+  green:   "#10b981",
+  orange:  "#f97316",
+  teal:    "#14b8a6",
+}
+
 export interface TimerState {
   taskId: string | null
   label: string
@@ -22,6 +35,7 @@ export interface TimerState {
   paused: boolean
   pausedAt: number | null       // epoch ms when paused (for resume math)
   elapsedBeforePause: number    // ms accumulated from prior segments
+  accentColor: TimerColor       // user-chosen color for the widget chrome
 
   start: (opts: {
     label: string
@@ -32,6 +46,7 @@ export interface TimerState {
   resume: () => void
   stop: () => void
   extend: (deltaMs: number) => void
+  setAccentColor: (c: TimerColor) => void
 }
 
 export const useTimerStore = create<TimerState>()(
@@ -44,6 +59,7 @@ export const useTimerStore = create<TimerState>()(
       paused: false,
       pausedAt: null,
       elapsedBeforePause: 0,
+      accentColor: "blue",
 
       start: ({ label, durationMs, taskId = null }) =>
         set({
@@ -90,6 +106,7 @@ export const useTimerStore = create<TimerState>()(
         }),
 
       extend: (deltaMs) => set({ durationMs: get().durationMs + deltaMs }),
+      setAccentColor: (c) => set({ accentColor: c }),
     }),
     {
       name: "flowspace.timer",

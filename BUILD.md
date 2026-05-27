@@ -111,6 +111,9 @@ because `better-sqlite3` loads it via a dynamic `require`.
 From the project root:
 
 ```bash
+# 0. ALWAYS BACK UP FIRST — the build wipes .next/standalone/data/
+node scripts/backup-data.mjs
+
 # 1. Clean previous build (optional but recommended)
 rm -rf .next
 
