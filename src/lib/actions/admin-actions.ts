@@ -9,7 +9,9 @@ import fs from "node:fs"
 import path from "node:path"
 import os from "node:os"
 
-const DATA_DIR = path.join(process.cwd(), "data")
+import { getDataDir } from "@/lib/utils/data-dir"
+
+const DATA_DIR = getDataDir()
 const DB_PATH = path.join(DATA_DIR, "app.db")
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads")
 const BACKUPS_DIR = path.join(DATA_DIR, "backups")

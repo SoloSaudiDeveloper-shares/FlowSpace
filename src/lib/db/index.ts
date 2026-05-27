@@ -4,8 +4,9 @@ import * as schema from "./schema"
 import path from "path"
 import fs from "fs"
 import { BOOTSTRAP_SCHEMA_SQL } from "./bootstrap-schema"
+import { getDataDir } from "@/lib/utils/data-dir"
 
-const dbDir = path.join(process.cwd(), "data")
+const dbDir = getDataDir()
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true })
 }

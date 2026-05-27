@@ -4,8 +4,9 @@ import { taskAttachments } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import fs from "fs"
 import path from "path"
+import { getDataDir } from "@/lib/utils/data-dir"
 
-const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads")
+const UPLOAD_DIR = path.join(getDataDir(), "uploads")
 
 export async function GET(
   request: NextRequest,

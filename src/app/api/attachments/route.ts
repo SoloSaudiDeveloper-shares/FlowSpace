@@ -6,8 +6,9 @@ import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import fs from "fs"
 import path from "path"
+import { getDataDir } from "@/lib/utils/data-dir"
 
-const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads")
+const UPLOAD_DIR = path.join(getDataDir(), "uploads")
 
 // Ensure upload directory exists
 if (!fs.existsSync(UPLOAD_DIR)) {

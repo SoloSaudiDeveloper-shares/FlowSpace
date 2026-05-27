@@ -39,8 +39,9 @@ import { eq, desc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import fs from "node:fs"
 import path from "node:path"
+import { getDataDir } from "@/lib/utils/data-dir"
 
-const BACKUP_DIR = path.join(process.cwd(), "data", "backups")
+const BACKUP_DIR = path.join(getDataDir(), "backups")
 
 function ensureBackupDir() {
   if (!fs.existsSync(BACKUP_DIR)) {
