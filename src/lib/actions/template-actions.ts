@@ -225,6 +225,10 @@ export async function createFromTemplate(
   templateId: string,
   overrides?: { title?: string; projectId?: string }
 ): Promise<{ id: string; type: string }> {
+  // The newly-created element must be owned by the caller, otherwise the
+  // per-user element scoping will hide it from them on the next request
+  // (resulting in a 404 when we redirect to /projects/<id>).
+  const user = await requireAuth()
   const result = await db
     .select()
     .from(templates)
@@ -266,6 +270,7 @@ export async function createFromTemplate(
         title,
         icon: template.icon || "FolderKanban",
         color: template.color || "#6366f1",
+        createdBy: user.id,
         createdAt: now,
         updatedAt: now,
       })
@@ -389,6 +394,7 @@ export async function createFromTemplate(
         title,
         icon: template.icon || "FileText",
         color: template.color || "#8b5cf6",
+        createdBy: user.id,
         createdAt: now,
         updatedAt: now,
       })
@@ -411,6 +417,7 @@ export async function createFromTemplate(
         title,
         icon: template.icon || "Layout",
         color: template.color || "#06b6d4",
+        createdBy: user.id,
         createdAt: now,
         updatedAt: now,
       })
@@ -430,6 +437,7 @@ export async function createFromTemplate(
         title,
         icon: template.icon || "GitBranch",
         color: template.color || "#ec4899",
+        createdBy: user.id,
         createdAt: now,
         updatedAt: now,
       })

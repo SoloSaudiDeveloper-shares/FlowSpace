@@ -210,10 +210,10 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
         key={template.id}
         className="bg-card border rounded-lg p-4 flex flex-col gap-3 hover:border-primary/30 transition-colors"
       >
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-start justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div
-              className="flex size-9 items-center justify-center rounded-md border"
+              className="flex size-9 shrink-0 items-center justify-center rounded-md border"
               style={{ borderColor: template.color || undefined }}
             >
               <TypeIcon
@@ -221,9 +221,14 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
                 style={{ color: template.color || undefined }}
               />
             </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-sm truncate">{template.name}</p>
-              <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${badgeColor}`}>
+            <div className="min-w-0 flex-1">
+              <p
+                className="font-semibold text-sm leading-snug line-clamp-2 break-words"
+                title={template.name}
+              >
+                {template.name}
+              </p>
+              <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium mt-1 ${badgeColor}`}>
                 {template.type}
               </span>
             </div>

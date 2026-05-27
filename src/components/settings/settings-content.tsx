@@ -193,11 +193,52 @@ export function SettingsContent() {
     { label: "30 days", min: 30 * 1440 },
   ]
 
+  // ── Settings navigation (in-page anchor links) ──────────────────
+  const SETTINGS_NAV: { id: string; label: string; icon: React.ComponentType<{ className?: string }>; ownerOnly?: boolean }[] = [
+    { id: "workspace",      label: "Workspace",        icon: Shield,       ownerOnly: true },
+    { id: "data-export",    label: "Data export",      icon: Database },
+    { id: "custom-fields",  label: "Custom fields",    icon: Settings2 },
+    { id: "appearance",     label: "Appearance",       icon: Palette },
+    { id: "sidebar",        label: "Sidebar",          icon: PanelLeft },
+    { id: "clock",          label: "Clock",            icon: ClockIcon },
+    { id: "feed-ticker",    label: "Feed ticker",      icon: Rss },
+    { id: "gantt",          label: "Gantt chart",      icon: BarChart2 },
+    { id: "speech",         label: "Speech",           icon: Mic },
+    { id: "ai",             label: "AI features",      icon: Sparkles },
+    { id: "shortcuts",      label: "Shortcuts",        icon: Keyboard },
+    { id: "about",          label: "About",            icon: Info },
+  ]
+
+  function scrollToSection(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
   return (
-    <div className="space-y-10">
+    <div className="flex gap-6 md:gap-8">
+      {/* ─── Sticky section nav (md+ only) ──────────────────────────── */}
+      <nav className="sticky top-0 self-start hidden md:flex flex-col gap-0.5 w-44 shrink-0 -ml-2 max-h-[calc(100vh-2rem)] overflow-y-auto py-2">
+        <div className="px-2 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">Settings</div>
+        {SETTINGS_NAV.filter((s) => !s.ownerOnly || isOwner).map((s) => {
+          const Icon = s.icon
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => scrollToSection(s.id)}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-left"
+            >
+              <Icon className="size-3.5" />
+              {s.label}
+            </button>
+          )
+        })}
+      </nav>
+
+      {/* ─── Main content ───────────────────────────────────────────── */}
+      <div className="flex-1 space-y-10 min-w-0">
       {/* ─── Workspace (owner only) ────────────────────────────────── */}
       {isOwner && (
-        <section>
+        <section id="workspace" className="scroll-mt-4">
           <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
             <Shield className="size-4" />
             Workspace administration
@@ -293,7 +334,7 @@ export function SettingsContent() {
       )}
 
       {/* ─── Data Export ───────────────────────────────────────────── */}
-      <section>
+      <section id="data-export" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Database className="size-4" />
           Data Export
@@ -352,10 +393,12 @@ export function SettingsContent() {
       </section>
 
       {/* ─── Custom Fields ───────────────────────────────────────── */}
-      <CustomFieldsSettings />
+      <section id="custom-fields" className="scroll-mt-4">
+        <CustomFieldsSettings />
+      </section>
 
       {/* ─── Appearance ───────────────────────────────────────────── */}
-      <section>
+      <section id="appearance" className="scroll-mt-4">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-base font-semibold flex items-center gap-2">
             <Palette className="size-4" />
@@ -518,7 +561,7 @@ export function SettingsContent() {
       </section>
 
       {/* ─── Sidebar ──────────────────────────────────────────────── */}
-      <section>
+      <section id="sidebar" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <PanelLeft className="size-4" />
           Sidebar
@@ -630,7 +673,7 @@ export function SettingsContent() {
       </section>
 
       {/* ─── Clock ────────────────────────────────────────────────── */}
-      <section>
+      <section id="clock" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <ClockIcon className="size-4" />
           Clock
@@ -695,7 +738,7 @@ export function SettingsContent() {
       </section>
 
       {/* ─── Feed Ticker ──────────────────────────────────────────── */}
-      <section>
+      <section id="feed-ticker" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Rss className="size-4" />
           Feed Ticker
@@ -810,7 +853,7 @@ export function SettingsContent() {
       </section>
 
       {/* ─── Gantt Chart ──────────────────────────────────────────── */}
-      <section>
+      <section id="gantt" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <BarChart2 className="size-4" />
           Gantt Chart
@@ -854,7 +897,7 @@ export function SettingsContent() {
       </section>
 
       {/* ─── Speech Recognition ─────────────────────────────────── */}
-      <section>
+      <section id="speech" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Mic className="size-4" />
           Speech Recognition
@@ -1029,7 +1072,7 @@ export function SettingsContent() {
       </section>
 
       {/* ─── AI Features (Ollama) ────────────────────────────────── */}
-      <section>
+      <section id="ai" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Sparkles className="size-4" />
           AI Features
@@ -1523,7 +1566,7 @@ export function SettingsContent() {
       </section>
 
       {/* ─── Keyboard Shortcuts ──────────────────────────────────── */}
-      <section>
+      <section id="shortcuts" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Keyboard className="size-4" />
           Keyboard Shortcuts
@@ -1542,7 +1585,7 @@ export function SettingsContent() {
       </section>
 
       {/* ─── About ───────────────────────────────────────────────── */}
-      <section>
+      <section id="about" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Info className="size-4" />
           About
@@ -1613,6 +1656,7 @@ export function SettingsContent() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>{/* /flex-1 main content */}
     </div>
   )
 }
