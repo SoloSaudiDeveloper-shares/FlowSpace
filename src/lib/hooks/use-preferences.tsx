@@ -28,12 +28,21 @@ export type SidebarSectionKey =
   | "type:process"
   | "platform"
 
+export type ClockDateFormat = "short" | "long" | "iso" | "weekday"
+export type ClockMode = "digital" | "analog"
+
 export interface ClockPreferences {
   show: boolean
   format24: boolean
   showSeconds: boolean
   showDate: boolean
   secondTimezoneLabel: string  // empty = none; e.g. "UTC" or "America/Los_Angeles"
+  /** Optional accent color for the time digits / clock face hand */
+  accentColor?: string
+  /** Display style for the date chip */
+  dateFormat?: ClockDateFormat
+  /** Digital pill or round analog face */
+  mode?: ClockMode
 }
 
 export interface FeedTickerPreferences {
@@ -120,6 +129,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
     showSeconds: false,
     showDate: true,
     secondTimezoneLabel: "",
+    accentColor: undefined,
+    dateFormat: "short",
+    mode: "digital",
   },
   feedTicker: {
     show: true,
