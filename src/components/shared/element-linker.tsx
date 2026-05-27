@@ -32,7 +32,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
 import {
   createLink,
   deleteLink,
@@ -49,11 +48,23 @@ const TYPE_ICONS: Record<ElementType, React.ComponentType<{ className?: string }
   process: GitBranch,
 }
 
+/**
+ * Tailwind tints per relationship type — keeps the chips readable while still
+ * signalling what kind of link this is at a glance.
+ */
+const LINK_TYPE_STYLES: Record<string, { dot: string; label: string }> = {
+  reference:   { dot: "bg-blue-400",   label: "Reference" },
+  dependency:  { dot: "bg-amber-400",  label: "Dependency" },
+  contains:    { dot: "bg-violet-400", label: "Contains" },
+  blocks:      { dot: "bg-rose-400",   label: "Blocks" },
+  relates_to:  { dot: "bg-teal-400",   label: "Relates to" },
+}
+
 const LINK_TYPES = [
-  { value: "reference" as const, label: "Reference" },
+  { value: "reference"  as const, label: "Reference"  },
   { value: "dependency" as const, label: "Dependency" },
-  { value: "contains" as const, label: "Contains" },
-  { value: "blocks" as const, label: "Blocks" },
+  { value: "contains"   as const, label: "Contains"   },
+  { value: "blocks"     as const, label: "Blocks"     },
   { value: "relates_to" as const, label: "Relates to" },
 ]
 
@@ -71,6 +82,15 @@ interface ElementLinkerProps {
   links: LinkInfo[]
 }
 
+/**
+ * Horizontal chip-row that lives in its own bar below the page header.
+ * Each link renders as a pill with a directional arrow, a type-tinted dot,
+ * an icon, a name, and an × on hover. A trailing "+ Add link" chip opens
+ * the search dialog.
+ *
+ * When there are zero links, the row collapses to just the Add chip on the
+ * left — discoverable without being noisy.
+ */
 export function ElementLinker({ elementId, links }: ElementLinkerProps) {
   const router = useRouter()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -79,17 +99,14 @@ export function ElementLinker({ elementId, links }: ElementLinkerProps) {
   const [linkType, setLinkType] = useState<typeof LINK_TYPES[number]["value"]>("reference")
 
   const doSearch = useCallback(async (q: string) => {
-    if (q.length < 1) {
-      setResults([])
-      return
-    }
+    if (q.length < 1) { setResults([]); return }
     const found = await searchElements(q, elementId)
     setResults(found)
   }, [elementId])
 
   useEffect(() => {
-    const timeout = setTimeout(() => doSearch(query), 200)
-    return () => clearTimeout(timeout)
+    const t = setTimeout(() => doSearch(query), 200)
+    return () => clearTimeout(t)
   }, [query, doSearch])
 
   async function handleLink(targetId: string) {
@@ -100,22 +117,67 @@ export function ElementLinker({ elementId, links }: ElementLinkerProps) {
 
   function getElementHref(el: Element): string {
     switch (el.type) {
-      case "project": return `/projects/${el.id}`
-      case "page": return `/pages/${el.id}`
-      case "canvas": return `/canvas/${el.id}`
+      case "project":   return `/projects/${el.id}`
+      case "page":      return `/pages/${el.id}`
+      case "canvas":    return `/canvas/${el.id}`
       case "todo_list": return `/todos/${el.id}`
-      case "reminder": return `/reminders`
-      case "process": return `/process/${el.id}`
-      default: return "/"
+      case "reminder":  return `/reminders`
+      case "process":   return `/process/${el.id}`
+      default:          return "/"
     }
   }
 
-  if (links.length === 0 && !dialogOpen) {
-    return (
+  return (
+    <div
+      className="flex items-center gap-1.5 px-4 py-1.5 border-b bg-muted/30 overflow-x-auto scrollbar-thin"
+      data-slot="element-links-bar"
+    >
+      {/* Label — only shown when there's content to label */}
+      {links.length > 0 && (
+        <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mr-1 shrink-0">
+          <Link2 className="size-3" />
+          Linked
+        </div>
+      )}
+
+      {/* Link chips */}
+      {links.map((link) => {
+        if (!link.relatedElement) return null
+        const Icon = TYPE_ICONS[link.relatedElement.type]
+        const tint = LINK_TYPE_STYLES[link.linkType] ?? LINK_TYPE_STYLES.reference
+        const ArrowIcon = link.direction === "outgoing" ? ArrowRight : ArrowLeft
+        return (
+          <div
+            key={link.id}
+            className="group/chip inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full text-xs bg-card border border-border/60 hover:border-border hover:bg-accent/60 transition-colors cursor-pointer max-w-xs shrink-0"
+            onClick={() => router.push(getElementHref(link.relatedElement!))}
+            title={`${tint.label} — click to open`}
+          >
+            <ArrowIcon className="size-3 text-muted-foreground/60 shrink-0" />
+            <span className={`size-1.5 rounded-full shrink-0 ${tint.dot}`} aria-hidden />
+            <Icon className="size-3 text-muted-foreground shrink-0" />
+            <span className="truncate font-medium text-foreground/90">{link.relatedElement.title}</span>
+            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider shrink-0">
+              {tint.label}
+            </span>
+            <button
+              type="button"
+              className="size-4 inline-flex items-center justify-center rounded-full opacity-0 group-hover/chip:opacity-100 hover:bg-destructive/15 hover:text-destructive transition-colors shrink-0 ml-0.5"
+              onClick={(e) => { e.stopPropagation(); deleteLink(link.id) }}
+              title="Remove link"
+              aria-label="Remove link"
+            >
+              <Trash2 className="size-2.5" />
+            </button>
+          </div>
+        )
+      })}
+
+      {/* Add link chip */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogTrigger className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-          <Link2 className="size-3.5" />
-          Add link
+        <DialogTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-accent/60 border border-dashed border-border/60 hover:border-border transition-colors shrink-0">
+          <Plus className="size-3" />
+          {links.length === 0 ? "Add a link" : "Add"}
         </DialogTrigger>
         <LinkDialog
           query={query}
@@ -126,76 +188,12 @@ export function ElementLinker({ elementId, links }: ElementLinkerProps) {
           onSelect={handleLink}
         />
       </Dialog>
-    )
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-          <Link2 className="size-3" />
-          Linked Elements
-        </h3>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger className="inline-flex items-center justify-center size-6 rounded-md hover:bg-accent">
-            <Plus className="size-3" />
-          </DialogTrigger>
-          <LinkDialog
-            query={query}
-            setQuery={setQuery}
-            results={results}
-            linkType={linkType}
-            setLinkType={setLinkType}
-            onSelect={handleLink}
-          />
-        </Dialog>
-      </div>
-      <div className="space-y-1">
-        {links.map((link) => {
-          if (!link.relatedElement) return null
-          const Icon = TYPE_ICONS[link.relatedElement.type]
-          return (
-            <div
-              key={link.id}
-              className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent cursor-pointer text-sm"
-              onClick={() => router.push(getElementHref(link.relatedElement!))}
-            >
-              {link.direction === "outgoing" ? (
-                <ArrowRight className="size-3 text-muted-foreground shrink-0" />
-              ) : (
-                <ArrowLeft className="size-3 text-muted-foreground shrink-0" />
-              )}
-              <Icon className="size-3.5 shrink-0" />
-              <span className="truncate flex-1">{link.relatedElement.title}</span>
-              <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">
-                {link.linkType}
-              </Badge>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-5 opacity-0 group-hover:opacity-100 shrink-0"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  deleteLink(link.id)
-                }}
-              >
-                <Trash2 className="size-3" />
-              </Button>
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }
 
 function LinkDialog({
-  query,
-  setQuery,
-  results,
-  linkType,
-  setLinkType,
-  onSelect,
+  query, setQuery, results, linkType, setLinkType, onSelect,
 }: {
   query: string
   setQuery: (q: string) => void
@@ -223,12 +221,14 @@ function LinkDialog({
             />
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border px-2 text-xs hover:bg-accent shrink-0">
+            <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md border px-3 text-xs hover:bg-accent shrink-0">
+              <span className={`size-1.5 rounded-full ${LINK_TYPE_STYLES[linkType]?.dot ?? "bg-muted-foreground"}`} />
               {LINK_TYPES.find((t) => t.value === linkType)?.label}
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {LINK_TYPES.map((t) => (
-                <DropdownMenuItem key={t.value} onClick={() => setLinkType(t.value)}>
+                <DropdownMenuItem key={t.value} onClick={() => setLinkType(t.value)} className="gap-2">
+                  <span className={`size-1.5 rounded-full ${LINK_TYPE_STYLES[t.value]?.dot ?? "bg-muted-foreground"}`} />
                   {t.label}
                 </DropdownMenuItem>
               ))}
@@ -246,16 +246,14 @@ function LinkDialog({
               >
                 <Icon className="size-4 shrink-0" />
                 <span className="truncate">{el.title}</span>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-auto shrink-0">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider ml-auto shrink-0">
                   {el.type.replace("_", " ")}
-                </Badge>
+                </span>
               </button>
             )
           })}
           {query.length > 0 && results.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No elements found
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-4">No elements found</p>
           )}
         </div>
       </div>

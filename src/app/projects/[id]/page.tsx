@@ -51,9 +51,6 @@ export default async function ProjectPage({
           <FolderKanban className="size-4" />
         </span>
         <InlineTitle elementId={element.id} initialTitle={element.title} />
-        <div className="ml-4">
-          <ElementLinker elementId={element.id} links={links} />
-        </div>
         <div className="ml-auto">
           <WatchButton
             elementId={element.id}
@@ -62,6 +59,8 @@ export default async function ProjectPage({
           />
         </div>
       </header>
+
+      <ElementLinker elementId={element.id} links={links} />
 
       {subProjects.length > 0 && (
         <SubProjectBar parentId={id} subProjects={subProjects} />

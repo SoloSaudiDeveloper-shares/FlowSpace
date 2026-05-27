@@ -50,12 +50,10 @@ export default async function ProcessPage({
           />
         </div>
       </header>
+      <ElementLinker elementId={element.id} links={links} />
       <PageContextMenu className="flex-1 overflow-auto p-6">
         <div className="mx-auto max-w-3xl">
           <InlineTitle elementId={element.id} initialTitle={element.title} />
-          <div className="mt-2 mb-4">
-            <ElementLinker elementId={element.id} links={links} />
-          </div>
           <ProcessContent processId={element.id} steps={steps} />
         </div>
       </PageContextMenu>

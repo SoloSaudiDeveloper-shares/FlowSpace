@@ -49,12 +49,10 @@ export default async function PageDetailPage({
           />
         </div>
       </header>
+      <ElementLinker elementId={element.id} links={links} />
       <PageContextMenu className="flex-1 overflow-auto">
         <div className="mx-auto max-w-4xl px-6 py-10">
           <InlineTitle elementId={element.id} initialTitle={element.title} />
-          <div className="mt-2 mb-4">
-            <ElementLinker elementId={element.id} links={links} />
-          </div>
           <PageEditor pageId={element.id} initialContent={page?.content} />
         </div>
       </PageContextMenu>

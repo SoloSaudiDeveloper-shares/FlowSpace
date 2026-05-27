@@ -49,12 +49,10 @@ export default async function TodoListPage({
           />
         </div>
       </header>
+      <ElementLinker elementId={element.id} links={links} />
       <PageContextMenu className="flex-1 overflow-auto p-6">
         <div className="mx-auto max-w-2xl">
           <InlineTitle elementId={element.id} initialTitle={element.title} />
-          <div className="mt-2 mb-4">
-            <ElementLinker elementId={element.id} links={links} />
-          </div>
           <TodoListEditor listId={element.id} items={items} />
         </div>
       </PageContextMenu>
