@@ -4,7 +4,7 @@ import { db } from "@/lib/db"
 import { elements, pages, projects, taskStatuses, canvases, todoLists, processes, reminders } from "@/lib/db/schema"
 import type { ElementType } from "@/lib/db/schema"
 import { createId } from "@/lib/utils/ids"
-import { eq, desc, and, sql } from "drizzle-orm"
+import { eq, asc, desc, and, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
 const ELEMENT_ICONS: Record<ElementType, string> = {
@@ -86,6 +86,9 @@ export async function createElement(type: ElementType, title?: string, parentId?
 }
 
 export async function getElements() {
+  // Order by user-controlled sortOrder (set via sidebar drag), with
+  // updatedAt as a tiebreaker so newly-created items still surface naturally
+  // when they share a sortOrder of 0.
   return db
     .select()
     .from(elements)
@@ -95,7 +98,7 @@ export async function getElements() {
         eq(elements.isArchived, false)
       )
     )
-    .orderBy(desc(elements.updatedAt))
+    .orderBy(asc(elements.sortOrder), desc(elements.updatedAt))
 }
 
 export async function getElementsByType(type: ElementType) {
@@ -109,7 +112,7 @@ export async function getElementsByType(type: ElementType) {
         eq(elements.isArchived, false)
       )
     )
-    .orderBy(desc(elements.updatedAt))
+    .orderBy(asc(elements.sortOrder), desc(elements.updatedAt))
 }
 
 export async function getElement(id: string) {
