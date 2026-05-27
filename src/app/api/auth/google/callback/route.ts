@@ -108,6 +108,15 @@ export async function GET(request: NextRequest) {
         updatedAt: now,
       })
       sqlite.prepare(`UPDATE users SET google_id = ? WHERE id = ?`).run(profile.sub, id)
+
+      // Seed showcase templates into the new Google user's workspace.
+      try {
+        const { seedShowcaseTemplates } = await import("@/lib/db/seed-showcase-templates")
+        seedShowcaseTemplates(sqlite, id)
+      } catch (err) {
+        console.error("[google-oauth] template seed failed for", id, err)
+      }
+
       userId = id
     }
   }

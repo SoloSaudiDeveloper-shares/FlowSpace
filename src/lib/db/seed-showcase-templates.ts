@@ -289,17 +289,16 @@ const SHOWCASE_TEMPLATES: TemplateSeed[] = [
   },
 ]
 
+/**
+ * Seed showcase templates for a specific user. Each user gets their own
+ * private copies (per the per-user isolation model).
+ *
+ * Idempotent per user — skips templates already present in that user's
+ * workspace, only inserts genuinely new ones. Safe to call on every
+ * new-user signup and on startup for the oldest user.
+ */
 export function seedShowcaseTemplates(db: Database.Database, ownerId: string): number {
-  // Idempotency flag — bump this version when new templates are added
-  // so existing installs pick them up. Old templates stay (in case the
-  // owner customised them); only the new ones get inserted.
-  const flag = db
-    .prepare(`SELECT value FROM server_settings WHERE key = 'templates_seeded_v2'`)
-    .get() as { value: string } | undefined
-  if (flag) return 0
-
-  // Skip individual templates that already exist by name (idempotency
-  // when re-seeding existing installs that ran v1).
+  // Skip individual templates that already exist for this user.
   const existingNames = new Set(
     (db
       .prepare(`SELECT name FROM templates WHERE created_by = ?`)
@@ -313,11 +312,6 @@ export function seedShowcaseTemplates(db: Database.Database, ownerId: string): n
   const insertItem = db.prepare(`
     INSERT INTO template_items (id, template_id, item_type, title, description, config, sort_order, parent_item_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
-  `)
-  const markSeeded = db.prepare(`
-    INSERT INTO server_settings (key, value, updated_at)
-    VALUES ('templates_seeded_v2', 'true', datetime('now'))
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
   `)
 
   const randomId = () => "tpl" + Math.random().toString(36).slice(2, 14)
@@ -353,7 +347,6 @@ export function seedShowcaseTemplates(db: Database.Database, ownerId: string): n
         }
       }
     }
-    markSeeded.run()
   })
   tx()
   return insertedCount

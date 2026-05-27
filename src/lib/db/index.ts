@@ -97,16 +97,20 @@ try {
 }
 
 // ─── Showcase templates seed ───────────────────────────────────────────
-// One-time. Owned by the oldest user. Skipped if already seeded.
+// Idempotent per user — every active user gets their own copies of the
+// showcase templates. Runs on every startup but only inserts genuinely
+// missing rows. Backfills any user that signed up before this seed
+// existed (e.g. early Google sign-ups), then runs harmlessly thereafter.
 try {
-  const oldestForSeed = sqlite
-    .prepare(`SELECT id FROM users WHERE is_active = 1 ORDER BY created_at ASC LIMIT 1`)
-    .get() as { id: string } | undefined
-  if (oldestForSeed) {
-    // Lazy require keeps top-of-file imports identical for build-time pruning.
+  const allUsers = sqlite
+    .prepare(`SELECT id FROM users WHERE is_active = 1`)
+    .all() as { id: string }[]
+  if (allUsers.length > 0) {
     const { seedShowcaseTemplates } = await import("./seed-showcase-templates")
-    const count = seedShowcaseTemplates(sqlite, oldestForSeed.id)
-    if (count > 0) console.log(`[seed] showcase templates: ${count} inserted for ${oldestForSeed.id}`)
+    for (const u of allUsers) {
+      const count = seedShowcaseTemplates(sqlite, u.id)
+      if (count > 0) console.log(`[seed] showcase templates: ${count} inserted for ${u.id}`)
+    }
   }
 } catch (err) {
   console.error("[seed] showcase templates failed:", err)

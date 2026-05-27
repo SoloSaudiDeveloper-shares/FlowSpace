@@ -214,10 +214,16 @@ export function SettingsContent() {
   }
 
   return (
-    <div className="flex gap-6 md:gap-8">
-      {/* ─── Sticky section nav (md+ only) ──────────────────────────── */}
-      <nav className="sticky top-0 self-start hidden md:flex flex-col gap-0.5 w-44 shrink-0 -ml-2 max-h-[calc(100vh-2rem)] overflow-y-auto py-2">
-        <div className="px-2 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">Settings</div>
+    <div className="flex">
+      {/* ─── Sticky section nav, sidebar-style — md+ only ───────────── */}
+      <nav
+        className="sticky top-0 self-start hidden md:flex flex-col gap-0.5 w-52 shrink-0 border-r border-border/40 bg-card/30 max-h-screen overflow-y-auto p-3"
+        aria-label="Settings sections"
+      >
+        <div className="px-2 pb-2 pt-1 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium flex items-center gap-1.5">
+          <Settings2 className="size-3" />
+          Settings
+        </div>
         {SETTINGS_NAV.filter((s) => !s.ownerOnly || isOwner).map((s) => {
           const Icon = s.icon
           return (
@@ -225,17 +231,17 @@ export function SettingsContent() {
               key={s.id}
               type="button"
               onClick={() => scrollToSection(s.id)}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-left"
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors text-left"
             >
-              <Icon className="size-3.5" />
-              {s.label}
+              <Icon className="size-3.5 shrink-0" />
+              <span className="truncate">{s.label}</span>
             </button>
           )
         })}
       </nav>
 
       {/* ─── Main content ───────────────────────────────────────────── */}
-      <div className="flex-1 space-y-10 min-w-0">
+      <div className="flex-1 space-y-10 min-w-0 p-6 max-w-3xl">
       {/* ─── Workspace (owner only) ────────────────────────────────── */}
       {isOwner && (
         <section id="workspace" className="scroll-mt-4">

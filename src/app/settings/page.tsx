@@ -13,8 +13,8 @@ export default function SettingsPage() {
         <h1 className="text-lg font-semibold">Settings</h1>
       </header>
 
-      <div className="flex-1 overflow-auto p-6">
-        <div className="mx-auto max-w-2xl animate-page-enter">
+      <div className="flex-1 overflow-auto">
+        <div className="animate-page-enter">
           <SettingsContent />
         </div>
       </div>

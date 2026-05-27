@@ -122,6 +122,17 @@ export async function createUser(data: {
     updatedAt: now,
   })
 
+  // Seed showcase templates into the new user's workspace so they have
+  // something to explore on first login. Failure here doesn't block
+  // signup — it's a nice-to-have, not load-bearing.
+  try {
+    const { sqlite } = await import("@/lib/db")
+    const { seedShowcaseTemplates } = await import("@/lib/db/seed-showcase-templates")
+    seedShowcaseTemplates(sqlite, id)
+  } catch (err) {
+    console.error("[signup] template seed failed for", id, err)
+  }
+
   revalidatePath("/settings")
   return { id }
 }
