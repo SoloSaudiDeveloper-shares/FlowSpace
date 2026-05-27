@@ -363,6 +363,89 @@ function SortableElementItem({
   )
 }
 
+/**
+ * Sortable wrapper for a ROOT project item. Mirrors the project row's
+ * existing chrome (chevron-to-expand, hover "+ new sub-project", folder
+ * icon, context menu) but adds a drag handle on the far left.
+ *
+ * Sub-projects (rendered inside SidebarMenuSub) remain non-sortable for now —
+ * they live under their parent's expanded state and don't share a list with
+ * root projects.
+ */
+function SortableProjectItem({
+  project,
+  isActive,
+  hasChildren,
+  isExpanded,
+  onOpen,
+  onContextMenu,
+  onToggleExpanded,
+  onAddChild,
+  children,
+}: {
+  project: Element
+  isActive: boolean
+  hasChildren: boolean
+  isExpanded: boolean
+  onOpen: () => void
+  onContextMenu: (e: React.MouseEvent) => void
+  onToggleExpanded: () => void
+  onAddChild: () => void
+  children?: React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: project.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+  }
+  return (
+    <SidebarMenuItem ref={setNodeRef} style={style}>
+      <SidebarMenuButton
+        isActive={isActive}
+        onClick={onOpen}
+        onContextMenu={onContextMenu}
+        tooltip={project.title}
+        className="group/proj"
+      >
+        {/* Drag handle — visible on hover, never steals click on the row */}
+        <span
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          className="cursor-grab active:cursor-grabbing opacity-0 group-hover/proj:opacity-60 hover:!opacity-100 -ml-1 p-0.5 rounded transition-opacity shrink-0"
+          title="Drag to reorder"
+          aria-label="Drag project"
+        >
+          <GripVertical className="size-3" />
+        </span>
+        {hasChildren ? (
+          <div
+            role="button"
+            className="shrink-0 p-0.5 rounded hover:bg-sidebar-accent"
+            onClick={(e) => { e.stopPropagation(); onToggleExpanded() }}
+          >
+            <ChevronRight className={`size-3 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
+          </div>
+        ) : (
+          <FolderKanban className="size-4 shrink-0" style={{ color: project.color ?? undefined }} />
+        )}
+        <span className="truncate flex-1">{project.title}</span>
+        <div
+          role="button"
+          className="opacity-0 group-hover/proj:opacity-100 shrink-0 p-0.5 rounded hover:bg-sidebar-accent transition-opacity"
+          title="New sub-project"
+          onClick={(e) => { e.stopPropagation(); onAddChild() }}
+        >
+          <Plus className="size-3" />
+        </div>
+      </SidebarMenuButton>
+      {children}
+    </SidebarMenuItem>
+  )
+}
+
 export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -580,6 +663,23 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
     }
   }
 
+  // Root-project drag handler. Reorders only the top-level projects.
+  // Sub-projects retain their position inside their parent.
+  async function handleProjectDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const ids = rootProjects.map((p) => p.id)
+    const oldIdx = ids.indexOf(active.id as string)
+    const newIdx = ids.indexOf(over.id as string)
+    if (oldIdx === -1 || newIdx === -1) return
+    const next = arrayMove(ids, oldIdx, newIdx)
+    try {
+      await reorderElements(next)
+    } catch {
+      toast.error("Failed to save new project order")
+    }
+  }
+
   function renderProjectItem(project: Element, depth = 0): React.ReactNode {
     const href = `/projects/${project.id}`
     const children = getSubProjects(project.id)
@@ -721,6 +821,59 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                     <span>Add project</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+              ) : dndReady ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleProjectDragEnd}
+                >
+                  <SortableContext
+                    items={rootProjects.map((p) => p.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {rootProjects.map((project) => {
+                      const href = `/projects/${project.id}`
+                      const childProjects = getSubProjects(project.id)
+                      const hasChildren = childProjects.length > 0
+                      const isExpanded = expandedProjects.has(project.id)
+                      return (
+                        <SortableProjectItem
+                          key={project.id}
+                          project={project}
+                          isActive={pathname === href}
+                          hasChildren={hasChildren}
+                          isExpanded={isExpanded}
+                          onOpen={() => router.push(href)}
+                          onContextMenu={(e) => handleElementContextMenu(e, project)}
+                          onToggleExpanded={() => toggleExpanded(project.id)}
+                          onAddChild={async () => {
+                            const result = await createElement("project", undefined, project.id)
+                            setExpandedProjects((prev) => new Set([...prev, project.id]))
+                            router.push(`/projects/${result.id}`)
+                          }}
+                        >
+                          {hasChildren && isExpanded && (
+                            <SidebarMenuSub>
+                              {childProjects.map((child) => (
+                                <SidebarMenuSubItem key={child.id}>
+                                  <SidebarMenuSubButton
+                                    isActive={pathname === `/projects/${child.id}`}
+                                    onClick={() => router.push(`/projects/${child.id}`)}
+                                    onContextMenu={(e) => handleElementContextMenu(e, child)}
+                                    className="group/sub"
+                                  >
+                                    <FolderKanban className="size-3.5 shrink-0" style={{ color: child.color ?? undefined }} />
+                                    <span className="truncate flex-1">{child.title}</span>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              ))}
+                            </SidebarMenuSub>
+                          )}
+                        </SortableProjectItem>
+                      )
+                    })}
+                  </SortableContext>
+                </DndContext>
               ) : (
                 rootProjects.map((project) => renderProjectItem(project))
               )}
