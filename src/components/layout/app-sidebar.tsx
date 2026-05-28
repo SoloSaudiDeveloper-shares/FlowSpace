@@ -31,6 +31,7 @@ import {
   GripVertical,
   Pin,
   PinOff,
+  Palette,
 } from "lucide-react"
 import {
   DndContext,
@@ -130,7 +131,8 @@ interface AppSidebarProps {
   favorites: Element[]
 }
 
-/** Color presets used by the sidebar right-click color picker. */
+/** Color presets used by the sidebar right-click color picker (per-item).
+ * These ride on element.color which is a free-form hex string. */
 const SIDEBAR_COLOR_OPTIONS: { value: string; label: string }[] = [
   { value: "#737373", label: "Neutral" },
   { value: "#3b82f6", label: "Blue" },
@@ -139,6 +141,20 @@ const SIDEBAR_COLOR_OPTIONS: { value: string; label: string }[] = [
   { value: "#10b981", label: "Green" },
   { value: "#f97316", label: "Orange" },
   { value: "#14b8a6", label: "Teal" },
+]
+
+/** Color presets used for SECTION HEADERS (Projects, Pages, Canvases…).
+ * Tuned for dark-mode legibility: bright enough to read, soft enough not
+ * to fight the content. Pair freely. */
+const SIDEBAR_SECTION_COLOR_OPTIONS: { value: string; label: string }[] = [
+  { value: "#94a3b8", label: "Neutral" },
+  { value: "#a78bfa", label: "Violet" },
+  { value: "#60a5fa", label: "Blue" },
+  { value: "#67e8f9", label: "Cyan" },
+  { value: "#6ee7b7", label: "Emerald" },
+  { value: "#fbbf24", label: "Amber" },
+  { value: "#fb7185", label: "Rose" },
+  { value: "#f472b6", label: "Pink" },
 ]
 
 function sidebarRelativeTime(iso: string): string {
@@ -165,6 +181,8 @@ function CollapsibleSection({
   onToggle,
   sortable = false,
   children,
+  accentColor,
+  onContextMenu,
 }: {
   sectionKey: string
   icon?: React.ComponentType<{ className?: string }>
@@ -174,6 +192,8 @@ function CollapsibleSection({
   onToggle: (k: string) => void
   sortable?: boolean
   children: ReactNode
+  accentColor?: string
+  onContextMenu?: (e: React.MouseEvent) => void
 }) {
   return sortable ? (
     <SortableCollapsibleSectionInner
@@ -183,6 +203,8 @@ function CollapsibleSection({
       count={count}
       collapsed={collapsed}
       onToggle={onToggle}
+      accentColor={accentColor}
+      onContextMenu={onContextMenu}
     >
       {children}
     </SortableCollapsibleSectionInner>
@@ -193,6 +215,8 @@ function CollapsibleSection({
       label={label}
       count={count}
       collapsed={collapsed}
+      accentColor={accentColor}
+      onContextMenu={onContextMenu}
       onToggle={onToggle}
     >
       {children}
@@ -202,6 +226,7 @@ function CollapsibleSection({
 
 function SectionLabel({
   sectionKey, icon: Icon, label, count, collapsed, onToggle, dragHandle,
+  accentColor, onContextMenu,
 }: {
   sectionKey: string
   icon?: React.ComponentType<{ className?: string }>
@@ -210,20 +235,27 @@ function SectionLabel({
   collapsed: boolean
   onToggle: (k: string) => void
   dragHandle?: ReactNode
+  accentColor?: string
+  onContextMenu?: (e: React.MouseEvent) => void
 }) {
+  const accent = accentColor || undefined
   return (
     <SidebarGroupLabel
       role="button"
       tabIndex={0}
       onClick={() => onToggle(sectionKey)}
+      onContextMenu={onContextMenu}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()
           onToggle(sectionKey)
         }
       }}
-      className="group/lbl cursor-pointer select-none hover:bg-sidebar-accent/50 transition-colors"
-      title={collapsed ? "Expand" : "Collapse"}
+      className={`group/lbl cursor-pointer select-none hover:bg-sidebar-accent/50 transition-colors relative ${
+        !collapsed && accent ? "border-l-2 -ml-2 pl-1.5" : ""
+      }`}
+      style={!collapsed && accent ? { borderLeftColor: accent } : undefined}
+      title={collapsed ? "Expand (right-click for color)" : "Collapse (right-click for color)"}
       aria-expanded={!collapsed}
     >
       {dragHandle}
@@ -232,10 +264,29 @@ function SectionLabel({
           collapsed ? "" : "rotate-90"
         }`}
       />
-      {Icon && <Icon className="mr-2 size-3 shrink-0" />}
-      <span className="flex-1">{label}</span>
+      {Icon && (
+        <span
+          className="mr-2 inline-flex shrink-0 transition-transform duration-200 group-hover/lbl:scale-110 group-hover/lbl:-rotate-6"
+          style={accent ? { color: accent } : undefined}
+        >
+          <Icon className="size-3" />
+        </span>
+      )}
+      <span
+        className="flex-1 transition-[letter-spacing,color] duration-200 group-hover/lbl:tracking-[0.02em]"
+        style={accent ? { color: `${accent}cc` } : undefined}
+      >
+        {label}
+      </span>
       {typeof count === "number" && count > 0 && (
-        <span className="ml-1 rounded-full bg-sidebar-accent/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground tabular-nums">
+        <span
+          className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums transition-colors"
+          style={
+            accent
+              ? { background: `${accent}26`, color: accent }
+              : { background: "color-mix(in oklab, var(--sidebar-accent) 60%, transparent)", color: "var(--muted-foreground)" }
+          }
+        >
           {count}
         </span>
       )}
@@ -262,6 +313,7 @@ function SectionBody({
 
 function PlainCollapsibleSection({
   sectionKey, icon: Icon, label, count, collapsed, onToggle, children,
+  accentColor, onContextMenu,
 }: {
   sectionKey: string
   icon?: React.ComponentType<{ className?: string }>
@@ -270,12 +322,15 @@ function PlainCollapsibleSection({
   collapsed: boolean
   onToggle: (k: string) => void
   children: ReactNode
+  accentColor?: string
+  onContextMenu?: (e: React.MouseEvent) => void
 }) {
   return (
     <SidebarGroup>
       <SectionLabel
         sectionKey={sectionKey} icon={Icon} label={label} count={count}
         collapsed={collapsed} onToggle={onToggle}
+        accentColor={accentColor} onContextMenu={onContextMenu}
       />
       <SectionBody collapsed={collapsed}>{children}</SectionBody>
     </SidebarGroup>
@@ -284,6 +339,7 @@ function PlainCollapsibleSection({
 
 function SortableCollapsibleSectionInner({
   sectionKey, icon: Icon, label, count, collapsed, onToggle, children,
+  accentColor, onContextMenu,
 }: {
   sectionKey: string
   icon?: React.ComponentType<{ className?: string }>
@@ -292,6 +348,8 @@ function SortableCollapsibleSectionInner({
   collapsed: boolean
   onToggle: (k: string) => void
   children: ReactNode
+  accentColor?: string
+  onContextMenu?: (e: React.MouseEvent) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: sectionKey })
@@ -305,6 +363,7 @@ function SortableCollapsibleSectionInner({
       <SectionLabel
         sectionKey={sectionKey} icon={Icon} label={label} count={count}
         collapsed={collapsed} onToggle={onToggle}
+        accentColor={accentColor} onContextMenu={onContextMenu}
         dragHandle={
           <span
             {...attributes}
@@ -716,6 +775,34 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   }
   const labelFor = (key: SidebarSectionKey) =>
     preferences.sidebarLabels?.[key]?.trim() || DEFAULT_LABELS[key]
+  const accentForSection = (key: SidebarSectionKey) =>
+    preferences.sidebarSectionColors?.[key] || undefined
+
+  function handleSectionContextMenu(e: React.MouseEvent, key: SidebarSectionKey, label: string) {
+    const currentColor = preferences.sidebarSectionColors?.[key]
+    const items: ContextMenuEntry[] = [
+      { header: true, title: label, subtitle: "Section appearance", icon: Palette },
+      { separator: true },
+      {
+        colors: true,
+        options: SIDEBAR_SECTION_COLOR_OPTIONS,
+        selected: currentColor,
+        onPick: (val: string) => {
+          const next = { ...(preferences.sidebarSectionColors ?? {}) }
+          if (val) next[key] = val
+          else delete next[key]
+          updatePreference("sidebarSectionColors", next)
+        },
+      },
+      { separator: true },
+      {
+        label: isCollapsed(key) ? "Expand section" : "Collapse section",
+        icon: ChevronRight,
+        onClick: () => toggleGroup(key),
+      },
+    ]
+    openCtx(e, items)
+  }
 
   // Section order from preferences, falling back to default order
   const DEFAULT_ORDER: SidebarSectionKey[] = [
@@ -916,6 +1003,8 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
             count={favorites.length}
             collapsed={isCollapsed("favorites")}
             onToggle={toggleGroup}
+            accentColor={accentForSection("favorites")}
+            onContextMenu={(e) => handleSectionContextMenu(e, "favorites", labelFor("favorites"))}
           >
             <SidebarMenu>
               {favorites.map((el) => {
@@ -950,6 +1039,8 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
             count={rootProjects.length}
             collapsed={isCollapsed("projects")}
             onToggle={toggleGroup}
+            accentColor={accentForSection("projects")}
+            onContextMenu={(e) => handleSectionContextMenu(e, "projects", labelFor("projects"))}
           >
             <SidebarMenu>
               {rootProjects.length === 0 ? (
@@ -1040,6 +1131,8 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
             label={labelFor("platform")}
             collapsed={isCollapsed("platform")}
             onToggle={toggleGroup}
+            accentColor={accentForSection("platform")}
+            onContextMenu={(e) => handleSectionContextMenu(e, "platform", labelFor("platform"))}
           >
             <SidebarMenu>
               <SidebarMenuItem>
@@ -1111,6 +1204,8 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
             count={items.length}
             collapsed={isCollapsed(key)}
             onToggle={toggleGroup}
+            accentColor={accentForSection(key)}
+            onContextMenu={(e) => handleSectionContextMenu(e, key, labelFor(key))}
           >
             <SidebarMenu>
               {items.length === 0 ? (

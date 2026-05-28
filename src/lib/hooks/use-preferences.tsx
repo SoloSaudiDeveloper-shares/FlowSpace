@@ -83,6 +83,9 @@ export interface Preferences {
   sidebarOrder: SidebarSectionKey[]
   /** User-renamed section labels. Empty / missing keys fall back to defaults. */
   sidebarLabels: Partial<Record<SidebarSectionKey, string>>
+  /** User-picked accent color per section. Tints the section icon, count
+   * badge, and a thin left edge when expanded. Empty = default neutral. */
+  sidebarSectionColors: Partial<Record<SidebarSectionKey, string>>
   // Top-bar clock
   clock: ClockPreferences
   // Scrolling feed ticker
@@ -138,6 +141,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
     "platform",
   ],
   sidebarLabels: {},
+  sidebarSectionColors: {},
   clock: {
     show: true,
     format24: true,
