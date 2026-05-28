@@ -12,6 +12,8 @@ import {
 import type { SpeechRecognizer, SpeechStatus, SpeechEngine, SpeechError, WebAISpeechModelId } from "@/lib/speech/types"
 import { WEBAI_SPEECH_MODELS } from "@/lib/speech/types"
 import { createRecognizer, DEFAULT_ENGINE, getAvailableEngines } from "@/lib/speech/speech-factory"
+import { usePreferences } from "@/lib/hooks/use-preferences"
+import { toast } from "sonner"
 
 // ─── Context ──────────────────────────────────────────────────────────
 
@@ -78,6 +80,7 @@ const SpeechContext = createContext<SpeechContextValue>({
 // ─── Provider ─────────────────────────────────────────────────────────
 
 export function SpeechProvider({ children }: { children: ReactNode }) {
+  const { preferences } = usePreferences()
   const [status, setStatus] = useState<SpeechStatus>("idle")
   const [isListening, setIsListening] = useState(false)
   const [interimText, setInterimText] = useState("")
@@ -103,6 +106,9 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
         {
           language: "en",
           modelId,
+          // Pass the user's Groq key from preferences — needed by GroqRecognizer.
+          // For other engines this is ignored.
+          apiKey: preferences.speechGroqApiKey,
           onInterim: (text) => {
             setInterimText(text)
           },
@@ -113,6 +119,9 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
           onError: (err) => {
             setError(err)
             setIsListening(false)
+            // Surface the error to the user so they aren't left wondering
+            // why nothing happened. Previously errors were caught silently.
+            toast.error(err.message, { duration: 6000 })
           },
           onStatusChange: (s) => {
             setStatus(s)

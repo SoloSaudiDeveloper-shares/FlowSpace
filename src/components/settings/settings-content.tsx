@@ -1133,6 +1133,12 @@ export function SettingsContent() {
             <div className="space-y-2">
               {speech.availableEngines.map((eng) => {
                 const isActive = speech.engine === eng.engine
+                const description =
+                  eng.engine === "groq"
+                    ? "Cloud Whisper via Groq. Works in every browser, including Safari, Firefox, and iOS. 2000 transcriptions/day free, no credit card. Records audio locally then POSTs to Groq."
+                    : eng.engine === "webai"
+                      ? "Runs entirely in your browser via WebAI.js. Private, no data leaves your device, but downloads a 27–73 MB model on first use."
+                      : "Uses your browser's built-in speech API. Fast and zero-setup. Requires Chrome or Edge — silently fails in Safari, Firefox, and iOS PWAs."
                 const isLocal = eng.engine === "webai"
                 return (
                   <button
@@ -1163,16 +1169,43 @@ export function SettingsContent() {
                         <span className="ml-auto text-xs text-muted-foreground">Not supported</span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground pl-5.5">
-                      {isLocal
-                        ? "Runs entirely in your browser via WebAI.js. Private, no data sent anywhere."
-                        : "Uses your browser's built-in speech API. Fast and lightweight. Requires Chrome or Edge."}
-                    </p>
+                    <p className="text-xs text-muted-foreground pl-5.5">{description}</p>
                   </button>
                 )
               })}
             </div>
           </div>
+
+          {/* Groq API key — only shown when Groq engine is selected */}
+          {speech.engine === "groq" && (
+            <div className="px-4 py-3 rounded-lg border bg-card">
+              <h3 className="text-sm font-medium mb-1">Groq API key</h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Get a free key at{" "}
+                <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+                  console.groq.com/keys
+                </a>{" "}
+                — no credit card needed. Stored in your browser only; never sent to the FlowSpace server.
+              </p>
+              <input
+                type="password"
+                value={preferences.speechGroqApiKey}
+                onChange={(e) => updatePreference("speechGroqApiKey", e.target.value)}
+                placeholder="gsk_..."
+                autoComplete="off"
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm font-mono placeholder:text-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              {preferences.speechGroqApiKey ? (
+                <p className="text-[11px] text-emerald-500 mt-1.5 flex items-center gap-1">
+                  <Check className="size-3" /> Key set — try the mic icon on any input.
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-500 mt-1.5">
+                  No key yet. Voice input won&apos;t work until you paste one.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Speech model selector (WebAI only) */}
           {speech.engine === "webai" && (

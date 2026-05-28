@@ -65,6 +65,9 @@ export interface Preferences {
   borderRadius: BorderRadius
   ganttTooltipFields: GanttTooltipField[]
   speechEnabled: boolean
+  /** Groq API key for the cloud Whisper engine. Browser-only, never sent to
+   * our server — same trust model as `aiOpenAIApiKey`. */
+  speechGroqApiKey: string
   aiEnabled: boolean
   aiLLMModel: string
   aiTTSModel: string
@@ -123,6 +126,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   borderRadius: "default",
   ganttTooltipFields: ["status", "priority", "dates", "completion"],
   speechEnabled: true,
+  speechGroqApiKey: "",
   aiEnabled: false,
   aiLLMModel: "llama3.1:8b",
   aiTTSModel: "",

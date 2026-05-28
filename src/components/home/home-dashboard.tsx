@@ -57,6 +57,7 @@ import { SpeechButton } from "@/components/shared/speech-button"
 import { createElement } from "@/lib/actions/element-actions"
 import type { DashboardSummary } from "@/lib/actions/dashboard-actions"
 import type { Element, ElementType } from "@/lib/db/schema"
+import { AIImportDialog } from "@/components/import/ai-import-dialog"
 
 // ─── Visual constants ─────────────────────────────────────────────────────
 
@@ -99,8 +100,10 @@ function isSectionVisible(prefs: Record<string, boolean | undefined>, key: HomeS
 
 function HeroBlock({
   onCustomize,
+  onImport,
 }: {
   onCustomize: () => void
+  onImport: () => void
 }) {
   const { workspaceName } = useWorkspaceName()
   const { user } = useAuth()
@@ -115,15 +118,26 @@ function HeroBlock({
           {suffix && <span className="text-muted-foreground font-medium">: {suffix}</span>}
         </h1>
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onCustomize}
-        className="gap-1.5 text-muted-foreground hover:text-foreground"
-      >
-        <Settings2 className="size-3.5" />
-        Customize
-      </Button>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onImport}
+          className="gap-1.5 text-muted-foreground hover:text-foreground"
+        >
+          <Sparkles className="size-3.5" />
+          Import from AI
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onCustomize}
+          className="gap-1.5 text-muted-foreground hover:text-foreground"
+        >
+          <Settings2 className="size-3.5" />
+          Customize
+        </Button>
+      </div>
     </div>
   )
 }
@@ -670,13 +684,19 @@ export function HomeDashboard({
   favorites: Element[]
 }) {
   const [customizing, setCustomizing] = useState(false)
+  const [importing, setImporting] = useState(false)
   const { preferences } = usePreferences()
   const sections = preferences.homeSections ?? {}
   const show = (k: HomeSectionKey) => isSectionVisible(sections, k)
 
   return (
     <div className="space-y-5 animate-page-enter">
-      {show("hero") && <HeroBlock onCustomize={() => setCustomizing(true)} />}
+      {show("hero") && (
+        <HeroBlock
+          onCustomize={() => setCustomizing(true)}
+          onImport={() => setImporting(true)}
+        />
+      )}
       {show("kpi") && <KpiRow counts={summary.counts} />}
 
       {(show("pulse") || show("today")) && (
@@ -716,6 +736,7 @@ export function HomeDashboard({
       {show("recent") && <RecentRow recent={recent} favorites={favorites} />}
 
       <CustomizeDialog open={customizing} onOpenChange={setCustomizing} />
+      <AIImportDialog open={importing} onOpenChange={setImporting} />
     </div>
   )
 }

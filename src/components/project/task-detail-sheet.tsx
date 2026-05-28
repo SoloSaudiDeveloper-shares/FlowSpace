@@ -48,8 +48,10 @@ import {
   Upload,
   Download,
   File,
+  Mail,
 } from "lucide-react"
 import { SpeechButton } from "@/components/shared/speech-button"
+import { SendTaskEmailDialog } from "@/components/project/send-task-email-dialog"
 import { TTSButton } from "@/components/shared/tts-button"
 import { AIActionButton } from "@/components/shared/ai-action-button"
 import { CustomFieldsPanel } from "@/components/shared/custom-fields-panel"
@@ -236,6 +238,8 @@ export function TaskDetailSheet({
 
   // Clipboard notification
   const [copied, setCopied] = useState(false)
+  // Send-as-email dialog
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false)
 
   useEffect(() => {
     if (task && open) {
@@ -615,6 +619,10 @@ export function TaskDetailSheet({
                   <DropdownMenuItem onClick={handleCopyId}>
                     <ClipboardCopy className="size-3.5 mr-2" />
                     {copied ? "Copied!" : "Copy task ID"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setEmailDialogOpen(true)}>
+                    <Mail className="size-3.5 mr-2" />
+                    Send as email…
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -1224,6 +1232,11 @@ export function TaskDetailSheet({
           </div>
         </div>
       </DialogContent>
+      <SendTaskEmailDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        task={task}
+      />
     </Dialog>
   )
 }

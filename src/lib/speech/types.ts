@@ -14,6 +14,8 @@ export interface SpeechRecognizerOptions {
   streaming?: boolean
   /** WebAI.js model ID (e.g. "whisper-base", "moonshine-tiny-en") */
   modelId?: string
+  /** API key for cloud-based engines (Groq). Browser-side. */
+  apiKey?: string
   /** Callback fired with interim (partial) results */
   onInterim?: (text: string) => void
   /** Callback fired with final confirmed results */
@@ -35,7 +37,15 @@ export type SpeechStatus =
   | "error"
 
 export interface SpeechError {
-  code: "model_load_failed" | "microphone_denied" | "not_supported" | "processing_failed" | "unknown"
+  code:
+    | "model_load_failed"
+    | "microphone_denied"
+    | "not_supported"
+    | "processing_failed"
+    | "no_api_key"
+    | "api_error"
+    | "network_error"
+    | "unknown"
   message: string
 }
 
@@ -66,7 +76,7 @@ export interface SpeechRecognizer {
 }
 
 /** Available speech engine backends */
-export type SpeechEngine = "webai" | "web-speech"
+export type SpeechEngine = "webai" | "web-speech" | "groq"
 
 /** Available WebAI.js speech models */
 export const WEBAI_SPEECH_MODELS = [
