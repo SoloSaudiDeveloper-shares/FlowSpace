@@ -295,8 +295,13 @@ function SectionLabel({
 }
 
 function SectionBody({
-  collapsed, children,
-}: { collapsed: boolean; children: ReactNode }) {
+  collapsed, children, accentColor,
+}: { collapsed: boolean; children: ReactNode; accentColor?: string }) {
+  // When the section has an accent color, give expanded children a subtle
+  // tint background + a vertical accent-colored connector line + a small
+  // indent. Makes it obvious which items belong to which parent at a
+  // glance, even when several sections are expanded.
+  const accent = accentColor || undefined
   return (
     <div
       className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
@@ -305,7 +310,21 @@ function SectionBody({
       aria-hidden={collapsed}
     >
       <div className="overflow-hidden">
-        {!collapsed && <SidebarGroupContent>{children}</SidebarGroupContent>}
+        {!collapsed && (
+          <div
+            className={accent ? "ml-3 pl-2 border-l-[1.5px] rounded-r-sm" : ""}
+            style={
+              accent
+                ? {
+                    borderLeftColor: `${accent}aa`,
+                    background: `linear-gradient(to right, ${accent}10, transparent 70%)`,
+                  }
+                : undefined
+            }
+          >
+            <SidebarGroupContent>{children}</SidebarGroupContent>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -332,7 +351,7 @@ function PlainCollapsibleSection({
         collapsed={collapsed} onToggle={onToggle}
         accentColor={accentColor} onContextMenu={onContextMenu}
       />
-      <SectionBody collapsed={collapsed}>{children}</SectionBody>
+      <SectionBody collapsed={collapsed} accentColor={accentColor}>{children}</SectionBody>
     </SidebarGroup>
   )
 }
@@ -377,7 +396,7 @@ function SortableCollapsibleSectionInner({
           </span>
         }
       />
-      <SectionBody collapsed={collapsed}>{children}</SectionBody>
+      <SectionBody collapsed={collapsed} accentColor={accentColor}>{children}</SectionBody>
     </SidebarGroup>
   )
 }

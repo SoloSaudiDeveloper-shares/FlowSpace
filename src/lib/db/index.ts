@@ -67,6 +67,17 @@ sqlite.exec(`
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_token ON password_reset_tokens(token);`)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pwd_reset_user ON password_reset_tokens(user_id);`)
 
+// ─── Per-user preferences (the giant JSON blob from the settings page) ──
+// One row per user. Source of truth so a user signing in on a new device
+// gets their theme/sidebar/clock/AI/etc. choices immediately.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS user_preferences (
+    user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    prefs_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+
 // ─── Email verification tokens ─────────────────────────────────────────
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS email_verification_tokens (

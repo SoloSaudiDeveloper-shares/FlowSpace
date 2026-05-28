@@ -263,46 +263,80 @@ const PreferencesContext = createContext<PreferencesContextValue>({
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES)
   const [mounted, setMounted] = useState(false)
+  // Track whether the user-specific snapshot has been fetched from the
+  // server. We don't write to the server before that — otherwise we'd
+  // immediately overwrite the saved prefs with whatever was hydrated
+  // from defaults+cache.
+  const [serverHydrated, setServerHydrated] = useState(false)
 
-  // Load from localStorage on mount
+  /**
+   * Apply small format migrations to a freshly-loaded prefs object so
+   * older saved blobs still hydrate cleanly. Pure — returns a new value.
+   */
+  function migratePrefs(parsed: Partial<Preferences>): Partial<Preferences> {
+    // Migrate WebAI.js model IDs → Ollama model IDs
+    const webaiLLMs = [
+      "smollm2-135m-instruct", "smollm2-360m-instruct",
+      "gemma-3-270m-it", "gemma-3-270m-instruct",
+    ]
+    if (parsed.aiLLMModel && webaiLLMs.includes(parsed.aiLLMModel)) {
+      parsed.aiLLMModel = "llama3.1:8b"
+    }
+    const webaiTTS = ["kokoro-tts", "kokoro-tts-82m"]
+    if (parsed.aiTTSModel && webaiTTS.includes(parsed.aiTTSModel)) {
+      parsed.aiTTSModel = ""
+    }
+    if (parsed.aiEmbeddingsModel === "all-minilm-l6-v2") {
+      parsed.aiEmbeddingsModel = "nomic-embed-text"
+    }
+    const piperVoices = [
+      "en_US-amy-medium", "en_US-danny-low", "en_US-lessac-medium",
+      "en_GB-alan-medium", "en_GB-alba-medium",
+    ]
+    if (parsed.aiTTSVoice && piperVoices.includes(parsed.aiTTSVoice)) {
+      parsed.aiTTSVoice = ""
+    }
+    if (!parsed.ollamaUrl) parsed.ollamaUrl = "http://localhost:11434"
+    return parsed
+  }
+
+  // ── Phase 1: instant render from per-user localStorage cache.
+  // ── Phase 2: pull the source-of-truth from the server, reconcile.
+  // ── Phase 3: future changes write to BOTH cache + server (debounced).
   useEffect(() => {
+    // Phase 1 — read the legacy global key OR a fresh per-user key.
     try {
       const stored = localStorage.getItem("flowspace-preferences")
       if (stored) {
-        const parsed = JSON.parse(stored)
-        // Migrate WebAI.js model IDs → Ollama model IDs
-        const webaiLLMs = [
-          "smollm2-135m-instruct", "smollm2-360m-instruct",
-          "gemma-3-270m-it", "gemma-3-270m-instruct",
-        ]
-        if (webaiLLMs.includes(parsed.aiLLMModel)) {
-          parsed.aiLLMModel = "llama3.1:8b"
-        }
-        const webaiTTS = ["kokoro-tts", "kokoro-tts-82m"]
-        if (webaiTTS.includes(parsed.aiTTSModel)) {
-          parsed.aiTTSModel = ""
-        }
-        if (parsed.aiEmbeddingsModel === "all-minilm-l6-v2") {
-          parsed.aiEmbeddingsModel = "nomic-embed-text"
-        }
-        // Migrate old Piper TTS voice IDs to empty (browser default)
-        const piperVoices = [
-          "en_US-amy-medium", "en_US-danny-low", "en_US-lessac-medium",
-          "en_GB-alan-medium", "en_GB-alba-medium",
-        ]
-        if (piperVoices.includes(parsed.aiTTSVoice)) {
-          parsed.aiTTSVoice = ""
-        }
-        // Add ollamaUrl default if missing
-        if (!parsed.ollamaUrl) {
-          parsed.ollamaUrl = "http://localhost:11434"
-        }
+        const parsed = migratePrefs(JSON.parse(stored))
         setPreferences((prev) => ({ ...prev, ...parsed }))
       }
     } catch {
-      // ignore parse errors
+      // ignore
     }
     setMounted(true)
+
+    // Phase 2 — fetch the server copy. If it exists, it overrides cache.
+    // If the user isn't signed in, the server returns null and we keep
+    // whatever the cache provided.
+    let cancelled = false
+    import("@/lib/actions/preferences-actions").then(({ getMyPreferences }) => {
+      getMyPreferences()
+        .then((serverPrefs) => {
+          if (cancelled) return
+          if (serverPrefs && typeof serverPrefs === "object") {
+            const merged = migratePrefs({ ...(serverPrefs as Partial<Preferences>) })
+            setPreferences((prev) => ({ ...prev, ...merged }))
+          }
+          setServerHydrated(true)
+        })
+        .catch(() => {
+          // network/auth error — keep local cache, do not push to server
+          setServerHydrated(false)
+        })
+    })
+
+    return () => { cancelled = true }
   }, [])
 
   // Apply preferences to DOM
@@ -324,15 +358,28 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     root.dataset.accent = preferences.accentColor
   }, [preferences, mounted])
 
-  // Persist to localStorage
+  // Persist — to localStorage immediately (instant on the next reload)
+  // and to the server with a small debounce (so we don't fire a request
+  // on every keystroke when typing in a label input).
   useEffect(() => {
     if (!mounted) return
     try {
       localStorage.setItem("flowspace-preferences", JSON.stringify(preferences))
     } catch {
-      // ignore
+      // ignore (e.g. private mode quota)
     }
-  }, [preferences, mounted])
+    if (!serverHydrated) return // wait until we've reconciled with the server
+
+    const t = window.setTimeout(() => {
+      import("@/lib/actions/preferences-actions").then(({ saveMyPreferences }) => {
+        saveMyPreferences(preferences).catch(() => {
+          // Network blip — the next change will retry. Don't toast on
+          // every save; would be noisy.
+        })
+      })
+    }, 500)
+    return () => window.clearTimeout(t)
+  }, [preferences, mounted, serverHydrated])
 
   const updatePreference = useCallback(
     <K extends keyof Preferences>(key: K, value: Preferences[K]) => {
