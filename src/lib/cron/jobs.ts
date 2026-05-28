@@ -162,6 +162,110 @@ function escMd(s: string): string {
   return s.replace(/[*_`[\]]/g, "\\$&")
 }
 
+// ─── Job 2.5: end-of-day digest ────────────────────────────────────────
+// Mirror of morning digest. Sends an evening summary: today's completions
+// + slipped items + tomorrow's load. Helps close the loop on a workday.
+
+registerJob({
+  name: "telegram:digest-evening",
+  async run() {
+    const d = new Date()
+    const hh = String(d.getHours()).padStart(2, "0")
+    const mm = String(d.getMinutes()).padStart(2, "0")
+    const nowHHMM = `${hh}:${mm}`
+    const todayDate = d.toISOString().slice(0, 10)
+
+    const due = sqlite
+      .prepare(
+        `SELECT user_id, bot_token, chat_id FROM telegram_bots
+         WHERE is_active = 1
+           AND digest_evening_enabled = 1
+           AND digest_evening_time = ?
+           AND chat_id IS NOT NULL
+           AND (digest_evening_last_sent IS NULL OR substr(digest_evening_last_sent, 1, 10) <> ?)
+         LIMIT 100`,
+      )
+      .all(nowHHMM, todayDate) as {
+        user_id: string
+        bot_token: string
+        chat_id: string
+      }[]
+
+    for (const b of due) {
+      sqlite
+        .prepare(`UPDATE telegram_bots SET digest_evening_last_sent = datetime('now') WHERE user_id = ?`)
+        .run(b.user_id)
+      const text = await buildEveningDigest(b.user_id)
+      await sendMessage(b.bot_token, b.chat_id, text, {
+        parseMode: "Markdown",
+        replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+      }).catch(() => undefined)
+    }
+  },
+})
+
+async function buildEveningDigest(userId: string): Promise<string> {
+  const startOfTodayIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+  const startOfTomorrowIso = new Date(new Date().setHours(24, 0, 0, 0)).toISOString()
+  const endOfTomorrowIso = new Date(new Date().setHours(48, 0, 0, 0)).toISOString()
+
+  // Today's completions
+  const completed = sqlite
+    .prepare(
+      `SELECT COUNT(*) AS n FROM tasks t INNER JOIN elements e ON e.id = t.project_id
+       WHERE e.created_by = ? AND t.completed_at >= ?`,
+    )
+    .get(userId, startOfTodayIso) as { n: number }
+  // Today's todo items checked off
+  const todosDone = sqlite
+    .prepare(
+      `SELECT COUNT(*) AS n FROM todo_items ti INNER JOIN elements e ON e.id = ti.list_id
+       WHERE e.created_by = ? AND ti.is_completed = 1 AND ti.completed_at >= ?`,
+    )
+    .get(userId, startOfTodayIso) as { n: number }
+  // What slipped — tasks that were due today and are not done
+  const slipped = sqlite
+    .prepare(
+      `SELECT COUNT(*) AS n FROM tasks t INNER JOIN elements e ON e.id = t.project_id
+       WHERE e.created_by = ? AND t.due_date >= ? AND t.due_date < ?
+         AND t.status_id NOT IN (SELECT id FROM task_statuses WHERE is_done_state = 1)`,
+    )
+    .get(userId, startOfTodayIso, startOfTomorrowIso) as { n: number }
+  // Tomorrow's load
+  const tomorrow = sqlite
+    .prepare(
+      `SELECT t.title, e.title AS project_title FROM tasks t INNER JOIN elements e ON e.id = t.project_id
+       WHERE e.created_by = ? AND t.due_date >= ? AND t.due_date < ?
+         AND t.status_id NOT IN (SELECT id FROM task_statuses WHERE is_done_state = 1)
+       ORDER BY t.priority DESC LIMIT 10`,
+    )
+    .all(userId, startOfTomorrowIso, endOfTomorrowIso) as { title: string; project_title: string }[]
+
+  const lines = [
+    "🌙 *Day wrap-up*",
+    "",
+  ]
+  if (completed.n > 0 || todosDone.n > 0) {
+    lines.push(`✅ Completed today: ${completed.n} task${completed.n === 1 ? "" : "s"} · ${todosDone.n} todo item${todosDone.n === 1 ? "" : "s"}`)
+  } else {
+    lines.push("✅ Nothing logged complete today. Tomorrow's a fresh start.")
+  }
+  if (slipped.n > 0) {
+    lines.push(`⚠️ Slipped to tomorrow: *${slipped.n}* task${slipped.n === 1 ? "" : "s"}`)
+  }
+  if (tomorrow.length > 0) {
+    lines.push("")
+    lines.push(`*Tomorrow's load (${tomorrow.length})*`)
+    for (const t of tomorrow) {
+      lines.push(`• ${escMd(t.title)} _(${escMd(t.project_title)})_`)
+    }
+  } else {
+    lines.push("")
+    lines.push("🌤 Tomorrow looks light. Good day to plan something.")
+  }
+  return lines.join("\n")
+}
+
 // ─── Job 3: clean up stale pending voice messages ──────────────────────
 // User received a voice picker but abandoned it. After 1 hour the
 // pending row is meaningless — Telegram's file_id may expire too.

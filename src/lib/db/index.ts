@@ -201,6 +201,16 @@ try {
   // use the server-wide shared TELEGRAM_VOICE_GROQ_KEY env var. Default 0
   // so the workspace quota doesn't get drained by a single power user.
   if (!has("voice_key_use_shared")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN voice_key_use_shared INTEGER NOT NULL DEFAULT 0`)
+  // End-of-day digest — mirror of morning digest. Two separate
+  // settings: enabled flag, time-of-day (HH:MM), last_sent tracking.
+  // Default off — opt-in via /digest evening on or Settings UI.
+  if (!has("digest_evening_enabled"))   sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN digest_evening_enabled INTEGER NOT NULL DEFAULT 0`)
+  if (!has("digest_evening_time"))      sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN digest_evening_time TEXT NOT NULL DEFAULT '19:00'`)
+  if (!has("digest_evening_last_sent")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN digest_evening_last_sent TEXT`)
+  // Natural-language commands: when true, freeform text that doesn't
+  // match a slash command, smart-capture, or AI-import format gets
+  // routed through the user's AI provider for intent parsing.
+  if (!has("nl_commands_enabled")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN nl_commands_enabled INTEGER NOT NULL DEFAULT 0`)
 } catch (err) {
   console.error("[migration] telegram_bots digest columns:", err)
 }

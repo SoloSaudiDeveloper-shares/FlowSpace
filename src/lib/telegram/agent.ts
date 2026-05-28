@@ -26,6 +26,7 @@ import "server-only"
 import { sqlite } from "@/lib/db"
 import { createId } from "@/lib/utils/ids"
 import { createElement } from "@/lib/actions/element-actions"
+import { classifyIntent, isNLEnabled, getUserAIConfig } from "@/lib/telegram/nl-intent"
 
 interface BotRow {
   user_id: string
@@ -65,11 +66,31 @@ export async function dispatchTelegramMessage(
       case "/search":   return searchAll(bot, args)
       case "/digest":   return toggleDigest(bot, args)
       case "/voice":    return voiceLanguage(bot, args)
+      case "/nl":       return toggleNL(bot, args)
       default:
         return `Unknown command "${cmd}". Try /help or /menu.`
     }
   }
 
+  // Freeform path: if NL commands are enabled AND user has an AI
+  // provider configured, classify intent via AI. Falls back to capture
+  // if AI returns nothing useful or errors.
+  if (isNLEnabled(bot.user_id)) {
+    const intent = await classifyIntent(bot.user_id, trimmed)
+    if (intent?.kind === "command") {
+      switch (intent.name) {
+        case "tasks":     return `🤖 _Interpreted as_ \`/tasks\`\n\n${listOpenTasks(bot)}`
+        case "deadlines": return `🤖 _Interpreted as_ \`/deadlines\`\n\n${listDeadlines(bot, 7)}`
+        case "projects":  return `🤖 _Interpreted as_ \`/projects\`\n\n${listProjects(bot)}`
+        case "lists":     return `🤖 _Interpreted as_ \`/lists\`\n\n${listTodoLists(bot)}`
+        case "stats":     return `🤖 _Interpreted as_ \`/stats\`\n\n${weeklyStats(bot)}`
+        case "help":      return helpText()
+      }
+    }
+    if (intent?.kind === "capture" && intent.text) {
+      return addToDefaultList(bot, intent.text)
+    }
+  }
   // Freeform path: quick-capture into the user's default todo list.
   return addToDefaultList(bot, trimmed)
 }
@@ -562,19 +583,54 @@ function toggleDigest(bot: BotRow, args: string): string {
   const a = args.trim().toLowerCase()
   if (!a) {
     const row = sqlite
-      .prepare(`SELECT digest_enabled, digest_time FROM telegram_bots WHERE user_id = ?`)
-      .get(bot.user_id) as { digest_enabled: number; digest_time: string } | undefined
+      .prepare(
+        `SELECT digest_enabled, digest_time, digest_evening_enabled, digest_evening_time
+         FROM telegram_bots WHERE user_id = ?`,
+      )
+      .get(bot.user_id) as
+      | { digest_enabled: number; digest_time: string; digest_evening_enabled: number; digest_evening_time: string }
+      | undefined
     if (!row) return "Bot not configured."
     return [
-      `🌅 *Daily digest*`,
+      `🌅 *Digests*`,
       ``,
       row.digest_enabled
-        ? `Currently *on* at *${row.digest_time}* (server time).`
-        : `Currently *off*.`,
+        ? `Morning: *on* at *${row.digest_time}*`
+        : `Morning: *off*`,
+      row.digest_evening_enabled
+        ? `Evening: *on* at *${row.digest_evening_time}*`
+        : `Evening: *off*`,
       ``,
-      `Toggle: \`/digest on\` or \`/digest off\``,
-      `Set time: \`/digest 07:30\` (24-hour HH:MM)`,
+      `*Morning*`,
+      `  \`/digest on\` or \`/digest off\``,
+      `  \`/digest 07:30\` — set time`,
+      ``,
+      `*Evening wrap-up*`,
+      `  \`/digest evening on\` or \`/digest evening off\``,
+      `  \`/digest evening 19:00\` — set time`,
     ].join("\n")
+  }
+  // Evening subcommand
+  if (a.startsWith("evening")) {
+    const tail = a.slice(7).trim()
+    if (tail === "on") {
+      sqlite.prepare(`UPDATE telegram_bots SET digest_evening_enabled = 1 WHERE user_id = ?`).run(bot.user_id)
+      return "🌙 Evening wrap-up *on*. You'll get an end-of-day summary."
+    }
+    if (tail === "off") {
+      sqlite.prepare(`UPDATE telegram_bots SET digest_evening_enabled = 0 WHERE user_id = ?`).run(bot.user_id)
+      return "🌙 Evening wrap-up *off*."
+    }
+    const m = tail.match(/^([0-2]?\d):([0-5]\d)$/)
+    if (m) {
+      const hh = String(parseInt(m[1], 10)).padStart(2, "0")
+      const mm = m[2]
+      sqlite
+        .prepare(`UPDATE telegram_bots SET digest_evening_time = ?, digest_evening_enabled = 1 WHERE user_id = ?`)
+        .run(`${hh}:${mm}`, bot.user_id)
+      return `🌙 Evening digest set to *${hh}:${mm}*. Enabled.`
+    }
+    return "Usage: `/digest evening on|off` or `/digest evening HH:MM`"
   }
   if (a === "on") {
     sqlite.prepare(`UPDATE telegram_bots SET digest_enabled = 1 WHERE user_id = ?`).run(bot.user_id)
@@ -591,13 +647,56 @@ function toggleDigest(bot: BotRow, args: string): string {
     sqlite
       .prepare(`UPDATE telegram_bots SET digest_time = ?, digest_enabled = 1 WHERE user_id = ?`)
       .run(`${hh}:${mm}`, bot.user_id)
-    return `🌅 Digest set to *${hh}:${mm}* (server time). Enabled.`
+    return `🌅 Morning digest set to *${hh}:${mm}*. Enabled.`
   }
-  return "Usage: `/digest on|off` or `/digest HH:MM`"
+  return "Usage: `/digest on|off`, `/digest HH:MM`, or `/digest evening on|off|HH:MM`"
 }
 
 // (escMd is escapeMd lower below — keep one definition only)
 const escMd = (s: string): string => escapeMd(s)
+
+// ─── /nl — toggle natural-language command routing ──────────────────────
+function toggleNL(bot: BotRow, args: string): string {
+  const a = args.trim().toLowerCase()
+  const ai = getUserAIConfig(bot.user_id)
+  if (!a) {
+    const enabled = isNLEnabled(bot.user_id)
+    const lines = [
+      "🤖 *Natural-language commands*",
+      "",
+      enabled ? "Currently: *ON*" : "Currently: *OFF*",
+    ]
+    if (!ai) {
+      lines.push(
+        "",
+        "⚠️ You haven't configured an AI provider. Set one in",
+        "FlowSpace → Settings → AI features before turning this on.",
+      )
+    } else {
+      lines.push(
+        "",
+        "When on, text that isn't a slash command or markdown is",
+        "routed through your AI provider — say _\"what am I working on\"_",
+        "and the bot understands.",
+        "",
+        "Toggle: `/nl on` or `/nl off`",
+      )
+    }
+    return lines.join("\n")
+  }
+  if (a === "on") {
+    if (!ai) {
+      return "⚠️ Configure an AI provider in FlowSpace → Settings → AI features first."
+    }
+    sqlite.prepare(`UPDATE telegram_bots SET nl_commands_enabled = 1 WHERE user_id = ?`).run(bot.user_id)
+    return "🤖 Natural-language commands *ON*. Talk to me normally — I'll route through your AI provider."
+  }
+  if (a === "off") {
+    sqlite.prepare(`UPDATE telegram_bots SET nl_commands_enabled = 0 WHERE user_id = ?`).run(bot.user_id)
+    return "🤖 Natural-language commands *OFF*. Freeform text now goes straight to capture."
+  }
+  return "Usage: `/nl on` or `/nl off`"
+}
 
 // ─── /voice — set transcription language for voice messages ─────────────
 //
