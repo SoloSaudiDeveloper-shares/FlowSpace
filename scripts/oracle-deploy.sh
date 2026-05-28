@@ -78,7 +78,15 @@ sudo netfilter-persistent save || true
 
 echo "==> [3/6] Cloning / updating repo at $APP_DIR"
 if [ -d "$APP_DIR/.git" ]; then
-  git -C "$APP_DIR" pull --ff-only
+  # Use fetch + hard-reset (not `pull --ff-only`) so a force-pushed
+  # history doesn't kill the deploy. With `set -e`, a failed
+  # fast-forward used to abort the script before Docker rebuilt,
+  # leaving the live site stuck on the old image. fetch + reset
+  # always lands us on whatever `origin/main` currently points at.
+  git -C "$APP_DIR" fetch --prune origin
+  DEFAULT_BRANCH=$(git -C "$APP_DIR" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@' || echo "main")
+  git -C "$APP_DIR" reset --hard "origin/${DEFAULT_BRANCH}"
+  git -C "$APP_DIR" clean -fd
 else
   git clone "$REPO_URL" "$APP_DIR"
 fi
