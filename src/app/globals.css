@@ -121,18 +121,19 @@
 
 /* ─── Settings page section fade ───────────────────────────────────────
    On the Settings page, only the currently-scrolled-into-view section is
-   shown at full opacity. The rest fade out so the page feels focused on
-   one section at a time. Hover restores opacity in case the user wants to
-   peek at an inactive section without scrolling. */
+   shown at full opacity. The rest stay slightly dimmed so the page feels
+   focused on one section at a time. We deliberately do NOT un-fade on
+   hover — that produced a snappy flicker as the cursor crossed cards.
+   Scrolling (or clicking the nav) is the only way to "wake" a section. */
 .settings-sections > section {
-  opacity: 0.2;
-  transition: opacity 250ms ease;
-}
-.settings-sections > section:hover {
-  opacity: 1;
+  opacity: 0.55;
+  transition: opacity 500ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .settings-sections > section.is-active {
   opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-sections > section { transition: none; }
 }
 
 @custom-variant dark (&:is(.dark *));

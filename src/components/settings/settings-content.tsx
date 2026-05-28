@@ -84,17 +84,29 @@ function DescriptionPanel({
   const Icon = item.icon
   return (
     <aside
-      className="sticky top-0 self-start hidden xl:flex flex-col gap-3 w-64 shrink-0 border-l border-border/40 bg-card/30 max-h-screen overflow-y-auto p-5"
+      className="sticky top-0 hidden xl:flex flex-col w-64 shrink-0 border-l border-border/40 bg-card/30 h-screen overflow-hidden"
       aria-label="Section description"
     >
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">
-        Current section
+      {/* Inner scroll area — keeps the bg painting full-height even when
+          content is short, while still allowing scroll for long copy. */}
+      <div className="flex flex-col gap-3 p-5 overflow-y-auto">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">
+          Current section
+        </div>
+        <div
+          key={item.label}
+          className="flex items-center gap-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-1 motion-safe:duration-300"
+        >
+          <Icon className="size-4 text-primary" />
+          <span className="text-sm font-semibold">{item.label}</span>
+        </div>
+        <p
+          key={item.description}
+          className="text-xs text-muted-foreground leading-relaxed motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500"
+        >
+          {item.description}
+        </p>
       </div>
-      <div className="flex items-center gap-2">
-        <Icon className="size-4 text-primary" />
-        <span className="text-sm font-semibold">{item.label}</span>
-      </div>
-      <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
     </aside>
   )
 }
