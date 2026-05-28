@@ -23,6 +23,10 @@ export interface TelegramBotStatus {
   lastSeenAt?: string | null
   voiceLanguage: string
   voiceAutoSkip: boolean
+  voiceKeyUseShared: boolean
+  /** True if the server has TELEGRAM_VOICE_GROQ_KEY set — used by the UI
+   *  to decide whether to even offer the "shared key" toggle. */
+  sharedVoiceKeyAvailable: boolean
 }
 
 interface BotRow {
@@ -35,6 +39,7 @@ interface BotRow {
   last_seen_at: string | null
   voice_language: string | null
   voice_auto_skip: number | null
+  voice_key_use_shared: number | null
 }
 
 /** Compute the base URL for outbound webhook registration. We MUST send a
@@ -55,7 +60,7 @@ export async function getMyTelegramStatus(): Promise<TelegramBotStatus> {
     .prepare(`SELECT * FROM telegram_bots WHERE user_id = ?`)
     .get(me.id) as BotRow | undefined
   if (!row) {
-    return { connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false }
+    return { connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY }
   }
   const url = buildWebhookUrl(row.webhook_secret)
   return {
@@ -68,6 +73,8 @@ export async function getMyTelegramStatus(): Promise<TelegramBotStatus> {
     lastSeenAt: row.last_seen_at,
     voiceLanguage: row.voice_language ?? "en",
     voiceAutoSkip: row.voice_auto_skip === 1,
+    voiceKeyUseShared: row.voice_key_use_shared === 1,
+    sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY,
   }
 }
 
@@ -282,6 +289,14 @@ export async function setTelegramVoiceAutoSkip(enabled: boolean): Promise<{ ok: 
   const me = await requireAuth()
   sqlite
     .prepare(`UPDATE telegram_bots SET voice_auto_skip = ?, updated_at = datetime('now') WHERE user_id = ?`)
+    .run(enabled ? 1 : 0, me.id)
+  return { ok: true }
+}
+
+export async function setTelegramVoiceKeyUseShared(enabled: boolean): Promise<{ ok: true }> {
+  const me = await requireAuth()
+  sqlite
+    .prepare(`UPDATE telegram_bots SET voice_key_use_shared = ?, updated_at = datetime('now') WHERE user_id = ?`)
     .run(enabled ? 1 : 0, me.id)
   return { ok: true }
 }

@@ -196,6 +196,11 @@ try {
   // and route straight to the user's defaults (voice_language + target_list_id).
   // Users can toggle this with `/voice skip on|off` or in Settings → Telegram.
   if (!has("voice_auto_skip"))    sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN voice_auto_skip INTEGER NOT NULL DEFAULT 0`)
+  // Voice transcription key source: 0 = use this user's own Groq key
+  // (from their browser pref → user_preferences.speechGroqApiKey), 1 =
+  // use the server-wide shared TELEGRAM_VOICE_GROQ_KEY env var. Default 0
+  // so the workspace quota doesn't get drained by a single power user.
+  if (!has("voice_key_use_shared")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN voice_key_use_shared INTEGER NOT NULL DEFAULT 0`)
 } catch (err) {
   console.error("[migration] telegram_bots digest columns:", err)
 }

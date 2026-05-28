@@ -23,8 +23,29 @@ import "server-only"
 import { sqlite } from "@/lib/db"
 import { fileDownloadUrl, getFile } from "@/lib/telegram/client"
 
-/** Resolve the Groq API key for a given user, browser pref first then env. */
+/** Resolve the Groq API key for a given user, respecting their per-user
+ *  choice between own key and the shared workspace key (env var).
+ *
+ *  Order:
+ *    - If user opted into the shared key (voice_key_use_shared = 1):
+ *        env var only — even if they have their own key set.
+ *    - Otherwise:
+ *        their own key from preferences → fallback to env if missing,
+ *        so a user who hasn't gotten around to setting one isn't blocked
+ *        on day one.
+ */
 export function resolveGroqKey(userId: string): string | null {
+  const env = process.env.TELEGRAM_VOICE_GROQ_KEY?.trim() || null
+
+  // Read the user's preference
+  const botRow = sqlite
+    .prepare(`SELECT voice_key_use_shared FROM telegram_bots WHERE user_id = ?`)
+    .get(userId) as { voice_key_use_shared: number | null } | undefined
+  if (botRow?.voice_key_use_shared === 1) {
+    return env
+  }
+
+  // Default path: prefer the user's own key
   const row = sqlite
     .prepare(`SELECT prefs_json FROM user_preferences WHERE user_id = ?`)
     .get(userId) as { prefs_json: string } | undefined
@@ -37,8 +58,7 @@ export function resolveGroqKey(userId: string): string | null {
       /* ignore malformed prefs */
     }
   }
-  const env = process.env.TELEGRAM_VOICE_GROQ_KEY?.trim()
-  return env || null
+  return env
 }
 
 /**

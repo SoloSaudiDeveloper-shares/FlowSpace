@@ -42,6 +42,7 @@ import {
   clearMyTelegramHistory,
   setTelegramVoiceLanguage,
   setTelegramVoiceAutoSkip,
+  setTelegramVoiceKeyUseShared,
   type TelegramBotStatus,
   type TelegramHistoryEntry,
 } from "@/lib/actions/telegram-actions"
@@ -75,7 +76,7 @@ export function TelegramSection({
         setLists(ls)
       }
     } catch {
-      setStatus({ connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false })
+      setStatus({ connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, sharedVoiceKeyAvailable: false })
     }
   }
   useEffect(() => { refresh() }, [])
@@ -124,6 +125,21 @@ export function TelegramSection({
     try {
       await setTelegramVoiceAutoSkip(enabled)
       toast.success(enabled ? "Auto-skip ON — voice notes use defaults" : "Auto-skip OFF — pickers will show")
+      await refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update setting")
+    } finally {
+      setSavingVoice(false)
+    }
+  }
+
+  async function handleToggleSharedKey(useShared: boolean) {
+    setSavingVoice(true)
+    try {
+      await setTelegramVoiceKeyUseShared(useShared)
+      toast.success(useShared
+        ? "Switched to the shared workspace key"
+        : "Switched to your own Groq key")
       await refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update setting")
@@ -300,6 +316,54 @@ export function TelegramSection({
               </p>
             </div>
           </div>
+
+          {/* Groq key source */}
+          {status.sharedVoiceKeyAvailable ? (
+            <div className="flex items-center gap-3 pt-3 mt-3 border-t border-border/40">
+              <button
+                role="switch"
+                aria-checked={status.voiceKeyUseShared}
+                onClick={() => handleToggleSharedKey(!status.voiceKeyUseShared)}
+                disabled={savingVoice}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${
+                  status.voiceKeyUseShared ? "bg-primary" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span
+                  className={`inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                    status.voiceKeyUseShared ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+              <div className="flex-1">
+                <p className="text-sm font-medium">
+                  Use shared workspace key
+                  {status.voiceKeyUseShared && (
+                    <span className="ml-1.5 text-[10px] font-semibold text-amber-400 uppercase tracking-wider">
+                      rate-limited
+                    </span>
+                  )}
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {status.voiceKeyUseShared
+                    ? "Using the workspace key (free tier: ~2,000 transcriptions/day, shared with everyone). Switch off to use your own."
+                    : "Using your personal key from Settings → Speech. Best — each user gets their own quota."}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="pt-3 mt-3 border-t border-border/40">
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                💡 <strong className="text-foreground/80">Using your personal Groq key</strong>
+                {" "}from Settings → Speech. Workspace admin hasn&apos;t set a
+                shared fallback key (TELEGRAM_VOICE_GROQ_KEY env var), so each user provides their own. Get a free
+                one at{" "}
+                <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+                  console.groq.com/keys
+                </a>.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Where captures go */}
