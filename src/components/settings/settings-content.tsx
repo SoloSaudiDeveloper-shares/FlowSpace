@@ -75,6 +75,30 @@ import { CustomFieldsSettings } from "@/components/settings/custom-fields-settin
 import { AIProviderSection } from "@/components/settings/ai-provider-section"
 import { AccountSection } from "@/components/settings/account-section"
 
+/** Small sub-component so we can use the JSX-tag form on a dynamic icon. */
+function DescriptionPanel({
+  item,
+}: {
+  item: { icon: React.ComponentType<{ className?: string }>; label: string; description: string }
+}) {
+  const Icon = item.icon
+  return (
+    <aside
+      className="sticky top-0 self-start hidden xl:flex flex-col gap-3 w-64 shrink-0 border-l border-border/40 bg-card/30 max-h-screen overflow-y-auto p-5"
+      aria-label="Section description"
+    >
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">
+        Current section
+      </div>
+      <div className="flex items-center gap-2">
+        <Icon className="size-4 text-primary" />
+        <span className="text-sm font-semibold">{item.label}</span>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
+    </aside>
+  )
+}
+
 export function SettingsContent() {
   const [exporting, setExporting] = useState(false)
   const [promptsDialogOpen, setPromptsDialogOpen] = useState(false)
@@ -196,28 +220,74 @@ export function SettingsContent() {
   ]
 
   // ── Settings navigation (in-page anchor links) ──────────────────
-  const SETTINGS_NAV: { id: string; label: string; icon: React.ComponentType<{ className?: string }>; ownerOnly?: boolean }[] = [
-    { id: "account",        label: "Account",          icon: KeyIcon },
-    { id: "workspace",      label: "Workspace",        icon: Shield,       ownerOnly: true },
-    { id: "data-export",    label: "Data export",      icon: Database },
-    { id: "custom-fields",  label: "Custom fields",    icon: Settings2 },
-    { id: "appearance",     label: "Appearance",       icon: Palette },
-    { id: "sidebar",        label: "Sidebar",          icon: PanelLeft },
-    { id: "clock",          label: "Clock",            icon: ClockIcon },
-    { id: "feed-ticker",    label: "Feed ticker",      icon: Rss },
-    { id: "gantt",          label: "Gantt chart",      icon: BarChart2 },
-    { id: "speech",         label: "Speech",           icon: Mic },
-    { id: "ai",             label: "AI features",      icon: Sparkles },
-    { id: "shortcuts",      label: "Shortcuts",        icon: Keyboard },
-    { id: "about",          label: "About",            icon: Info },
+  const SETTINGS_NAV: {
+    id: string
+    label: string
+    icon: React.ComponentType<{ className?: string }>
+    description: string
+    ownerOnly?: boolean
+  }[] = [
+    { id: "account",        label: "Account",       icon: KeyIcon,    description: "Your personal sign-in details. Change your password — other devices get signed out automatically." },
+    { id: "workspace",      label: "Workspace",     icon: Shield,     ownerOnly: true, description: "Owner-only controls. Allow or block new signups, set how long user sessions stay valid." },
+    { id: "data-export",    label: "Data export",   icon: Database,   description: "Export everything you own — projects, pages, tasks, comments — as JSON or spreadsheet-friendly formats. For backups and migrations." },
+    { id: "custom-fields",  label: "Custom fields", icon: Settings2,  description: "Define your own fields (text, number, select, date, etc.) and attach them to elements or tasks. Use these to model anything your work needs." },
+    { id: "appearance",     label: "Appearance",    icon: Palette,    description: "Font, font size, accent color, border radius. The whole UI re-themes instantly when you change these." },
+    { id: "sidebar",        label: "Sidebar",       icon: PanelLeft,  description: "Show/hide and reorder the sidebar sections. Give them custom names that fit your workflow." },
+    { id: "clock",          label: "Clock",         icon: ClockIcon,  description: "The clock pinned in the corner. Right-click it for quick changes (color, format) or use this section for finer control." },
+    { id: "feed-ticker",    label: "Feed ticker",   icon: Rss,        description: "The scrolling activity bar at the top of every page. Choose top or bottom, direction, speed." },
+    { id: "gantt",          label: "Gantt chart",   icon: BarChart2,  description: "Which fields show in Gantt task tooltips." },
+    { id: "speech",         label: "Speech",        icon: Mic,        description: "Voice input. Pick between the browser's built-in Web Speech API (Chrome/Edge, fast) or a local Whisper model (private, all browsers, downloads a model)." },
+    { id: "ai",             label: "AI features",   icon: Sparkles,   description: "Hook the AI features up to a provider — local Ollama, OpenAI, Gemini, LM Studio, or any custom OpenAI-compatible endpoint. Keys stay in your browser." },
+    { id: "shortcuts",      label: "Shortcuts",     icon: Keyboard,   description: "Keyboard shortcuts reference. Saves you a lot of clicking once you remember a few." },
+    { id: "about",          label: "About",         icon: Info,       description: "Version info and project links." },
   ]
 
+  // Track which section is most-visible so we can fade the others out + highlight the matching nav item.
+  const [activeSectionId, setActiveSectionId] = useState<string>(SETTINGS_NAV[0].id)
+  useEffect(() => {
+    const ids = SETTINGS_NAV.map((s) => s.id)
+    const elements = ids
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => !!el)
+    if (elements.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+        if (visible[0]) setActiveSectionId(visible[0].target.id)
+      },
+      {
+        // The "anchor zone" sits roughly in the upper third of the viewport.
+        // A section counts as "active" when its top crosses into that band.
+        rootMargin: "-15% 0px -60% 0px",
+        threshold: [0, 0.25, 0.5, 0.75, 1],
+      }
+    )
+    elements.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+    // SETTINGS_NAV is stable per render; we want to observe after sections mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOwner])
+
   function scrollToSection(id: string) {
+    setActiveSectionId(id)
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
+  const activeNavItem =
+    SETTINGS_NAV.find((s) => s.id === activeSectionId) ?? SETTINGS_NAV[0]
+
+  // Toggle the .is-active class on the matching section so CSS can fade
+  // the others out. Avoids editing every <section> JSX block.
+  useEffect(() => {
+    const sections = document.querySelectorAll(".settings-sections > section")
+    sections.forEach((s) => s.classList.toggle("is-active", s.id === activeSectionId))
+  }, [activeSectionId])
+
   return (
-    <div className="flex">
+    <div className="flex" data-active-section={activeSectionId}>
       {/* ─── Sticky section nav, sidebar-style — md+ only ───────────── */}
       <nav
         className="sticky top-0 self-start hidden md:flex flex-col gap-0.5 w-52 shrink-0 border-r border-border/40 bg-card/30 max-h-screen overflow-y-auto p-3"
@@ -229,22 +299,29 @@ export function SettingsContent() {
         </div>
         {SETTINGS_NAV.filter((s) => !s.ownerOnly || isOwner).map((s) => {
           const Icon = s.icon
+          const isActive = activeSectionId === s.id
           return (
             <button
               key={s.id}
               type="button"
               onClick={() => scrollToSection(s.id)}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors text-left"
+              aria-current={isActive ? "true" : undefined}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors text-left ${
+                isActive
+                  ? "bg-primary/10 text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              }`}
             >
-              <Icon className="size-3.5 shrink-0" />
+              <Icon className={`size-3.5 shrink-0 ${isActive ? "text-primary" : ""}`} />
               <span className="truncate">{s.label}</span>
+              {isActive && <ChevronRight className="size-3 ml-auto text-primary shrink-0" />}
             </button>
           )
         })}
       </nav>
 
       {/* ─── Main content ───────────────────────────────────────────── */}
-      <div className="flex-1 space-y-10 min-w-0 p-6 max-w-3xl">
+      <div className="flex-1 space-y-10 min-w-0 p-6 max-w-3xl settings-sections">
       {/* ─── Account (everyone) ────────────────────────────────────── */}
       <section id="account" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
@@ -1678,6 +1755,9 @@ export function SettingsContent() {
         </DialogContent>
       </Dialog>
       </div>{/* /flex-1 main content */}
+
+      {/* ─── Description panel (xl+ only) ──────────────────────────── */}
+      <DescriptionPanel item={activeNavItem} />
     </div>
   )
 }

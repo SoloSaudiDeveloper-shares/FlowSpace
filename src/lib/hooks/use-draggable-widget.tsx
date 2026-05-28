@@ -57,12 +57,17 @@ export function useDraggableWidget({
   const fullKey = `flowspace.widget-pos.${storageKey}`
 
   // Compute default corner-anchored position once the element has measurable size.
+  // Uses documentElement.clientWidth/Height rather than window.innerWidth/Height
+  // so the scrollbar is excluded — otherwise the widget lands underneath the
+  // vertical scrollbar in bottom-right and looks "cut off / hidden".
+  // Force-measure after a frame to make sure offsetWidth/Height are accurate
+  // even when called right after the consumer mounts.
   const computeDefault = useCallback((): StoredPosition => {
     const el = containerRef.current
-    const w = el?.offsetWidth ?? 240
-    const h = el?.offsetHeight ?? 60
-    const vw = window.innerWidth
-    const vh = window.innerHeight
+    const w = el?.offsetWidth || 240
+    const h = el?.offsetHeight || 60
+    const vw = document.documentElement.clientWidth || window.innerWidth
+    const vh = document.documentElement.clientHeight || window.innerHeight
     switch (defaultCorner) {
       case "top-left":
         return { x: margin, y: margin }
@@ -158,11 +163,17 @@ export function useDraggableWidget({
   )
 
   const resetPosition = useCallback(() => {
-    const next = computeDefault()
-    setPos(next)
-    try {
-      window.localStorage.removeItem(fullKey)
-    } catch {}
+    // Defer by one frame so any size changes (e.g. a CSS transition that
+    // finished mid-render) settle before we re-measure. Without this, a
+    // recent widget toggle can leave offsetWidth stale and the reset lands
+    // off-screen.
+    requestAnimationFrame(() => {
+      const next = computeDefault()
+      setPos(next)
+      try {
+        window.localStorage.removeItem(fullKey)
+      } catch {}
+    })
   }, [computeDefault, fullKey])
 
   // Until hydrated, render at the default corner via simple Tailwind classes —

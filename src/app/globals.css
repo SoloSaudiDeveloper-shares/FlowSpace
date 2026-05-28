@@ -119,6 +119,22 @@
 /* FeedTicker is now rendered as a sticky in-flow sibling at top (or bottom)
    of the SidebarInset content area — no padding hack needed. */
 
+/* ─── Settings page section fade ───────────────────────────────────────
+   On the Settings page, only the currently-scrolled-into-view section is
+   shown at full opacity. The rest fade out so the page feels focused on
+   one section at a time. Hover restores opacity in case the user wants to
+   peek at an inactive section without scrolling. */
+.settings-sections > section {
+  opacity: 0.2;
+  transition: opacity 250ms ease;
+}
+.settings-sections > section:hover {
+  opacity: 1;
+}
+.settings-sections > section.is-active {
+  opacity: 1;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
