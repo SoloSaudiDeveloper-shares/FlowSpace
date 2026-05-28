@@ -36,7 +36,7 @@ fi
 # ── Self-update: re-download oracle-deploy.sh from the latest commit on
 # the repo's default branch and re-exec if the content changed. Prevents
 # the "stale script in $HOME never picks up new features" trap.
-if [ -n "$REPO_URL" ] && [ -z "$FLOWSPACE_NO_SELF_UPDATE" ]; then
+if [ -n "$REPO_URL" ] && [ -z "${FLOWSPACE_NO_SELF_UPDATE:-}" ]; then
   # Derive the raw-content URL from the repo URL
   RAW_URL=$(echo "$REPO_URL" | sed -E 's#https://github.com/([^/]+/[^/.]+)(.git)?#https://raw.githubusercontent.com/\1/main/scripts/oracle-deploy.sh#')
   TMP_SCRIPT=$(mktemp)
