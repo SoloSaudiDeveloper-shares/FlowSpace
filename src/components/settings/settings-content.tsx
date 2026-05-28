@@ -710,6 +710,44 @@ export function SettingsContent() {
           </div>
         </div>
 
+        {/* Right-click color palette */}
+        <div className="mb-6">
+          <h3 className="text-sm font-medium mb-1">Right-click menu colors</h3>
+          <p className="text-xs text-muted-foreground mb-3">
+            Pick which colors appear in the right-click <strong>Color</strong>{" "}
+            submenu on sidebar items. The first color is also the default
+            for new items. Saved in your account — not your browser.
+          </p>
+          <RightClickPalettePicker />
+        </div>
+
+        {/* Notification badge */}
+        <div className="mb-6">
+          <h3 className="text-sm font-medium mb-1">Notification badge</h3>
+          <p className="text-xs text-muted-foreground mb-3">
+            The red number on the sidebar bell icon. Counts unread
+            notifications, pending Telegram imports, and overdue
+            tasks/reminders.
+          </p>
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-card">
+            <button
+              role="switch"
+              aria-checked={preferences.notificationBadgeEnabled !== false}
+              onClick={() => updatePreference("notificationBadgeEnabled", !(preferences.notificationBadgeEnabled !== false))}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                preferences.notificationBadgeEnabled !== false ? "bg-primary" : "bg-muted-foreground/30"
+              }`}
+            >
+              <span
+                className={`inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                  preferences.notificationBadgeEnabled !== false ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className="text-sm">Show the bell badge</span>
+          </div>
+        </div>
+
         {/* Border Radius */}
         <div>
           <h3 className="text-sm font-medium mb-3">Border Radius</h3>
@@ -1941,6 +1979,104 @@ export function SettingsContent() {
 
       {/* ─── Description panel (xl+ only) ──────────────────────────── */}
       <DescriptionPanel item={activeNavItem} />
+    </div>
+  )
+}
+
+/** Curates the right-click color palette + the platform default color.
+ *
+ *  Implementation notes:
+ *  - The user's choice is saved per-user in DB-backed preferences. The
+ *    sidebar's right-click handler reads `preferences.rightClickPalette`
+ *    + `preferences.rightClickDefaultColor` to render the submenu and
+ *    pre-select the default.
+ *  - This widget never touches localStorage — `usePreferences` persists
+ *    via the server action `saveMyPreferences`.
+ *  - Predefined swatches come from a wider palette so the user has
+ *    plenty to choose from. Toggling a swatch adds/removes it from the
+ *    palette; clicking the "default" radio sets `rightClickDefaultColor`. */
+function RightClickPalettePicker() {
+  const { preferences, updatePreference } = usePreferences()
+  const palette = preferences.rightClickPalette
+  const defaultColor = preferences.rightClickDefaultColor
+
+  // Wider swatch set users can pull from. Tuned for dark-mode readability.
+  const ALL_SWATCHES: { hex: string; name: string }[] = [
+    { hex: "#a78bfa", name: "Violet" },
+    { hex: "#8b5cf6", name: "Purple" },
+    { hex: "#60a5fa", name: "Blue" },
+    { hex: "#3b82f6", name: "Indigo" },
+    { hex: "#67e8f9", name: "Cyan" },
+    { hex: "#14b8a6", name: "Teal" },
+    { hex: "#6ee7b7", name: "Emerald" },
+    { hex: "#10b981", name: "Green" },
+    { hex: "#fbbf24", name: "Amber" },
+    { hex: "#f97316", name: "Orange" },
+    { hex: "#fb7185", name: "Rose" },
+    { hex: "#f43f5e", name: "Crimson" },
+    { hex: "#ec4899", name: "Pink" },
+    { hex: "#94a3b8", name: "Slate" },
+    { hex: "#737373", name: "Neutral" },
+  ]
+
+  function toggle(hex: string) {
+    if (palette.includes(hex)) {
+      // Removing — don't allow shrinking below 1.
+      if (palette.length <= 1) return
+      updatePreference("rightClickPalette", palette.filter((h) => h !== hex))
+      // If we just removed the default, fall back to first remaining.
+      if (defaultColor === hex) {
+        const next = palette.filter((h) => h !== hex)[0]
+        if (next) updatePreference("rightClickDefaultColor", next)
+      }
+    } else {
+      updatePreference("rightClickPalette", [...palette, hex])
+    }
+  }
+
+  function setDefault(hex: string) {
+    if (!palette.includes(hex)) {
+      updatePreference("rightClickPalette", [...palette, hex])
+    }
+    updatePreference("rightClickDefaultColor", hex)
+  }
+
+  return (
+    <div className="px-4 py-3 rounded-lg border bg-card space-y-3">
+      <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
+        {ALL_SWATCHES.map((s) => {
+          const enabled = palette.includes(s.hex)
+          const isDefault = defaultColor === s.hex
+          return (
+            <button
+              key={s.hex}
+              type="button"
+              onClick={() => toggle(s.hex)}
+              onDoubleClick={() => setDefault(s.hex)}
+              title={`${s.name} — single-click to toggle, double-click to set as default`}
+              className={`group relative flex flex-col items-center gap-1 p-1.5 rounded-md transition-all ${
+                enabled ? "bg-accent/40" : "opacity-30 hover:opacity-60"
+              }`}
+            >
+              <div
+                className="size-7 rounded-full ring-offset-background flex items-center justify-center transition-transform group-hover:scale-105"
+                style={{
+                  background: s.hex,
+                  boxShadow: isDefault ? `0 0 0 2px hsl(var(--background)), 0 0 0 4px ${s.hex}` : undefined,
+                }}
+              >
+                {isDefault && <span className="text-[9px] font-bold text-white drop-shadow-md">★</span>}
+              </div>
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">{s.name}</span>
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        Single-click to add/remove from your right-click menu. Double-click
+        to set as the default color (marked ★). Currently {palette.length}{" "}
+        color{palette.length === 1 ? "" : "s"} in your palette.
+      </p>
     </div>
   )
 }

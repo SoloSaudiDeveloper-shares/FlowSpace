@@ -110,6 +110,14 @@ export interface Preferences {
   /** Which home-dashboard sections this user wants visible. Missing keys
    * default to true. */
   homeSections: Partial<Record<HomeSectionKey, boolean>>
+  /** Hex colors that show up in the right-click "Color" submenu. The user
+   * can curate this list in Settings. Empty = use platform defaults. */
+  rightClickPalette: string[]
+  /** Default color used for newly created sidebar items (and shown
+   * pre-selected in the right-click color picker). */
+  rightClickDefaultColor: string
+  /** Bell-icon notification badge visibility. Default ON. */
+  notificationBadgeEnabled: boolean
 }
 
 // Home dashboard sections — each one can be toggled on/off by the user.
@@ -202,6 +210,21 @@ export const DEFAULT_PREFERENCES: Preferences = {
     quickCapture: true,
     recent: true,
   },
+  // Curated right-click palette — soft, dark-mode friendly, distinct hues.
+  // The first entry is the "default" by convention; users can curate this
+  // list and pick which one is default separately.
+  rightClickPalette: [
+    "#a78bfa", // violet (new default — was gray before)
+    "#60a5fa", // blue
+    "#67e8f9", // cyan
+    "#6ee7b7", // emerald
+    "#fbbf24", // amber
+    "#fb7185", // rose
+    "#f97316", // orange
+    "#94a3b8", // slate (the old default, still available)
+  ],
+  rightClickDefaultColor: "#a78bfa", // violet — friendlier than gray
+  notificationBadgeEnabled: true,
 }
 
 export const HOME_SECTION_LABELS: Record<HomeSectionKey, string> = {

@@ -728,6 +728,28 @@ function EventsTab({ events }: { events: any[] }) {
         </p>
       </div>
 
+      {/* Explainer panel — events are opaque without context */}
+      <div className="px-4 py-3 rounded-lg border border-primary/30 bg-primary/5">
+        <p className="text-xs font-medium uppercase tracking-wider text-primary mb-2 flex items-center gap-1.5">
+          <Info className="size-3" />
+          What are server events?
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+          The audit log of everything important the server did. Each entry
+          records WHEN something happened, WHAT happened, and WHO triggered
+          it. Use this to debug issues, spot suspicious activity, or
+          confirm a deploy succeeded.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground mt-2">
+          <div><strong className="text-foreground/80">server_start / server_stop</strong> — container booted or shut down. After every deploy you should see a fresh start.</div>
+          <div><strong className="text-foreground/80">backup_completed / backup_failed</strong> — scheduled backups firing on schedule. Red = investigate.</div>
+          <div><strong className="text-foreground/80">user_login / user_logout</strong> — session activity. Useful for security review.</div>
+          <div><strong className="text-foreground/80">user_created</strong> — new account signed up. Cross-check the Users tab.</div>
+          <div><strong className="text-foreground/80">permission_changed</strong> — admin or role flips. High-impact action.</div>
+          <div><strong className="text-foreground/80">error / warning</strong> — server-side errors logged for investigation.</div>
+        </div>
+      </div>
+
       {events.length === 0 ? (
         <div className="bg-card border rounded-lg px-4 py-8 text-center text-muted-foreground text-sm">
           No events recorded yet.

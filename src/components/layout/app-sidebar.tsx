@@ -279,17 +279,96 @@ function WorkspaceHeader({
   )
 }
 
-/** Color presets used by the sidebar right-click color picker (per-item).
- * These ride on element.color which is a free-form hex string. */
-const SIDEBAR_COLOR_OPTIONS: { value: string; label: string }[] = [
-  { value: "#737373", label: "Neutral" },
-  { value: "#3b82f6", label: "Blue" },
-  { value: "#8b5cf6", label: "Violet" },
-  { value: "#f43f5e", label: "Rose" },
-  { value: "#10b981", label: "Green" },
-  { value: "#f97316", label: "Orange" },
-  { value: "#14b8a6", label: "Teal" },
-]
+/** Friendly label for a hex — fallback when the color isn't in our named set. */
+const NAMED_COLORS: Record<string, string> = {
+  "#737373": "Neutral",
+  "#3b82f6": "Blue",
+  "#8b5cf6": "Violet",
+  "#f43f5e": "Rose",
+  "#10b981": "Green",
+  "#f97316": "Orange",
+  "#14b8a6": "Teal",
+  "#a78bfa": "Violet",
+  "#60a5fa": "Blue",
+  "#67e8f9": "Cyan",
+  "#6ee7b7": "Emerald",
+  "#fbbf24": "Amber",
+  "#fb7185": "Rose",
+  "#94a3b8": "Slate",
+}
+
+/** Build the right-click color options from the user's curated palette.
+ * Falls back to the platform default if they haven't set one. */
+function getRightClickColorOptions(
+  palette: string[] | undefined,
+): { value: string; label: string }[] {
+  const list = (palette && palette.length > 0)
+    ? palette
+    : ["#a78bfa", "#60a5fa", "#67e8f9", "#6ee7b7", "#fbbf24", "#fb7185", "#f97316", "#94a3b8"]
+  return list.map((hex) => ({ value: hex, label: NAMED_COLORS[hex] ?? hex }))
+}
+
+/** Sidebar "Notifications" button with an unread-count badge. The badge
+ *  combines unread notifications, pending Telegram imports, and overdue
+ *  task/reminder counts into one number. Polls every 60s so newly arrived
+ *  items show up without a refresh. The `enabled` prop hides the badge
+ *  per user preference (Settings → … → Notification badge). */
+function NotificationsButton({
+  active,
+  onClick,
+  enabled,
+}: {
+  active: boolean
+  onClick: () => void
+  enabled: boolean
+}) {
+  const [count, setCount] = useState(0)
+  useEffect(() => {
+    if (!enabled) {
+      setCount(0)
+      return
+    }
+    let cancelled = false
+    async function tick() {
+      try {
+        const { getMyNotificationCount } = await import(
+          "@/lib/actions/notification-count-actions"
+        )
+        const c = await getMyNotificationCount()
+        if (!cancelled) setCount(c.total)
+      } catch {
+        /* ignore — keep last known */
+      }
+    }
+    void tick()
+    const t = window.setInterval(tick, 60_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(t)
+    }
+  }, [enabled])
+
+  return (
+    <SidebarMenuButton
+      isActive={active}
+      onClick={onClick}
+      tooltip="Notifications"
+    >
+      <span className="relative inline-flex items-center justify-center">
+        <Bell className="size-4" />
+        {enabled && count > 0 && (
+          <span
+            aria-label={`${count} pending`}
+            className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center leading-none ring-2 ring-sidebar"
+          >
+            {count > 99 ? "99+" : count}
+          </span>
+        )}
+      </span>
+      <span>Notifications</span>
+    </SidebarMenuButton>
+  )
+}
 
 /** Color presets used for SECTION HEADERS (Projects, Pages, Canvases…).
  * Tuned for dark-mode legibility: bright enough to read, soft enough not
@@ -870,7 +949,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
       },
       {
         colors: true,
-        options: SIDEBAR_COLOR_OPTIONS,
+        options: getRightClickColorOptions(preferences.rightClickPalette),
         selected: el.color ?? undefined,
         onPick: async (val: string) => {
           await updateElement(el.id, { color: val || undefined })
@@ -1553,14 +1632,11 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
             </SidebarMenuItem>
           )}
           <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={pathname === "/notifications"}
+            <NotificationsButton
+              active={pathname === "/notifications"}
               onClick={() => router.push("/notifications")}
-              tooltip="Notifications"
-            >
-              <Inbox className="size-4" />
-              <span>Notifications</span>
-            </SidebarMenuButton>
+              enabled={preferences.notificationBadgeEnabled !== false}
+            />
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
