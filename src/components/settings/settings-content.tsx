@@ -126,6 +126,10 @@ export function SettingsContent() {
   // Session duration is stored in ms server-side; UI works in minutes.
   const [sessionMinutes, setSessionMinutes] = useState<number | null>(null)
   const [sessionSaving, setSessionSaving] = useState(false)
+  // Workspace name (owner-only). Empty string until first fetch.
+  const [workspaceNameDraft, setWorkspaceNameDraft] = useState<string>("")
+  const [workspaceNameSaving, setWorkspaceNameSaving] = useState(false)
+  const [workspaceNameLoaded, setWorkspaceNameLoaded] = useState(false)
 
   // Load admin settings once for owners
   useEffect(() => {
@@ -133,8 +137,30 @@ export function SettingsContent() {
     import("@/lib/actions/server-settings-actions").then((mod) => {
       mod.getSignupsEnabled().then(setSignupsEnabledLocal).catch(() => setSignupsEnabledLocal(false))
       mod.getSessionDurationMs().then((ms) => setSessionMinutes(Math.round(ms / 60_000))).catch(() => setSessionMinutes(7 * 24 * 60))
+      mod.getWorkspaceName().then((n) => { setWorkspaceNameDraft(n); setWorkspaceNameLoaded(true) }).catch(() => { setWorkspaceNameDraft("FlowSpace"); setWorkspaceNameLoaded(true) })
     })
   }, [isOwner])
+
+  async function saveWorkspaceName() {
+    if (!isOwner) return
+    const trimmed = workspaceNameDraft.trim()
+    if (!trimmed) {
+      toast.error("Workspace name cannot be empty")
+      return
+    }
+    setWorkspaceNameSaving(true)
+    try {
+      const { setWorkspaceName } = await import("@/lib/actions/server-settings-actions")
+      await setWorkspaceName(trimmed)
+      // Notify in-tab listeners (sidebar) so they re-fetch without reload.
+      window.dispatchEvent(new CustomEvent("flowspace:workspace-name-changed"))
+      toast.success("Workspace name updated for everyone")
+    } catch {
+      toast.error("Failed to update workspace name")
+    } finally {
+      setWorkspaceNameSaving(false)
+    }
+  }
 
   async function toggleSignups() {
     if (!isOwner || signupsEnabled === null) return
@@ -356,6 +382,41 @@ export function SettingsContent() {
           <p className="text-sm text-muted-foreground mb-4">
             Visible to workspace owners only. Controls who can join.
           </p>
+          {/* ── Workspace name (admin sets the bold prefix everyone sees) ── */}
+          <div className="px-4 py-3 rounded-lg border bg-card mb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <PanelLeft className="size-3.5" />
+              <span className="text-sm font-medium">Workspace name</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              The bold name shown in the sidebar header for every member.
+              Individual users can add a personal tagline under it from their
+              own sidebar — that doesn&apos;t affect anyone else.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={workspaceNameDraft}
+                onChange={(e) => setWorkspaceNameDraft(e.target.value)}
+                disabled={!workspaceNameLoaded || workspaceNameSaving}
+                maxLength={40}
+                placeholder="FlowSpace"
+                className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <Button
+                onClick={saveWorkspaceName}
+                disabled={!workspaceNameLoaded || workspaceNameSaving}
+                size="sm"
+              >
+                {workspaceNameSaving ? (
+                  <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Check className="size-3.5 mr-1.5" />
+                )}
+                Save
+              </Button>
+            </div>
+          </div>
           <div className="px-4 py-3 rounded-lg border bg-card">
             <div className="flex items-start gap-3">
               <div className="flex-1">

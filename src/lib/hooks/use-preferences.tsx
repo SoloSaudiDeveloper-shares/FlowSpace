@@ -90,7 +90,23 @@ export interface Preferences {
   clock: ClockPreferences
   // Scrolling feed ticker
   feedTicker: FeedTickerPreferences
+  /** Personal tagline shown in the sidebar header under the admin-set
+   * workspace name. Empty = show the default "Workspace" placeholder. */
+  workspaceSuffix: string
+  /** Which home-dashboard sections this user wants visible. Missing keys
+   * default to true. */
+  homeSections: Partial<Record<HomeSectionKey, boolean>>
 }
+
+// Home dashboard sections — each one can be toggled on/off by the user.
+export type HomeSectionKey =
+  | "hero"
+  | "kpi"
+  | "pulse"
+  | "today"
+  | "activity"
+  | "quickCapture"
+  | "recent"
 
 // ─── Defaults ─────────────────────────────────────────────────────────────
 
@@ -158,6 +174,26 @@ export const DEFAULT_PREFERENCES: Preferences = {
     direction: "rtl",   // common for news tickers: enters from the right
     speedSec: 90,
   },
+  workspaceSuffix: "",
+  homeSections: {
+    hero: true,
+    kpi: true,
+    pulse: true,
+    today: true,
+    activity: true,
+    quickCapture: true,
+    recent: true,
+  },
+}
+
+export const HOME_SECTION_LABELS: Record<HomeSectionKey, string> = {
+  hero: "Greeting & quick actions",
+  kpi: "KPI stat cards",
+  pulse: "Project pulse (charts)",
+  today: "Today & upcoming",
+  activity: "Activity heatmap",
+  quickCapture: "Quick capture",
+  recent: "Recent items",
 }
 
 // Friendly labels for the sidebar sections (used in Settings UI)

@@ -2,29 +2,17 @@ import {
   getRecentElements,
   getFavoriteElements,
 } from "@/lib/actions/element-actions"
-import {
-  getDashboardWidgets,
-  initializeDefaultDashboard,
-  getMyTasks,
-  getUpcomingReminders,
-  getRecentActivity,
-} from "@/lib/actions/dashboard-actions"
-import { HomeContent } from "@/components/home/home-content"
-import { DashboardGrid } from "@/components/dashboard/dashboard-grid"
+import { getDashboardSummary } from "@/lib/actions/dashboard-actions"
+import { HomeDashboard } from "@/components/home/home-dashboard"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { PageContextMenu } from "@/components/shared/page-context-menu"
 
 export default async function HomePage() {
-  await initializeDefaultDashboard()
-
-  const [recentElements, favorites, widgets, myTasks, upcomingReminders, recentActivity] = await Promise.all([
-    getRecentElements(20),
+  const [recent, favorites, summary] = await Promise.all([
+    getRecentElements(16),
     getFavoriteElements(),
-    getDashboardWidgets(),
-    getMyTasks(),
-    getUpcomingReminders(),
-    getRecentActivity(),
+    getDashboardSummary(),
   ])
 
   return (
@@ -35,19 +23,8 @@ export default async function HomePage() {
         <h1 className="text-lg font-semibold">Home</h1>
       </header>
       <PageContextMenu className="flex-1 overflow-auto p-6">
-        <div className="mx-auto max-w-6xl space-y-8 animate-page-enter">
-          {/* Dashboard Widgets */}
-          <DashboardGrid
-            widgets={widgets}
-            recentElements={recentElements}
-            favorites={favorites}
-            myTasks={myTasks}
-            upcomingReminders={upcomingReminders}
-            recentActivity={recentActivity}
-          />
-
-          {/* Quick Create + Recent below dashboard */}
-          <HomeContent recentElements={recentElements} favorites={favorites} />
+        <div className="mx-auto max-w-6xl">
+          <HomeDashboard summary={summary} recent={recent} favorites={favorites} />
         </div>
       </PageContextMenu>
     </div>

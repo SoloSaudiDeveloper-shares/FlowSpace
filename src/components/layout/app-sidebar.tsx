@@ -93,6 +93,7 @@ import type { Element, ElementType } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 import { useAuth } from "@/lib/hooks/use-auth"
 import { usePreferences, type SidebarSectionKey } from "@/lib/hooks/use-preferences"
+import { useWorkspaceName } from "@/lib/hooks/use-workspace-name"
 import { reorderElements } from "@/lib/actions/element-actions"
 
 const ELEMENT_TYPE_CONFIG: Record<
@@ -129,6 +130,153 @@ function getElementHref(element: Element): string {
 interface AppSidebarProps {
   elements: Element[]
   favorites: Element[]
+}
+
+/**
+ * Sidebar header with an editable two-line workspace title.
+ *
+ * Layout: [Home icon button] [bold workspace name] / [muted personal tag]
+ *
+ * - The Home icon takes you home (existing behaviour).
+ * - The bold workspace name is the admin-set prefix. Double-click only
+ *   opens an editor if the current user is an owner. For everyone else
+ *   it's read-only.
+ * - The muted line below is a per-user tagline (workspaceSuffix in
+ *   preferences). Anyone can double-click to edit their own. When empty,
+ *   we show a faded "Add a personal tag…" prompt so the affordance is
+ *   discoverable.
+ */
+function WorkspaceHeader({
+  isOwner,
+  isActive,
+  onNavigateHome,
+}: {
+  isOwner: boolean
+  isActive: boolean
+  onNavigateHome: () => void
+}) {
+  const { workspaceName, setWorkspaceName } = useWorkspaceName()
+  const { preferences, updatePreference } = usePreferences()
+  const [editing, setEditing] = useState<"name" | "suffix" | null>(null)
+  const [draft, setDraft] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const suffix = preferences.workspaceSuffix ?? ""
+
+  function startEditingName() {
+    if (!isOwner) return
+    setDraft(workspaceName)
+    setEditing("name")
+  }
+  function startEditingSuffix() {
+    setDraft(suffix)
+    setEditing("suffix")
+  }
+  async function commit() {
+    if (editing === "name") {
+      const trimmed = draft.trim()
+      if (trimmed && trimmed !== workspaceName) {
+        try {
+          await setWorkspaceName(trimmed)
+          toast.success("Workspace name updated for everyone")
+        } catch {
+          toast.error("Only owners can rename the workspace")
+        }
+      }
+    } else if (editing === "suffix") {
+      const trimmed = draft.trim().slice(0, 40)
+      if (trimmed !== suffix) updatePreference("workspaceSuffix", trimmed)
+    }
+    setEditing(null)
+  }
+  function cancel() {
+    setEditing(null)
+    setDraft("")
+  }
+
+  // Auto-focus the input when we open it.
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [editing])
+
+  return (
+    <div
+      className={`group/wsheader flex items-center gap-2 rounded-md p-2 transition-colors ${
+        isActive ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/40"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onNavigateHome}
+        aria-label="Go home"
+        className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-transform hover:scale-105"
+      >
+        <Home className="size-4" />
+      </button>
+      <div className="flex flex-col gap-0.5 leading-none min-w-0 flex-1">
+        {/* ── Workspace name (admin-editable) ───────────────────────── */}
+        {editing === "name" ? (
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit()
+              if (e.key === "Escape") cancel()
+            }}
+            maxLength={40}
+            className="font-semibold text-sm bg-transparent border-b border-primary/60 outline-none w-full px-0.5"
+          />
+        ) : (
+          <button
+            type="button"
+            onDoubleClick={startEditingName}
+            onClick={onNavigateHome}
+            title={isOwner ? "Double-click to rename workspace" : workspaceName}
+            className={`font-semibold text-sm truncate text-left ${
+              isOwner ? "cursor-text" : "cursor-pointer"
+            }`}
+          >
+            {workspaceName}
+          </button>
+        )}
+
+        {/* ── Personal tagline (per-user, anyone can edit) ──────────── */}
+        {editing === "suffix" ? (
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit()
+              if (e.key === "Escape") cancel()
+            }}
+            maxLength={40}
+            placeholder="Add a personal tag…"
+            className="text-xs bg-transparent border-b border-primary/40 outline-none w-full px-0.5 text-muted-foreground placeholder:text-muted-foreground/50"
+          />
+        ) : (
+          <button
+            type="button"
+            onDoubleClick={startEditingSuffix}
+            title="Double-click to personalise"
+            className={`text-xs truncate text-left transition-colors ${
+              suffix
+                ? "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground/40 hover:text-muted-foreground italic opacity-0 group-hover/wsheader:opacity-100"
+            }`}
+          >
+            {suffix || "Add a personal tag…"}
+          </button>
+        )}
+      </div>
+    </div>
+  )
 }
 
 /** Color presets used by the sidebar right-click color picker (per-item).
@@ -1301,19 +1449,11 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              onClick={() => router.push("/")}
+            <WorkspaceHeader
+              isOwner={user?.role === "owner"}
               isActive={pathname === "/"}
-            >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Home className="size-4" />
-              </div>
-              <div className="flex flex-col gap-0.5 leading-none">
-                <span className="font-semibold">FlowSpace</span>
-                <span className="text-xs text-muted-foreground">Workspace</span>
-              </div>
-            </SidebarMenuButton>
+              onNavigateHome={() => router.push("/")}
+            />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

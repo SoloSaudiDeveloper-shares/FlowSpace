@@ -74,3 +74,24 @@ export async function setSessionDurationMs(ms: number) {
   setRaw("sessionDurationMs", String(clamped))
   revalidatePath("/settings")
 }
+
+// ── Workspace name (admin-set, shown to everyone) ─────────────────────
+// This is the bold prefix in the sidebar header. Owners change it for
+// the whole workspace; everyone else just reads it. Per-user personal
+// tagline (the line under it) is stored in user_preferences.workspaceSuffix.
+
+const DEFAULT_WORKSPACE_NAME = "FlowSpace"
+
+export async function getWorkspaceName(): Promise<string> {
+  const raw = getRaw("workspaceName")
+  return raw && raw.trim() ? raw : DEFAULT_WORKSPACE_NAME
+}
+
+export async function setWorkspaceName(name: string) {
+  await requireOwner()
+  const trimmed = name.trim().slice(0, 40)
+  if (!trimmed) throw new Error("Workspace name cannot be empty")
+  setRaw("workspaceName", trimmed)
+  // The name shows up on every page (sidebar header), so revalidate root.
+  revalidatePath("/", "layout")
+}
