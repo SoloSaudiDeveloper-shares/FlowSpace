@@ -1,5 +1,15 @@
 // Bootstrap the admin user when the DB has been wiped.
 // Same SHA-256 + 8-byte hex salt format as src/lib/actions/user-actions.ts.
+//
+// Required env vars (no defaults — never ship a credential in code):
+//   PASSWORD       — initial admin password
+//   DISPLAY_NAME   — name shown in the sidebar / People page
+// Optional:
+//   USERNAME       — defaults to "admin"
+//   DB_PATH        — defaults to .next/standalone/data/app.db
+//
+// Usage:
+//   PASSWORD='a-strong-one' DISPLAY_NAME='Your Name' node scripts/bootstrap-admin.mjs
 
 import Database from "better-sqlite3"
 import crypto from "node:crypto"
@@ -11,8 +21,20 @@ const DB_PATH =
   path.join(process.cwd(), ".next", "standalone", "data", "app.db")
 
 const USERNAME = process.env.USERNAME || "admin"
-const PASSWORD = process.env.PASSWORD || "***REDACTED***"
-const DISPLAY_NAME = process.env.DISPLAY_NAME || "Admin"
+const PASSWORD = process.env.PASSWORD
+const DISPLAY_NAME = process.env.DISPLAY_NAME
+
+if (!PASSWORD || PASSWORD.length < 8) {
+  console.error(
+    "ERROR: set PASSWORD env var (8+ chars) before running bootstrap-admin.\n" +
+    "Example: PASSWORD='a-strong-one' DISPLAY_NAME='Your Name' node scripts/bootstrap-admin.mjs",
+  )
+  process.exit(1)
+}
+if (!DISPLAY_NAME) {
+  console.error("ERROR: set DISPLAY_NAME env var before running bootstrap-admin.")
+  process.exit(1)
+}
 
 const db = new Database(DB_PATH)
 db.pragma("foreign_keys = ON")
