@@ -78,6 +78,136 @@ sqlite.exec(`
   );
 `)
 
+// ─── Telegram bots (one per user) ──────────────────────────────────────
+// Each user wires up their OWN bot via BotFather — no sharing. We store
+// the token + a webhook_secret embedded in the per-user webhook URL so
+// inbound Telegram updates route to the right user.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS telegram_bots (
+    user_id        TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    bot_token      TEXT NOT NULL,
+    bot_username   TEXT,
+    bot_id         INTEGER,
+    chat_id        TEXT,
+    webhook_secret TEXT NOT NULL UNIQUE,
+    target_list_id TEXT REFERENCES elements(id) ON DELETE SET NULL,
+    is_active      INTEGER NOT NULL DEFAULT 1,
+    last_seen_at   TEXT,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_tg_bots_secret ON telegram_bots(webhook_secret);`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_tg_bots_active ON telegram_bots(is_active) WHERE is_active = 1;`)
+
+// ─── Telegram message history ──────────────────────────────────────────
+// Each inbound message + each outbound reply gets logged so the user can
+// scroll through what the bot has been doing on their behalf. Pruned to
+// the last 500 entries per user on insert to keep this from growing
+// unbounded.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS telegram_messages (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    direction  TEXT NOT NULL,   -- "in" | "out"
+    text       TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_tg_msgs_user_time ON telegram_messages(user_id, created_at DESC);`)
+
+// ─── Pending imports (Telegram → app approval flow) ────────────────────
+// When the bot recognises FlowSpace AI-import markdown in a message
+// (starts with "# Project:" / "# Page:" etc), we DON'T create the element
+// immediately. Instead we stash it here and surface a notification in
+// the app so the user can preview & approve before anything materializes.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS pending_imports (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source     TEXT NOT NULL,   -- "telegram" today; "email" / "api" later
+    payload    TEXT NOT NULL,   -- raw markdown to be parsed
+    parsed_summary TEXT,        -- human-friendly one-liner shown in the bell
+    status     TEXT NOT NULL DEFAULT 'pending', -- pending | approved | dismissed
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at TEXT
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pending_user_status ON pending_imports(user_id, status);`)
+
+// ─── Telegram conversation state ────────────────────────────────────────
+// Holds the "I'm waiting for the user's next text" cursor between
+// messages. One row per user — flat schema, last write wins. We always
+// stamp an expires_at (10 min default) so an abandoned flow doesn't
+// leave the user stuck in a hidden state.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS telegram_conversations (
+    user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    step       TEXT NOT NULL,
+    context    TEXT,
+    expires_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+
+// ─── Pending voice messages ────────────────────────────────────────────
+// Holds a voice note received from Telegram between the user tapping
+// the language button and the destination button. Short-lived — a cron
+// job purges anything older than 1 hour so stale rows don't pile up.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS pending_voices (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    file_id     TEXT NOT NULL,
+    chat_id     TEXT NOT NULL,
+    message_id  INTEGER NOT NULL,
+    transcript  TEXT,
+    language    TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pending_voices_user ON pending_voices(user_id, created_at);`)
+
+// ─── Reminder bot-fired tracking ────────────────────────────────────────
+// `bot_fired_at` so the cron doesn't re-DM the same reminder forever.
+// SQLite has no ADD COLUMN IF NOT EXISTS — check pragma first.
+try {
+  const cols = sqlite.prepare(`PRAGMA table_info(reminders)`).all() as { name: string }[]
+  if (!cols.some((c) => c.name === "bot_fired_at")) {
+    sqlite.exec(`ALTER TABLE reminders ADD COLUMN bot_fired_at TEXT`)
+  }
+} catch (err) {
+  console.error("[migration] reminders.bot_fired_at:", err)
+}
+
+// ─── Telegram digest preferences (per-bot) ─────────────────────────────
+try {
+  const cols = sqlite.prepare(`PRAGMA table_info(telegram_bots)`).all() as { name: string }[]
+  const has = (n: string) => cols.some((c) => c.name === n)
+  if (!has("digest_enabled"))     sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN digest_enabled INTEGER NOT NULL DEFAULT 0`)
+  if (!has("digest_time"))        sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN digest_time TEXT NOT NULL DEFAULT '08:00'`)
+  if (!has("digest_last_sent"))   sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN digest_last_sent TEXT`)
+  // Voice transcription language hint passed to Groq Whisper. `auto` lets
+  // Whisper guess (which can mis-detect short utterances). Default `en` so
+  // English speakers don't get surprise Arabic/Spanish/etc back. Switch via
+  // /voice <lang> at any time.
+  if (!has("voice_language"))     sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN voice_language TEXT NOT NULL DEFAULT 'en'`)
+  // When true, voice messages bypass the language + destination pickers
+  // and route straight to the user's defaults (voice_language + target_list_id).
+  // Users can toggle this with `/voice skip on|off` or in Settings → Telegram.
+  if (!has("voice_auto_skip"))    sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN voice_auto_skip INTEGER NOT NULL DEFAULT 0`)
+} catch (err) {
+  console.error("[migration] telegram_bots digest columns:", err)
+}
+
+// ─── Start the background cron ─────────────────────────────────────────
+// Imported lazily so bootstrap-only scripts (e.g., bootstrap-admin.mjs)
+// don't accidentally start a cron timer. Anything that uses the DB at
+// runtime hits this file, kicking off the singleton.
+import("@/lib/cron/index").then((mod) => {
+  import("@/lib/cron/jobs").then(() => mod.startCron())
+}).catch((err) => console.error("[cron] startup failed:", err))
+
 // ─── Email verification tokens ─────────────────────────────────────────
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS email_verification_tokens (

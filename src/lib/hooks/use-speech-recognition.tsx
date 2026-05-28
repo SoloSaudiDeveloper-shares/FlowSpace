@@ -11,7 +11,7 @@ import {
 } from "react"
 import type { SpeechRecognizer, SpeechStatus, SpeechEngine, SpeechError, WebAISpeechModelId } from "@/lib/speech/types"
 import { WEBAI_SPEECH_MODELS } from "@/lib/speech/types"
-import { createRecognizer, DEFAULT_ENGINE, getAvailableEngines } from "@/lib/speech/speech-factory"
+import { createRecognizer, DEFAULT_ENGINE, getAvailableEngines, isWebSpeechSupported } from "@/lib/speech/speech-factory"
 import { usePreferences } from "@/lib/hooks/use-preferences"
 import { toast } from "sonner"
 
@@ -92,6 +92,10 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
   const [activeButtonId, setActiveButtonId] = useState<string | null>(null)
 
   const recognizerRef = useRef<SpeechRecognizer | null>(null)
+  // Tracks which engine the LIVE recognizer was built for, so we can
+  // tear it down when the user flips streaming mode and the next
+  // session needs a different engine.
+  const currentRecognizerEngineRef = useRef<SpeechEngine | null>(null)
 
   // Compute available engines only after mount to avoid SSR/client hydration mismatch
   const [availableEngines, setAvailableEngines] = useState<ReturnType<typeof getAvailableEngines>>([])
@@ -159,25 +163,58 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
     setLoadProgress(-1)
   }, [preferences.speechGroqApiKey, engine])
 
+  /**
+   * Pick the engine for THIS recording session.
+   *
+   * When the "Streaming" preference is on AND the Web Speech API is
+   * supported in this browser, we route through it regardless of the
+   * configured engine. That gives users word-by-word transcription on
+   * Chrome/Edge instead of the wait-for-stop-then-roundtrip behaviour
+   * of Groq/WebAI. On Safari/Firefox/iOS PWAs where Web Speech is
+   * absent, we fall back to whatever they configured.
+   *
+   * Important: don't cache the streaming-override decision on the
+   * recognizerRef — recompute on every start so toggling the
+   * preference takes effect on the next click.
+   */
+  function resolveEngine(): SpeechEngine {
+    if (preferences.speechStreaming && isWebSpeechSupported()) {
+      return "web-speech"
+    }
+    return engine
+  }
+
   // Initialize the recognizer
   const init = useCallback(async () => {
     if (recognizerRef.current && status === "ready") return
     if (!recognizerRef.current) {
-      recognizerRef.current = buildRecognizer(engine, speechModel)
+      recognizerRef.current = buildRecognizer(resolveEngine(), speechModel)
     }
     try {
       await recognizerRef.current.init()
     } catch {
       // Error already handled via onError callback
     }
+    // ESLint hint: resolveEngine reads from React state; intentional fresh
+    // read on each call rather than captured at memo time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, speechModel, status, buildRecognizer])
 
   // Start listening
   const startListening = useCallback(async (buttonId?: string) => {
     setError(null)
     setActiveButtonId(buttonId ?? null)
+    const chosenEngine = resolveEngine()
+    // If the live recognizer is for a different engine than the one
+    // we want this session (e.g. user toggled streaming off after the
+    // previous run), tear it down and rebuild for the chosen engine.
+    if (recognizerRef.current && chosenEngine !== currentRecognizerEngineRef.current) {
+      recognizerRef.current.dispose()
+      recognizerRef.current = null
+    }
     if (!recognizerRef.current) {
-      recognizerRef.current = buildRecognizer(engine, speechModel)
+      recognizerRef.current = buildRecognizer(chosenEngine, speechModel)
+      currentRecognizerEngineRef.current = chosenEngine
     }
     try {
       if (recognizerRef.current.getStatus() === "idle") {

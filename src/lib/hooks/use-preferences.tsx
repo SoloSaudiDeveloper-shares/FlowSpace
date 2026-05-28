@@ -68,6 +68,11 @@ export interface Preferences {
   /** Groq API key for the cloud Whisper engine. Browser-only, never sent to
    * our server — same trust model as `aiOpenAIApiKey`. */
   speechGroqApiKey: string
+  /** When true (default), prefer the Web Speech API for live word-by-word
+   * transcription instead of waiting for the recording to finish and
+   * round-tripping to Groq. Falls back to the configured engine when Web
+   * Speech isn't available (Safari, Firefox, iOS PWAs). */
+  speechStreaming: boolean
   aiEnabled: boolean
   aiLLMModel: string
   aiTTSModel: string
@@ -127,6 +132,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   ganttTooltipFields: ["status", "priority", "dates", "completion"],
   speechEnabled: true,
   speechGroqApiKey: "",
+  speechStreaming: true,
   aiEnabled: false,
   aiLLMModel: "llama3.1:8b",
   aiTTSModel: "",

@@ -35,6 +35,7 @@ import {
   UserPlus,
   Lock,
   KeyRound as KeyIcon,
+  Bot,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -74,6 +75,8 @@ import {
 import { CustomFieldsSettings } from "@/components/settings/custom-fields-settings"
 import { AIProviderSection } from "@/components/settings/ai-provider-section"
 import { AccountSection } from "@/components/settings/account-section"
+import { TelegramSection } from "@/components/settings/telegram-section"
+import { getTelegramFeatureEnabled } from "@/lib/actions/telegram-actions"
 
 /** Small sub-component so we can use the JSX-tag form on a dynamic icon. */
 function DescriptionPanel({
@@ -130,6 +133,11 @@ export function SettingsContent() {
   const [workspaceNameDraft, setWorkspaceNameDraft] = useState<string>("")
   const [workspaceNameSaving, setWorkspaceNameSaving] = useState(false)
   const [workspaceNameLoaded, setWorkspaceNameLoaded] = useState(false)
+  // Telegram feature is gated on a workspace-wide admin toggle.
+  const [telegramFeatureEnabled, setTelegramFeatureEnabled] = useState<boolean>(false)
+  useEffect(() => {
+    getTelegramFeatureEnabled().then(setTelegramFeatureEnabled).catch(() => setTelegramFeatureEnabled(false))
+  }, [])
 
   // Load admin settings once for owners
   useEffect(() => {
@@ -276,6 +284,7 @@ export function SettingsContent() {
     { id: "gantt",          label: "Gantt chart",   icon: BarChart2,  description: "Which fields show in Gantt task tooltips." },
     { id: "speech",         label: "Speech",        icon: Mic,        description: "Voice input. Pick between the browser's built-in Web Speech API (Chrome/Edge, fast) or a local Whisper model (private, all browsers, downloads a model)." },
     { id: "ai",             label: "AI features",   icon: Sparkles,   description: "Hook the AI features up to a provider — local Ollama, OpenAI, Gemini, LM Studio, or any custom OpenAI-compatible endpoint. Keys stay in your browser." },
+    { id: "telegram",       label: "Telegram",      icon: Bot,        description: "Connect your own Telegram bot. Text it from anywhere — ideas become real items in FlowSpace. Each user has their own bot; nothing is shared." },
     { id: "shortcuts",      label: "Shortcuts",     icon: Keyboard,   description: "Keyboard shortcuts reference. Saves you a lot of clicking once you remember a few." },
     { id: "about",          label: "About",         icon: Info,       description: "Version info and project links." },
   ]
@@ -1127,6 +1136,36 @@ export function SettingsContent() {
             </button>
           </div>
 
+          {/* Streaming mode toggle — overrides engine selection when on */}
+          <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card">
+            <div className="pr-4">
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                Streaming mode
+                <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">live</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                Words appear as you speak instead of waiting for the recording
+                to finish. Uses the browser&apos;s Web Speech API on
+                Chrome/Edge — falls back to your selected engine on browsers
+                that don&apos;t support it.
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={preferences.speechStreaming}
+              onClick={() => updatePreference("speechStreaming", !preferences.speechStreaming)}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                preferences.speechStreaming ? "bg-primary" : "bg-muted-foreground/30"
+              }`}
+            >
+              <span
+                className={`inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                  preferences.speechStreaming ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
           {/* Engine selector */}
           <div className="px-4 py-3 rounded-lg border bg-card">
             <h3 className="text-sm font-medium mb-3">Engine</h3>
@@ -1298,6 +1337,19 @@ export function SettingsContent() {
             )}
           </div>
         </div>
+      </section>
+
+      {/* ─── Telegram ──────────────────────────────────────────── */}
+      <section id="telegram" className="scroll-mt-4">
+        <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
+          <Bot className="size-4" />
+          Telegram
+        </h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Wire up your own Telegram bot. Walking down the street with an
+          idea? Text the bot — it lands as a real item in FlowSpace.
+        </p>
+        <TelegramSection featureEnabled={telegramFeatureEnabled} />
       </section>
 
       {/* ─── AI Features (Ollama) ────────────────────────────────── */}

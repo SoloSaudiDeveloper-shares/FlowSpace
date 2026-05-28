@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-// Public paths that don't require authentication
-const PUBLIC_PATHS = ["/login", "/api/auth", "/forgot-password", "/reset-password", "/verify-email"]
+// Public paths that don't require authentication. Note: `/api/telegram` is
+// reached by Telegram's servers POSTing webhook updates — no session cookie
+// possible. The webhook route does its own auth via a per-user secret in the
+// URL path AND a matching `X-Telegram-Bot-Api-Secret-Token` header.
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/telegram", "/forgot-password", "/reset-password", "/verify-email"]
 // Static asset patterns
 const STATIC_PATTERNS = [
   "/_next",

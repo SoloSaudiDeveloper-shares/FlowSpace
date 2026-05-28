@@ -17,7 +17,7 @@
  * Charts are pure SVG to keep the bundle light — no recharts dependency.
  */
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   FolderKanban,
@@ -58,6 +58,9 @@ import { createElement } from "@/lib/actions/element-actions"
 import type { DashboardSummary } from "@/lib/actions/dashboard-actions"
 import type { Element, ElementType } from "@/lib/db/schema"
 import { AIImportDialog } from "@/components/import/ai-import-dialog"
+import { PendingImportsDialog } from "@/components/inbox/pending-imports-dialog"
+import { getMyPendingImportCount } from "@/lib/actions/pending-imports-actions"
+import { Inbox } from "lucide-react"
 
 // ─── Visual constants ─────────────────────────────────────────────────────
 
@@ -685,9 +688,28 @@ export function HomeDashboard({
 }) {
   const [customizing, setCustomizing] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [inboxOpen, setInboxOpen] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
   const { preferences } = usePreferences()
   const sections = preferences.homeSections ?? {}
   const show = (k: HomeSectionKey) => isSectionVisible(sections, k)
+
+  // Poll for pending imports so a fresh Telegram payload shows up without
+  // a manual refresh. 30s feels live enough without spamming the server.
+  useEffect(() => {
+    let cancelled = false
+    async function tick() {
+      try {
+        const n = await getMyPendingImportCount()
+        if (!cancelled) setPendingCount(n)
+      } catch {
+        /* ignore */
+      }
+    }
+    void tick()
+    const t = window.setInterval(tick, 30_000)
+    return () => { cancelled = true; window.clearInterval(t) }
+  }, [])
 
   return (
     <div className="space-y-5 animate-page-enter">
@@ -697,6 +719,31 @@ export function HomeDashboard({
           onImport={() => setImporting(true)}
         />
       )}
+
+      {/* Pending imports banner — only shows when there are unresolved
+          payloads from the Telegram bot waiting for human approval. */}
+      {pendingCount > 0 && (
+        <button
+          onClick={() => setInboxOpen(true)}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-primary/40 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent hover:from-primary/15 transition-colors text-left group"
+        >
+          <div className="size-9 rounded-lg bg-primary/20 text-primary flex items-center justify-center shrink-0">
+            <Inbox className="size-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">
+              {pendingCount} import{pendingCount === 1 ? "" : "s"} waiting for your review
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Payloads from your Telegram bot — preview & approve before they land in the workspace.
+            </p>
+          </div>
+          <span className="text-xs text-primary font-medium group-hover:translate-x-0.5 transition-transform">
+            Review →
+          </span>
+        </button>
+      )}
+
       {show("kpi") && <KpiRow counts={summary.counts} />}
 
       {(show("pulse") || show("today")) && (
@@ -737,6 +784,14 @@ export function HomeDashboard({
 
       <CustomizeDialog open={customizing} onOpenChange={setCustomizing} />
       <AIImportDialog open={importing} onOpenChange={setImporting} />
+      <PendingImportsDialog
+        open={inboxOpen}
+        onOpenChange={setInboxOpen}
+        onChanged={async () => {
+          // Update the count when the inbox dialog changes anything.
+          try { setPendingCount(await getMyPendingImportCount()) } catch {}
+        }}
+      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import {
   Activity,
@@ -27,12 +27,14 @@ import {
   LogOut,
   UserPlus,
   Lock,
+  Bot,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { createBackup, deleteBackup, restoreBackup } from "@/lib/actions/backup-actions"
 import { updateUser, deleteUser } from "@/lib/actions/user-actions"
+import { getTelegramFeatureEnabled, setTelegramFeatureEnabled } from "@/lib/actions/telegram-actions"
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -90,6 +92,7 @@ const TABS = [
   { id: "backups", label: "Backups", icon: Archive },
   { id: "events", label: "Events", icon: Zap },
   { id: "database", label: "Database", icon: Database },
+  { id: "integrations", label: "Integrations", icon: Bot },
 ] as const
 
 type TabId = (typeof TABS)[number]["id"]
@@ -249,6 +252,72 @@ export function AdminContent({
       )}
       {activeTab === "events" && <EventsTab events={events} />}
       {activeTab === "database" && <DatabaseTab dbStats={dbStats} />}
+      {activeTab === "integrations" && <IntegrationsTab />}
+    </div>
+  )
+}
+
+// ─── Integrations Tab (admin enable/disable for each integration) ──────
+// Currently: Telegram bot feature flag. Adding more (Slack webhook, etc.)
+// is a matter of dropping in another `IntegrationCard`.
+
+function IntegrationsTab() {
+  const [telegram, setTelegram] = useState<boolean | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    getTelegramFeatureEnabled().then(setTelegram).catch(() => setTelegram(false))
+  }, [])
+
+  async function toggleTelegram() {
+    if (telegram === null) return
+    setSaving(true)
+    try {
+      await setTelegramFeatureEnabled(!telegram)
+      setTelegram(!telegram)
+      toast.success(!telegram ? "Telegram enabled workspace-wide" : "Telegram disabled")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't update setting")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="px-4 py-4 rounded-lg border bg-card flex items-start gap-3">
+        <div className="size-9 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
+          <Bot className="size-4" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-medium flex items-center gap-1.5">
+            Telegram bots
+            {telegram && (
+              <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">on</span>
+            )}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+            When on, each user can connect their own Telegram bot from
+            Settings → Telegram. Per-user — no sharing between accounts.
+            Inbound webhook traffic is routed via a per-user secret in the URL.
+          </p>
+        </div>
+        <button
+          role="switch"
+          aria-checked={telegram ?? false}
+          onClick={toggleTelegram}
+          disabled={telegram === null || saving}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+            telegram ? "bg-primary" : "bg-muted-foreground/30"
+          }`}
+        >
+          <span
+            className={`inline-block size-4 transform rounded-full bg-white shadow-sm transition-transform ${
+              telegram ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </button>
+      </div>
     </div>
   )
 }

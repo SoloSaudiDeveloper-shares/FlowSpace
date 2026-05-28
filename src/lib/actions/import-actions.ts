@@ -69,10 +69,31 @@ export async function importFromAI(
   | { ok: true; id: string; type: string }
   | { ok: false; error: string }
 > {
+  const user = await requireAuth()
+  return importFromAIAs(user.id, parsed)
+}
+
+/**
+ * Internal: same as importFromAI but takes the user-id explicitly. Used
+ * by paths that DON'T have a Next.js session cookie — currently the
+ * Telegram webhook (acting on behalf of the bot's bound user). Server
+ * actions that DO have a cookie should keep calling `importFromAI` so
+ * the auth check stays in one place.
+ *
+ * Marked async (despite no awaits in its prelude) because callers
+ * already use it that way and it lets us keep the DB inserts on a
+ * promise chain.
+ */
+export async function importFromAIAs(
+  userId: string,
+  parsed: ParsedImport,
+): Promise<
+  | { ok: true; id: string; type: string }
+  | { ok: false; error: string }
+> {
   if (!parsed || !parsed.title?.trim()) {
     return { ok: false, error: "Nothing to import — the parser didn't find a header." }
   }
-  const user = await requireAuth()
 
   const id = createId()
   const now = new Date().toISOString()
@@ -86,7 +107,7 @@ export async function importFromAI(
     description: parsed.notes ? parsed.notes.slice(0, 2000) : null,
     icon: ICONS[parsed.type],
     color: COLORS[parsed.type],
-    createdBy: user.id,
+    createdBy: userId,
     createdAt: now,
     updatedAt: now,
   })
@@ -199,7 +220,7 @@ export async function importFromAI(
   try {
     await createFeedEvent({
       type: "user_joined", // closest existing enum value; not perfect but expressive
-      actorUserId: user.id,
+      actorUserId: userId,
       subjectElementId: id,
       title: `Imported from AI: "${parsed.title}"`,
       summary: `${parsed.tasks.length} task${parsed.tasks.length === 1 ? "" : "s"}, ${parsed.tags.length} tag${parsed.tags.length === 1 ? "" : "s"}`,
