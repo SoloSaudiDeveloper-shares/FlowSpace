@@ -137,8 +137,27 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
         eng,
       )
     },
-    [],
+    // Re-create the closure when the Groq key changes so we never feed an
+    // engine its stale (often empty) constructor-time value. The dispose
+    // effect below tears down the live recognizer for the same reason.
+    [preferences.speechGroqApiKey],
   )
+
+  // When the user pastes / updates their Groq API key in Settings, the
+  // existing recognizer instance still holds the old (or empty) key in
+  // its private field — `start()` would fail with "no api key" forever.
+  // Tear it down so the next click constructs a fresh one with the
+  // current key. Only relevant while the Groq engine is active.
+  useEffect(() => {
+    if (engine !== "groq") return
+    if (!recognizerRef.current) return
+    recognizerRef.current.dispose()
+    recognizerRef.current = null
+    setStatus("idle")
+    setIsListening(false)
+    setError(null)
+    setLoadProgress(-1)
+  }, [preferences.speechGroqApiKey, engine])
 
   // Initialize the recognizer
   const init = useCallback(async () => {
