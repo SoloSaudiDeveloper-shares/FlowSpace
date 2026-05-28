@@ -941,6 +941,31 @@ export function SettingsContent() {
             <span className="text-sm">Show feed ticker</span>
           </label>
 
+          {/* Pinned vs floating */}
+          <label className="flex items-center gap-3 py-1.5 px-2 rounded-md cursor-pointer hover:bg-accent/30 transition-colors">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={preferences.feedTicker?.pinned !== false}
+              onClick={() => {
+                const next = { ...(preferences.feedTicker ?? DEFAULT_PREFERENCES.feedTicker) }
+                next.pinned = !(preferences.feedTicker?.pinned !== false)
+                updatePreference("feedTicker", next)
+              }}
+              className={`size-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                preferences.feedTicker?.pinned !== false
+                  ? "bg-primary border-primary"
+                  : "border-muted-foreground/30 hover:border-primary"
+              }`}
+            >
+              {preferences.feedTicker?.pinned !== false && <Check className="size-3 text-primary-foreground" />}
+            </button>
+            <span className="text-sm flex-1">Pinned to the edge of the page</span>
+            <span className="text-[10px] text-muted-foreground">
+              Off = float &amp; drag
+            </span>
+          </label>
+
           {/* Position */}
           <div className="pt-1">
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">Position</label>

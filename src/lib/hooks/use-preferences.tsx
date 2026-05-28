@@ -50,6 +50,12 @@ export interface FeedTickerPreferences {
   position: "top" | "bottom"
   direction: "ltr" | "rtl"
   speedSec: number   // time for one full loop (lower = faster)
+  /** True (default) = stuck to top/bottom of viewport. False = floating
+   * draggable + resizable widget anchored by `float`. */
+  pinned: boolean
+  /** Position + size used when `pinned` is false. Coordinates are absolute
+   * pixels from the top-left of the viewport. Width/height in px. */
+  float?: { x: number; y: number; w: number; h: number }
 }
 
 export interface Preferences {
@@ -173,6 +179,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
     position: "top",
     direction: "rtl",   // common for news tickers: enters from the right
     speedSec: 90,
+    pinned: true,
+    float: undefined,
   },
   workspaceSuffix: "",
   homeSections: {

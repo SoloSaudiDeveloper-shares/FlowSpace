@@ -18,7 +18,7 @@ export default async function FeedPage() {
         <Rss className="size-4 text-primary" />
         <h1 className="text-sm font-semibold">Feed</h1>
       </header>
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden min-h-0">
         <FeedContent events={events} currentUserId={currentUser?.id ?? null} mode="global" />
       </div>
     </div>

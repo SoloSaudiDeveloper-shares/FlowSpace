@@ -76,6 +76,60 @@ export async function createFeedEvent(data: {
   return id
 }
 
+/**
+ * Change the priority of an existing feed event. Users can do this from the
+ * right-click menu on a ticker item or a feed card to emphasise or de-
+ * emphasise an item visually. We only allow the change if the user owns the
+ * subject element (or the actor was them) — that keeps one user from
+ * re-prioritising someone else's events.
+ */
+export async function setFeedEventPriority(
+  eventId: string,
+  priority: FeedPriority,
+) {
+  const uid = await currentUserId()
+  if (!uid) throw new Error("Not authenticated")
+
+  // Verify the user owns this event: either they were the actor, or the
+  // subject/parent element belongs to them.
+  const rows = await db
+    .select({
+      event: feedEvents,
+      ownsSubject: elements.createdBy,
+    })
+    .from(feedEvents)
+    .leftJoin(elements, eq(elements.id, feedEvents.subjectElementId))
+    .where(eq(feedEvents.id, eventId))
+    .limit(1)
+
+  if (rows.length === 0) throw new Error("Not found")
+  const row = rows[0]
+  const isActor = row.event.actorUserId === uid
+  const ownsSubject = row.ownsSubject === uid
+  if (!isActor && !ownsSubject) {
+    // Last-chance check: parent element ownership
+    if (row.event.parentElementId) {
+      const parent = await db
+        .select({ createdBy: elements.createdBy })
+        .from(elements)
+        .where(eq(elements.id, row.event.parentElementId))
+        .limit(1)
+      if (parent[0]?.createdBy !== uid) throw new Error("Forbidden")
+    } else {
+      throw new Error("Forbidden")
+    }
+  }
+
+  await db
+    .update(feedEvents)
+    .set({ priority })
+    .where(eq(feedEvents.id, eventId))
+
+  revalidatePath("/feed")
+  revalidatePath("/")
+  return { ok: true as const }
+}
+
 export async function getGlobalFeed(options?: {
   limit?: number
   offset?: number
