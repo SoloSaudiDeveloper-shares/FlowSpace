@@ -46,6 +46,7 @@ import {
   type TelegramBotStatus,
   type TelegramHistoryEntry,
 } from "@/lib/actions/telegram-actions"
+import { BotReplyTemplatesPanel } from "@/components/settings/bot-reply-templates"
 
 export function TelegramSection({
   featureEnabled,
@@ -515,6 +516,15 @@ export function TelegramSection({
               debugging or auditing.
             </GuideRow>
           </ul>
+        </div>
+
+        {/* Reply templates — customize what the bot says back */}
+        <div className="px-4 py-3 rounded-lg border bg-card">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-3">
+            <Bot className="size-3 text-primary" />
+            Reply templates
+          </p>
+          <BotReplyTemplatesPanel />
         </div>
 
         {/* Message history */}

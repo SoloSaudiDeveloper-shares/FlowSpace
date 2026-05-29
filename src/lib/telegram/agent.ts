@@ -27,6 +27,7 @@ import { sqlite } from "@/lib/db"
 import { createId } from "@/lib/utils/ids"
 import { createElement } from "@/lib/actions/element-actions"
 import { classifyIntent, isNLEnabled, getUserAIConfig } from "@/lib/telegram/nl-intent"
+import { renderBotReply } from "@/lib/telegram/replies"
 
 interface BotRow {
   user_id: string
@@ -98,12 +99,7 @@ export async function dispatchTelegramMessage(
 // ─── command handlers ────────────────────────────────────────────────────
 
 function greeting(bot: BotRow): string {
-  return [
-    "👋 You're connected to FlowSpace.",
-    "",
-    "Send me text and I'll capture it as a todo item.",
-    "Slash commands let you do more — try /help.",
-  ].join("\n")
+  return renderBotReply(bot.user_id, "greeting")
 }
 
 function helpText(): string {
@@ -296,7 +292,10 @@ async function addToDefaultList(bot: BotRow, text: string): Promise<string> {
   if (captured.dueDate)  hits.push(`due *${captured.dueDate}*`)
   if (captured.tags.length) hits.push(`tags ${captured.tags.map((t) => `\`#${t}\``).join(" ")}`)
   const detail = hits.length > 0 ? `\n· captured: ${hits.join(" · ")}` : ""
-  return `✅ Added to *${escapeMd(getElementTitle(listId) ?? "Inbox")}*${detail}`
+  return renderBotReply(bot.user_id, "capture_added", {
+    list: escapeMd(getElementTitle(listId) ?? "Inbox"),
+    detail,
+  })
 }
 
 /**
@@ -428,7 +427,7 @@ function markDone(bot: BotRow, args: string): string {
     sqlite
       .prepare(`UPDATE tasks SET status_id = ?, completed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`)
       .run(done.id, task.id)
-    return `✅ Marked task done: *${escapeMd(task.title)}*`
+    return renderBotReply(bot.user_id, "task_done", { title: escapeMd(task.title) })
   }
   // Then todo items
   const todo = sqlite
@@ -443,7 +442,7 @@ function markDone(bot: BotRow, args: string): string {
     sqlite
       .prepare(`UPDATE todo_items SET is_completed = 1, completed_at = datetime('now') WHERE id = ?`)
       .run(todo.id)
-    return `✅ Marked done: *${escapeMd(todo.title)}*`
+    return renderBotReply(bot.user_id, "todo_done", { title: escapeMd(todo.title) })
   }
   return `Nothing found matching \`${prefix}\`.`
 }

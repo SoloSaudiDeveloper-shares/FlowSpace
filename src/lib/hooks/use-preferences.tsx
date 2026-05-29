@@ -118,6 +118,12 @@ export interface Preferences {
   rightClickDefaultColor: string
   /** Bell-icon notification badge visibility. Default ON. */
   notificationBadgeEnabled: boolean
+  /** Per-slug Telegram bot reply overrides. Empty/missing = use default
+   *  template from `src/lib/telegram/replies.ts`. */
+  botReplies: Partial<Record<
+    "greeting" | "capture_added" | "task_done" | "todo_done" | "voice_received" | "unknown",
+    string
+  >>
 }
 
 // Home dashboard sections — each one can be toggled on/off by the user.
@@ -225,6 +231,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   ],
   rightClickDefaultColor: "#a78bfa", // violet — friendlier than gray
   notificationBadgeEnabled: true,
+  botReplies: {},
 }
 
 export const HOME_SECTION_LABELS: Record<HomeSectionKey, string> = {
