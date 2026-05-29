@@ -39,11 +39,11 @@ interface SpeechContextValue {
   /** Initialize the recognizer (downloads model) */
   init: () => Promise<void>
   /** Start listening (pass a button ID to scope results) */
-  startListening: (buttonId?: string) => Promise<void>
+  startListening: (buttonId?: string, opts?: { preferAccuracy?: boolean }) => Promise<void>
   /** Stop listening */
   stopListening: () => Promise<void>
   /** Toggle listening on/off (pass a button ID to scope results) */
-  toggleListening: (buttonId?: string) => Promise<void>
+  toggleListening: (buttonId?: string, opts?: { preferAccuracy?: boolean }) => Promise<void>
   /** Clear the transcript */
   clearTranscript: () => void
   /** Switch to a different engine */
@@ -177,7 +177,12 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
    * recognizerRef — recompute on every start so toggling the
    * preference takes effect on the next click.
    */
-  function resolveEngine(): SpeechEngine {
+  function resolveEngine(opts?: { preferAccuracy?: boolean }): SpeechEngine {
+    // preferAccuracy lets a caller (e.g. the home-page quick capture)
+    // skip the live-streaming Web Speech path and force the configured
+    // engine — Groq Whisper produces a much more accurate transcript,
+    // at the cost of waiting until the user stops talking.
+    if (opts?.preferAccuracy) return engine
     if (preferences.speechStreaming && isWebSpeechSupported()) {
       return "web-speech"
     }
@@ -201,10 +206,10 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
   }, [engine, speechModel, status, buildRecognizer])
 
   // Start listening
-  const startListening = useCallback(async (buttonId?: string) => {
+  const startListening = useCallback(async (buttonId?: string, opts?: { preferAccuracy?: boolean }) => {
     setError(null)
     setActiveButtonId(buttonId ?? null)
-    const chosenEngine = resolveEngine()
+    const chosenEngine = resolveEngine(opts)
     // If the live recognizer is for a different engine than the one
     // we want this session (e.g. user toggled streaming off after the
     // previous run), tear it down and rebuild for the chosen engine.
@@ -236,11 +241,11 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Toggle
-  const toggleListening = useCallback(async (buttonId?: string) => {
+  const toggleListening = useCallback(async (buttonId?: string, opts?: { preferAccuracy?: boolean }) => {
     if (isListening) {
       await stopListening()
     } else {
-      await startListening(buttonId)
+      await startListening(buttonId, opts)
     }
   }, [isListening, startListening, stopListening])
 

@@ -94,6 +94,7 @@ import type { Element, ElementType } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 import { useAuth } from "@/lib/hooks/use-auth"
 import { usePreferences, type SidebarSectionKey } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 import { useWorkspaceName } from "@/lib/hooks/use-workspace-name"
 import { reorderElements } from "@/lib/actions/element-actions"
 
@@ -323,6 +324,7 @@ function NotificationsButton({
   onClick: () => void
   enabled: boolean
 }) {
+  const { t } = useT()
   const [count, setCount] = useState(0)
   useEffect(() => {
     if (!enabled) {
@@ -366,7 +368,7 @@ function NotificationsButton({
           </span>
         )}
       </span>
-      <span>Notifications</span>
+      <span>{t("sidebar.notifications")}</span>
     </SidebarMenuButton>
   )
 }
@@ -816,6 +818,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   const { user, logout } = useAuth()
   const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
   const { preferences, updatePreference } = usePreferences()
+  const { t } = useT()
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
 
   // Tracks the id of the row currently being dragged, so we can render a
@@ -1009,7 +1012,25 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   const isVisible = (key: SidebarSectionKey) =>
     preferences.sidebarVisible?.[key] !== false
 
-  // Resolve a section's display label — user override falls back to default.
+  // Resolve a section's display label.
+  //
+  // Lookup order:
+  //   1. User-provided custom label (Settings → Sidebar)
+  //   2. Locale translation via useT() — Arabic users see Arabic labels
+  //   3. English default
+  //
+  // The translation key mirrors the section key so adding a new
+  // locale is just adding rows to strings.ts.
+  const I18N_KEYS: Record<SidebarSectionKey, string> = {
+    favorites:       "sidebar.favorites",
+    projects:        "sidebar.projects",
+    "type:page":     "sidebar.pages",
+    "type:canvas":   "sidebar.canvases",
+    "type:todo_list":"sidebar.todoLists",
+    "type:reminder": "sidebar.reminders",
+    "type:process":  "sidebar.processes",
+    platform:        "sidebar.platform",
+  }
   const DEFAULT_LABELS: Record<SidebarSectionKey, string> = {
     favorites: "Favorites",
     projects: "Projects",
@@ -1020,8 +1041,16 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
     "type:process": "Processes",
     platform: "Platform",
   }
-  const labelFor = (key: SidebarSectionKey) =>
-    preferences.sidebarLabels?.[key]?.trim() || DEFAULT_LABELS[key]
+  const labelFor = (key: SidebarSectionKey) => {
+    const custom = preferences.sidebarLabels?.[key]?.trim()
+    if (custom) return custom
+    const translated = t(I18N_KEYS[key])
+    // useT returns the key itself if no translation exists, so if it
+    // equals the lookup key we fall back to the English default.
+    return translated && translated !== I18N_KEYS[key]
+      ? translated
+      : DEFAULT_LABELS[key]
+  }
   const accentForSection = (key: SidebarSectionKey) =>
     preferences.sidebarSectionColors?.[key] || undefined
 
@@ -1389,7 +1418,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                   tooltip="Feed"
                 >
                   <Rss className="size-4" />
-                  <span>Feed</span>
+                  <span>{t("sidebar.feed")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -1399,7 +1428,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                   tooltip="Templates"
                 >
                   <BookTemplate className="size-4" />
-                  <span>Templates</span>
+                  <span>{t("sidebar.templates")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -1409,7 +1438,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                   tooltip="Forms"
                 >
                   <FileInput className="size-4" />
-                  <span>Forms</span>
+                  <span>{t("sidebar.forms")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -1419,7 +1448,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                   tooltip="Automations"
                 >
                   <Zap className="size-4" />
-                  <span>Automations</span>
+                  <span>{t("sidebar.automations")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -1429,7 +1458,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                   tooltip="Approvals"
                 >
                   <ShieldCheck className="size-4" />
-                  <span>Approvals</span>
+                  <span>{t("sidebar.approvals")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -1627,7 +1656,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
               tooltip="People & Teams"
             >
               <Users className="size-4" />
-              <span>People</span>
+              <span>{t("sidebar.people")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           {user && (user.role === "owner" || user.role === "admin") && (
@@ -1638,7 +1667,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                 tooltip="Administration"
               >
                 <Shield className="size-4" />
-                <span>Admin</span>
+                <span>{t("sidebar.admin")}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
@@ -1656,7 +1685,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
               tooltip="Trash & Archive"
             >
               <Trash2 className="size-4" />
-              <span>Trash</span>
+              <span>{t("sidebar.trash")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -1666,7 +1695,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
               tooltip="Settings"
             >
               <Settings className="size-4" />
-              <span>Settings</span>
+              <span>{t("sidebar.settings")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

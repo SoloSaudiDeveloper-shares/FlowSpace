@@ -18,6 +18,15 @@ interface SpeechButtonProps {
   showPulse?: boolean
   /** Tooltip text */
   tooltip?: string
+  /**
+   * When true, the button bypasses the streaming Web Speech path
+   * (Chrome's free but less-accurate engine) and forces the configured
+   * engine — usually Groq Whisper. Trades word-by-word feedback for a
+   * dramatically more accurate final transcript. Use on capture
+   * surfaces where the user is dictating a few sentences and accuracy
+   * matters more than seeing each word as it's spoken.
+   */
+  preferAccuracy?: boolean
 }
 
 export function SpeechButton({
@@ -27,6 +36,7 @@ export function SpeechButton({
   size = "md",
   showPulse = true,
   tooltip = "Voice input",
+  preferAccuracy = false,
 }: SpeechButtonProps) {
   const { preferences } = usePreferences()
   const buttonId = useId()
@@ -89,7 +99,7 @@ export function SpeechButton({
     <div className="relative inline-flex items-center">
       <button
         type="button"
-        onClick={() => toggleListening(buttonId)}
+        onClick={() => toggleListening(buttonId, { preferAccuracy })}
         disabled={isLoading || isBusy}
         title={
           hasError

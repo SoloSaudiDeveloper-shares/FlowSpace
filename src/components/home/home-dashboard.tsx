@@ -498,7 +498,8 @@ function QuickCaptureCompact() {
             onTranscript={(t) => setTitle((p) => p ? `${p} ${t}` : t)}
             size="sm"
             showPulse
-            tooltip="Speak"
+            tooltip="Speak (high-accuracy Whisper)"
+            preferAccuracy
           />
           {title.trim() && (
             <Button size="sm" variant="ghost" className="size-7 p-0 rounded-full" onClick={go} disabled={busy}>
