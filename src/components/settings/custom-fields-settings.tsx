@@ -224,6 +224,62 @@ export function CustomFieldsSettings() {
         Define custom metadata fields for your elements and tasks.
       </p>
 
+      {/* Explainer panel */}
+      <div className="px-4 py-3 rounded-lg border border-primary/30 bg-primary/5 mb-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-primary mb-2">
+          What are custom fields?
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed mb-2">
+          Extra columns you bolt onto your elements or tasks — anything that
+          isn&apos;t already built in. Estimated hours, client name, repo URL,
+          confidence rating, a checkbox for &ldquo;ready for review&rdquo;.
+          Once you define a field, it shows up on the task detail sheet (or
+          element panel) for whichever element types you scoped it to.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground mt-2">
+          <div><strong className="text-foreground/80">Text / Long text</strong> — free-form strings.</div>
+          <div><strong className="text-foreground/80">Number</strong> — integers or decimals, e.g. estimate.</div>
+          <div><strong className="text-foreground/80">Date</strong> — review date, kickoff, etc.</div>
+          <div><strong className="text-foreground/80">Checkbox</strong> — yes/no flag.</div>
+          <div><strong className="text-foreground/80">Select / Multi-select</strong> — fixed options. Add them after creating.</div>
+          <div><strong className="text-foreground/80">URL / Email</strong> — typed input with validation.</div>
+          <div><strong className="text-foreground/80">Rating</strong> — 1–5 stars.</div>
+        </div>
+        {fields.length === 0 && (
+          <div className="mt-3 pt-3 border-t border-primary/20">
+            <Button
+              variant="default"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={async () => {
+                // Seed a realistic example so the user can see one end-to-end
+                try {
+                  const fieldId = await createField({
+                    name: "Estimated hours",
+                    fieldType: "number",
+                    description: "How long you think this will take. Used by Gantt + capacity planning.",
+                    isRequired: false,
+                  })
+                  if (fieldId) {
+                    await addFieldScope(fieldId, "type", "task").catch(() => undefined)
+                  }
+                  toast.success("Example field 'Estimated hours' created — scoped to tasks")
+                  await loadFields()
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Couldn't create example")
+                }
+              }}
+            >
+              <Plus className="size-3 mr-1.5" />
+              Create example field
+            </Button>
+            <p className="text-[10px] text-muted-foreground/70 mt-1.5">
+              Creates an &ldquo;Estimated hours&rdquo; number field scoped to tasks so you can see one wired up end-to-end.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Field list */}
       {fields.length === 0 ? (
         <div className="px-4 py-8 rounded-lg border bg-card text-center">
