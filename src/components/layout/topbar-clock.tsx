@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { usePreferences, DEFAULT_PREFERENCES, type ClockDateFormat, type ClockMode } from "@/lib/hooks/use-preferences"
 import { useDraggableWidget } from "@/lib/hooks/use-draggable-widget"
+import { useLongPress } from "@/lib/hooks/use-long-press"
 import {
   ContextMenu,
   useContextMenu,
@@ -138,6 +139,13 @@ export function TopbarClock() {
     ? formatInTimezone(now, clock.secondTimezoneLabel, clock.format24, clock.showSeconds)
     : null
 
+  // Long-press → same context menu as right-click. The hook synthesises
+  // a React.PointerEvent so we cast it to MouseEvent-shape for
+  // handleContextMenu which only reads clientX/clientY + preventDefault.
+  const longPress = useLongPress((e) => {
+    handleContextMenu(e as unknown as React.MouseEvent)
+  }, 500)
+
   // Common wrapper for drag + context menu
   const wrapperCls = `z-30 select-none flex flex-col items-end gap-1 ${
     drag.isDragging ? "cursor-grabbing" : "cursor-grab"
@@ -149,16 +157,24 @@ export function TopbarClock() {
         <div
           ref={drag.containerRef}
           style={drag.style}
-          onPointerDown={drag.onPointerDown}
+          onPointerDown={(e) => {
+            drag.onPointerDown(e)
+            longPress.onPointerDown(e)
+          }}
+          onPointerMove={longPress.onPointerMove}
+          onPointerUp={longPress.onPointerUp}
+          onPointerCancel={longPress.onPointerCancel}
+          onPointerLeave={longPress.onPointerLeave}
           onContextMenu={handleContextMenu}
           className={wrapperCls}
-          aria-label="Current time (drag to reposition, right-click for options)"
+          aria-label="Current time (drag to reposition, long-press for options)"
           data-slot="topbar-clock"
         >
-          <div className="group inline-flex items-center gap-2 rounded-full border border-border/30 bg-background/50 backdrop-blur-md p-1.5 hover:bg-background/80 hover:border-border/60 transition-all">
+          <div className="group inline-flex items-center gap-2 rounded-full border border-border/30 bg-background/50 backdrop-blur-md p-1 md:p-1.5 hover:bg-background/80 hover:border-border/60 transition-all">
             <AnalogFace date={now} accent={accent} showSeconds={clock.showSeconds} />
+            {/* Date chip hidden on phones to keep the analog widget small. */}
             {dateStr && (
-              <span className="pr-2 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider">
+              <span className="hidden md:inline-flex pr-2 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wider">
                 {dateStr}
               </span>
             )}
@@ -187,17 +203,19 @@ export function TopbarClock() {
         data-slot="topbar-clock"
       >
         <div className="group inline-flex items-stretch gap-0 rounded-lg border border-border/30 bg-background/50 backdrop-blur-md supports-[backdrop-filter]:bg-background/30 shadow-[0_1px_2px_rgb(0_0_0/0.04)] overflow-hidden transition-[background,border-color,box-shadow] duration-300 hover:bg-background/80 hover:border-border/60 hover:shadow-[0_4px_16px_-4px_rgb(0_0_0/0.15)]">
-          <span className="flex items-center px-1.5 text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors" title="Drag to move, right-click for options">
+          {/* Drag-grip — hidden on phones; we use long-press there. */}
+          <span className="hidden md:flex items-center px-1.5 text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors" title="Drag to move, right-click for options">
             <GripVertical className="size-3" />
           </span>
           <span
-            className="flex items-center pr-2.5 py-1 font-mono text-sm tabular-nums leading-none tracking-tight"
+            className="flex items-center px-2 md:pr-2.5 md:pl-0 py-1 font-mono text-xs md:text-sm tabular-nums leading-none tracking-tight"
             style={accent ? { color: accent } : undefined}
           >
             {timeStr}
           </span>
+          {/* Date chip — hidden on phones to save real estate. Toggleable on tablets+. */}
           {dateStr && (
-            <span className="flex items-center px-2.5 py-1 text-[11px] font-medium text-muted-foreground/80 uppercase tracking-wider border-l border-border/30">
+            <span className="hidden md:flex items-center px-2.5 py-1 text-[11px] font-medium text-muted-foreground/80 uppercase tracking-wider border-l border-border/30">
               {dateStr}
             </span>
           )}
@@ -276,7 +294,7 @@ function AnalogFace({
   const hourColor = accent || "currentColor"
   const minColor = "currentColor"
   return (
-    <svg viewBox="0 0 44 44" className="size-11 shrink-0 text-foreground">
+    <svg viewBox="0 0 44 44" className="size-8 md:size-11 shrink-0 text-foreground">
       {/* face ring */}
       <circle cx={22} cy={22} r={20.5} fill="none" stroke="currentColor" strokeWidth={0.8} opacity={0.25} />
       {ticks}

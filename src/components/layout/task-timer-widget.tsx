@@ -14,6 +14,7 @@ import {
   type TimerColor,
 } from "@/lib/stores/use-timer-store"
 import { useDraggableWidget } from "@/lib/hooks/use-draggable-widget"
+import { useLongPress } from "@/lib/hooks/use-long-press"
 import {
   Dialog,
   DialogContent,
@@ -129,12 +130,22 @@ export function TaskTimerWidget() {
 
   const accent = TIMER_COLOR_HEX[timer.accentColor] ?? TIMER_COLOR_HEX.blue
 
+  // Long-press → same context menu as right-click (mobile parity).
+  const longPress = useLongPress((e) => {
+    handleContextMenu(e as unknown as React.MouseEvent)
+  }, 500)
+
   if (!active) {
     return (
       <>
         <div
           ref={drag.containerRef}
           onContextMenu={handleContextMenu}
+          onPointerDown={longPress.onPointerDown}
+          onPointerMove={longPress.onPointerMove}
+          onPointerUp={longPress.onPointerUp}
+          onPointerCancel={longPress.onPointerCancel}
+          onPointerLeave={longPress.onPointerLeave}
           className="z-30 group/fab inline-flex items-stretch rounded-full border border-border/40 bg-card/70 backdrop-blur-md text-xs font-medium text-muted-foreground shadow-[0_2px_8px_-2px_rgb(0_0_0/0.1)] hover:bg-card hover:text-foreground hover:border-border hover:shadow-[0_8px_24px_-6px_rgb(0_0_0/0.18)] transition-[background,border-color,box-shadow] duration-300"
           data-slot="timer-widget-fab"
           style={{ ...drag.style, borderColor: `${accent}66` }}
@@ -154,11 +165,12 @@ export function TaskTimerWidget() {
             type="button"
             data-no-drag
             onClick={() => setPickerOpen(true)}
-            className="inline-flex items-center gap-1.5 pr-3.5 pl-1 py-2"
+            className="inline-flex items-center gap-1.5 pr-2 md:pr-3.5 pl-2 md:pl-1 py-2"
             aria-label="Start a focus timer"
           >
             <Timer className="size-3.5 transition-transform duration-500 group-hover/fab:rotate-180" style={{ color: accent }} />
-            <span className="tracking-wide">Start timer</span>
+            {/* Label drops on phones — the icon + tap target stay. */}
+            <span className="hidden md:inline tracking-wide">Start timer</span>
           </button>
         </div>
         <TimerPicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
@@ -175,9 +187,16 @@ export function TaskTimerWidget() {
       <div
         ref={drag.containerRef}
         style={drag.style}
-        onPointerDown={drag.onPointerDown}
+        onPointerDown={(e) => {
+          drag.onPointerDown(e)
+          longPress.onPointerDown(e)
+        }}
+        onPointerMove={longPress.onPointerMove}
+        onPointerUp={longPress.onPointerUp}
+        onPointerCancel={longPress.onPointerCancel}
+        onPointerLeave={longPress.onPointerLeave}
         onContextMenu={handleContextMenu}
-        className={`z-30 w-64 rounded-xl border bg-card/95 backdrop-blur-md shadow-[0_12px_32px_-12px_rgb(0_0_0/0.25)] overflow-hidden ring-1 ${
+        className={`z-30 w-44 sm:w-56 md:w-64 rounded-xl border bg-card/95 backdrop-blur-md shadow-[0_12px_32px_-12px_rgb(0_0_0/0.25)] overflow-hidden ring-1 ${
           drag.isDragging ? "cursor-grabbing" : "cursor-grab"
         }`}
         data-slot="timer-widget"
