@@ -219,6 +219,9 @@ export const todoItems = sqliteTable("todo_items", {
   sortOrder: real("sort_order").notNull().default(0),
   dueDate: text("due_date"),
   notes: text("notes"),
+  priority: text("priority", {
+    enum: ["urgent", "high", "medium", "low"],
+  }),
   completedAt: text("completed_at"),
   createdAt: text("created_at")
     .notNull()

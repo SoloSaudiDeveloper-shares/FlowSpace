@@ -46,6 +46,8 @@ export async function updateTodoItem(
     sortOrder?: number
     dueDate?: string | null
     notes?: string | null
+    /** "urgent" | "high" | "medium" | "low" | null. */
+    priority?: "urgent" | "high" | "medium" | "low" | null
   }
 ) {
   const updateData: Record<string, unknown> = { ...data }

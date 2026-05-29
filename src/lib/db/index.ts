@@ -180,6 +180,19 @@ try {
   console.error("[migration] reminders.bot_fired_at:", err)
 }
 
+// ─── Todo items: priority (per-item) ───────────────────────────────────
+// Mirrors the tasks table — urgent / high / medium / low / null. Lets
+// the user mark a quick todo as urgent without promoting it to a full
+// project task.
+try {
+  const cols = sqlite.prepare(`PRAGMA table_info(todo_items)`).all() as { name: string }[]
+  if (!cols.some((c) => c.name === "priority")) {
+    sqlite.exec(`ALTER TABLE todo_items ADD COLUMN priority TEXT`)
+  }
+} catch (err) {
+  console.error("[migration] todo_items.priority:", err)
+}
+
 // ─── Two-factor authentication (per-user) ──────────────────────────────
 // `totp_secret`: base32 secret stored once enrolled; null = 2FA off
 // `totp_enabled`: 1 once the user has verified at least one code (so

@@ -39,6 +39,25 @@ export interface MenuResponse {
 
 // ── Main menu ──────────────────────────────────────────────────────────
 
+/** Public app URL for deep-link buttons, or null when PUBLIC_APP_URL
+ *  isn't set on the server. Telegram refuses to render `url:` buttons
+ *  with an empty or invalid scheme, so we omit the button entirely
+ *  when we can't build a real one. */
+function appUrl(): string | null {
+  const raw = process.env.PUBLIC_APP_URL?.replace(/\/+$/, "")
+  if (!raw || !/^https?:\/\//.test(raw)) return null
+  return raw
+}
+
+/** Optional "🔗 Open in FlowSpace" row appended to menus when the env
+ *  is configured. Lets the user one-tap from Telegram into the web UI
+ *  at the matching page. Pass a path like "/" or "/projects/abc". */
+function openInAppRow(path: string = "/"): { text: string; url: string }[][] {
+  const base = appUrl()
+  if (!base) return []
+  return [[{ text: "🔗 Open in FlowSpace", url: `${base}${path}` }]]
+}
+
 export function mainMenu(): MenuResponse {
   return {
     text: [
@@ -57,6 +76,7 @@ export function mainMenu(): MenuResponse {
         { text: "📝 Todo lists", callback_data: "v:lists" },
       ],
       [{ text: "🆘 Help", callback_data: "v:help" }],
+      ...openInAppRow("/"),
     ]),
   }
 }
@@ -206,6 +226,7 @@ export function taskDrillMenu(userId: string, taskPrefix: string): MenuResponse 
       ],
       [{ text: "🔀 Move status", callback_data: `t:s:${p}` }],
       [{ text: "🗑 Delete", callback_data: `t:del:${p}` }],
+      ...openInAppRow(`/projects/${row.project_id}`),
       [{ text: "⬅️ Back to tasks", callback_data: "v:tasks" }],
     ]),
   }

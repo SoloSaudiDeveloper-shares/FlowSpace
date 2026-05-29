@@ -77,6 +77,7 @@ import { AIProviderSection } from "@/components/settings/ai-provider-section"
 import { AccountSection } from "@/components/settings/account-section"
 import { TelegramSection } from "@/components/settings/telegram-section"
 import { LocaleSwitcher } from "@/components/settings/locale-switcher"
+import { MarkdownTemplatesPanel } from "@/components/settings/markdown-templates-panel"
 import { EmailInSection } from "@/components/settings/email-in-section"
 import { CalendarSyncSection } from "@/components/settings/calendar-sync-section"
 import { getTelegramFeatureEnabled } from "@/lib/actions/telegram-actions"
@@ -306,8 +307,9 @@ export function SettingsContent() {
     { id: "telegram",       label: "Telegram",      icon: Bot,        group: "integrations", description: "Connect your own Telegram bot. Text it from anywhere — ideas become real items in FlowSpace. Each user has their own bot; nothing is shared." },
     { id: "email-in",       label: "Email IN",      icon: Mic,        group: "integrations", description: "Forward emails to a webhook so they land as pending items in your bell. Approve to add to your Inbox list." },
     { id: "calendar-sync",  label: "Calendar sync", icon: ClockIcon,  group: "integrations", description: "Push tasks with due dates to Google Calendar as all-day events. One-way, every 5 minutes." },
-    { id: "language",       label: "Language & tour", icon: Globe,    group: "help",         description: "Pick your interface language (English / العربية, with RTL support) and replay the first-run guided tour." },
-    { id: "shortcuts",      label: "Shortcuts",     icon: Keyboard,   group: "help",         description: "Keyboard shortcuts reference. Saves you a lot of clicking once you remember a few." },
+    { id: "language",          label: "Language & tour",      icon: Globe,            group: "help", description: "Pick your interface language (English / العربية, with RTL support) and replay the first-run guided tour." },
+    { id: "markdown-templates", label: "Markdown templates",   icon: MessageSquareText, group: "help", description: "Ready-to-paste blueprints for sprint kickoffs, content calendars, OKRs, 1:1s, design reviews. Copy and feed into the importer." },
+    { id: "shortcuts",         label: "Shortcuts",            icon: Keyboard,         group: "help", description: "Keyboard shortcuts reference. Saves you a lot of clicking once you remember a few." },
     { id: "about",          label: "About",         icon: Info,       group: "help",         description: "Version info and project links." },
   ]
 
@@ -2004,6 +2006,20 @@ export function SettingsContent() {
           Pick your interface language. Replay the welcome tour any time.
         </p>
         <LocaleSwitcher />
+      </section>
+
+      {/* ─── Markdown templates ─────────────────────────────────── */}
+      <section id="markdown-templates" className="scroll-mt-4">
+        <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
+          <MessageSquareText className="size-4" />
+          Markdown templates
+        </h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Ready-to-paste blueprints for sprints, content calendars,
+          OKRs, 1:1s, design reviews. Copy and import to spin up a
+          full project.
+        </p>
+        <MarkdownTemplatesPanel />
       </section>
 
       {/* ─── Keyboard Shortcuts ──────────────────────────────────── */}
