@@ -211,6 +211,10 @@ try {
   // match a slash command, smart-capture, or AI-import format gets
   // routed through the user's AI provider for intent parsing.
   if (!has("nl_commands_enabled")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN nl_commands_enabled INTEGER NOT NULL DEFAULT 0`)
+  // Voice OUT — when true the bot also sends a voice-note version of
+  // its text reply (synthesised through the user's AI provider's
+  // /audio/speech endpoint, e.g. OpenAI tts-1). Off by default.
+  if (!has("voice_out_enabled")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN voice_out_enabled INTEGER NOT NULL DEFAULT 0`)
 } catch (err) {
   console.error("[migration] telegram_bots digest columns:", err)
 }

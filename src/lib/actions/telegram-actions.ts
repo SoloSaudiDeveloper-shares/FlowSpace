@@ -143,6 +143,7 @@ export async function connectTelegramBot(
     { command: "digest",    description: "🌅 Daily morning digest" },
     { command: "voice",     description: "🎙 Set voice transcription language" },
     { command: "nl",        description: "🤖 Toggle natural-language commands" },
+    { command: "voiceout",  description: "🔊 Toggle voice-note replies (TTS)" },
     { command: "help",      description: "🆘 Show commands & smart syntax" },
     { command: "cancel",    description: "❌ Cancel current action" },
   ]).catch(() => undefined)

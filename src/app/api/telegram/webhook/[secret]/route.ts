@@ -25,10 +25,12 @@ import type { NextRequest } from "next/server"
 import { sqlite } from "@/lib/db"
 import {
   sendMessage,
+  sendVoice,
   editMessageText,
   answerCallbackQuery,
   inlineKeyboard,
 } from "@/lib/telegram/client"
+import { isVoiceOutEnabled, synthesizeSpeech } from "@/lib/telegram/tts"
 import type { TelegramUpdate } from "@/lib/telegram/client"
 import { dispatchTelegramMessage } from "@/lib/telegram/agent"
 import { handleCallback } from "@/lib/telegram/callbacks"
@@ -330,6 +332,17 @@ export async function POST(
       parseMode: "Markdown",
       replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
     })
+    // Voice OUT — if the user opted in, also send a TTS rendering. This
+    // is fire-and-forget so a slow TTS provider can't hold up the
+    // webhook response.
+    if (isVoiceOutEnabled(bot.user_id)) {
+      synthesizeSpeech(bot.user_id, reply)
+        .then((audio) => {
+          if (!audio) return
+          return sendVoice(bot.bot_token, msg.chat.id, audio)
+        })
+        .catch(() => undefined)
+    }
   } catch (err) {
     // Bubble the failure back to the user so it's visible — better than
     // a silent server log they'll never see.

@@ -243,6 +243,62 @@ export function escapeMarkdownV2(s: string): string {
   return s.replace(/[_*\[\]()~`>#+\-=|{}.!\\]/g, "\\$&")
 }
 
+/**
+ * Send an audio file as a voice note (round mic-button playback in
+ * Telegram). The file must be OGG/Opus per Telegram's spec; other
+ * formats end up as a generic audio attachment.
+ *
+ * We POST multipart/form-data directly here rather than going through
+ * the JSON `call` helper because Telegram's bot API requires multipart
+ * for binary uploads.
+ */
+export async function sendVoice(
+  token: string,
+  chatId: number | string,
+  audio: ArrayBuffer | Uint8Array | Blob,
+  opts: {
+    caption?: string
+    parseMode?: "Markdown" | "MarkdownV2" | "HTML"
+    durationSec?: number
+    replyToMessageId?: number
+  } = {},
+): Promise<TelegramApiResult<TelegramMessage>> {
+  try {
+    const form = new FormData()
+    form.append("chat_id", String(chatId))
+    const blob =
+      audio instanceof Blob
+        ? audio
+        : new Blob([audio as ArrayBuffer], { type: "audio/ogg" })
+    form.append("voice", blob, "reply.ogg")
+    if (opts.caption) form.append("caption", opts.caption)
+    if (opts.parseMode) form.append("parse_mode", opts.parseMode)
+    if (opts.durationSec) form.append("duration", String(opts.durationSec))
+    if (opts.replyToMessageId)
+      form.append("reply_to_message_id", String(opts.replyToMessageId))
+
+    const res = await fetch(`${API_BASE}/bot${token}/sendVoice`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(30_000),
+    })
+    const data = (await res.json()) as
+      | { ok: true; result: TelegramMessage }
+      | { ok: false; error_code?: number; description?: string }
+    if (data.ok) return { ok: true, result: data.result }
+    return {
+      ok: false,
+      error_code: data.error_code,
+      description: data.description ?? "Telegram sendVoice error",
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      description: err instanceof Error ? err.message : "Network error",
+    }
+  }
+}
+
 /** Edit an existing message in place. The user just tapped a button —
  *  we want to swap the message contents and buttons without dumping a
  *  new line in the chat. */

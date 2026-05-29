@@ -68,6 +68,7 @@ export async function dispatchTelegramMessage(
       case "/digest":   return toggleDigest(bot, args)
       case "/voice":    return voiceLanguage(bot, args)
       case "/nl":       return toggleNL(bot, args)
+      case "/voiceout": return toggleVoiceOut(bot, args)
       default:
         return `Unknown command "${cmd}". Try /help or /menu.`
     }
@@ -138,6 +139,7 @@ function helpText(): string {
     "  • Hold the mic button — I'll transcribe & route as text",
     "  • `/voice` — show current language",
     "  • `/voice en`, `/voice ar`, `/voice auto` — pick / pin",
+    "  • `/voiceout on|off` — hear my replies as voice notes (needs TTS provider)",
     "",
     "ℹ️ *Setup*",
     "  • `/me` — which bot you're connected to",
@@ -695,6 +697,56 @@ function toggleNL(bot: BotRow, args: string): string {
     return "🤖 Natural-language commands *OFF*. Freeform text now goes straight to capture."
   }
   return "Usage: `/nl on` or `/nl off`"
+}
+
+// ─── /voiceout — toggle TTS voice-note replies ─────────────────────────
+function toggleVoiceOut(bot: BotRow, args: string): string {
+  const a = args.trim().toLowerCase()
+  const row = sqlite
+    .prepare(`SELECT voice_out_enabled FROM telegram_bots WHERE user_id = ?`)
+    .get(bot.user_id) as { voice_out_enabled: number | null } | undefined
+  const enabled = row?.voice_out_enabled === 1
+  if (!a) {
+    const ai = getUserAIConfig(bot.user_id)
+    const lines = [
+      "🔊 *Voice OUT* (TTS replies)",
+      "",
+      enabled ? "Currently: *ON*" : "Currently: *OFF*",
+    ]
+    if (!ai) {
+      lines.push(
+        "",
+        "⚠️ Configure an AI provider (Settings → AI features) with a",
+        "TTS-capable model (e.g. OpenAI `tts-1`) before turning this on.",
+      )
+    } else {
+      lines.push(
+        "",
+        "When on, every text reply is also sent as a voice note,",
+        "synthesised through your AI provider's `/audio/speech`",
+        "endpoint. Off by default — voice notes can be noisy.",
+        "",
+        "Toggle: `/voiceout on` or `/voiceout off`",
+      )
+    }
+    return lines.join("\n")
+  }
+  if (a === "on") {
+    if (!getUserAIConfig(bot.user_id)) {
+      return "⚠️ Configure an AI provider first (Settings → AI features)."
+    }
+    sqlite
+      .prepare(`UPDATE telegram_bots SET voice_out_enabled = 1 WHERE user_id = ?`)
+      .run(bot.user_id)
+    return "🔊 Voice OUT *ON*. I'll speak my replies."
+  }
+  if (a === "off") {
+    sqlite
+      .prepare(`UPDATE telegram_bots SET voice_out_enabled = 0 WHERE user_id = ?`)
+      .run(bot.user_id)
+    return "🔊 Voice OUT *OFF*. Text replies only."
+  }
+  return "Usage: `/voiceout on` or `/voiceout off`"
 }
 
 // ─── /voice — set transcription language for voice messages ─────────────
