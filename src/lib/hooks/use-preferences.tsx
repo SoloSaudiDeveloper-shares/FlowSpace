@@ -124,6 +124,11 @@ export interface Preferences {
     "greeting" | "capture_added" | "task_done" | "todo_done" | "voice_received" | "unknown",
     string
   >>
+  /** ISO timestamp when the user finished (or dismissed) the first-run
+   *  onboarding tour. Empty/missing = show the tour on next mount. */
+  onboardingCompletedAt: string
+  /** UI language. "en" or "ar" (more later). RTL is implied by "ar". */
+  locale: "en" | "ar"
 }
 
 // Home dashboard sections — each one can be toggled on/off by the user.
@@ -232,6 +237,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   rightClickDefaultColor: "#a78bfa", // violet — friendlier than gray
   notificationBadgeEnabled: true,
   botReplies: {},
+  onboardingCompletedAt: "",
+  locale: "en",
 }
 
 export const HOME_SECTION_LABELS: Record<HomeSectionKey, string> = {

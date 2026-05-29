@@ -6,6 +6,7 @@ import { PreferencesProvider } from "@/lib/hooks/use-preferences"
 import { SpeechProvider } from "@/lib/hooks/use-speech-recognition"
 import { AIProvider } from "@/lib/hooks/use-ai"
 import { AuthProvider } from "@/lib/hooks/use-auth"
+import { I18nProvider } from "@/lib/hooks/use-i18n"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -16,6 +17,7 @@ import { TopbarClock } from "@/components/layout/topbar-clock"
 import { TaskTimerWidget } from "@/components/layout/task-timer-widget"
 import { MainShell } from "@/components/layout/main-shell"
 import { PWABootstrap } from "@/components/layout/pwa-bootstrap"
+import { OnboardingTour } from "@/components/layout/onboarding-tour"
 import { Toaster } from "sonner"
 import { getElements, getFavoriteElements } from "@/lib/actions/element-actions"
 import { getCurrentUser, hasAnyUsers } from "@/lib/actions/user-actions"
@@ -93,6 +95,7 @@ export default async function RootLayout({
         <ThemeProvider defaultTheme="dark">
           <AuthProvider initialUser={currentUser} initialNeedsSetup={needsSetup}>
           <PreferencesProvider>
+            <I18nProvider>
             <SpeechProvider>
             <AIProvider>
             <TooltipProvider>
@@ -117,6 +120,7 @@ export default async function RootLayout({
                     <TaskTimerWidget />
                     <CommandPalette />
                     <KeyboardShortcuts />
+                    <OnboardingTour />
                   </>
                 )}
               </SidebarProvider>
@@ -125,6 +129,7 @@ export default async function RootLayout({
             </TooltipProvider>
             </AIProvider>
             </SpeechProvider>
+            </I18nProvider>
           </PreferencesProvider>
           </AuthProvider>
         </ThemeProvider>

@@ -76,6 +76,7 @@ import { CustomFieldsSettings } from "@/components/settings/custom-fields-settin
 import { AIProviderSection } from "@/components/settings/ai-provider-section"
 import { AccountSection } from "@/components/settings/account-section"
 import { TelegramSection } from "@/components/settings/telegram-section"
+import { LocaleSwitcher } from "@/components/settings/locale-switcher"
 import { getTelegramFeatureEnabled } from "@/lib/actions/telegram-actions"
 
 /** Small sub-component so we can use the JSX-tag form on a dynamic icon. */
@@ -301,6 +302,7 @@ export function SettingsContent() {
     { id: "speech",         label: "Speech",        icon: Mic,        group: "integrations", description: "Voice input. Pick between the browser's built-in Web Speech API (Chrome/Edge, fast) or a local Whisper model (private, all browsers, downloads a model)." },
     { id: "ai",             label: "AI features",   icon: Sparkles,   group: "integrations", description: "Hook the AI features up to a provider — local Ollama, OpenAI, Gemini, LM Studio, or any custom OpenAI-compatible endpoint. Keys stay in your browser." },
     { id: "telegram",       label: "Telegram",      icon: Bot,        group: "integrations", description: "Connect your own Telegram bot. Text it from anywhere — ideas become real items in FlowSpace. Each user has their own bot; nothing is shared." },
+    { id: "language",       label: "Language & tour", icon: Globe,    group: "help",         description: "Pick your interface language (English / العربية, with RTL support) and replay the first-run guided tour." },
     { id: "shortcuts",      label: "Shortcuts",     icon: Keyboard,   group: "help",         description: "Keyboard shortcuts reference. Saves you a lot of clicking once you remember a few." },
     { id: "about",          label: "About",         icon: Info,       group: "help",         description: "Version info and project links." },
   ]
@@ -1960,6 +1962,18 @@ export function SettingsContent() {
             </>
           )}
         </div>
+      </section>
+
+      {/* ─── Language + onboarding replay ────────────────────────── */}
+      <section id="language" className="scroll-mt-4">
+        <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
+          <Globe className="size-4" />
+          Language & onboarding
+        </h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Pick your interface language. Replay the welcome tour any time.
+        </p>
+        <LocaleSwitcher />
       </section>
 
       {/* ─── Keyboard Shortcuts ──────────────────────────────────── */}
