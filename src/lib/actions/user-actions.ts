@@ -1,6 +1,6 @@
 "use server"
 
-import { db } from "@/lib/db"
+import { db, sqlite } from "@/lib/db"
 import { users, sessions, teams, teamMembers } from "@/lib/db/schema"
 import type { User } from "@/lib/db/schema"
 import { createId } from "@/lib/utils/ids"
@@ -310,8 +310,9 @@ export async function deleteUser(id: string) {
 
 export async function login(
   username: string,
-  password: string
-): Promise<{ success: boolean; error?: string; user?: User }> {
+  password: string,
+  twoFactorCode?: string,
+): Promise<{ success: boolean; error?: string; user?: User; needsTwoFactor?: boolean }> {
   // Pull the caller's IP from the request headers (proxied behind Caddy)
   const h = await headers()
   const ip =
@@ -340,6 +341,25 @@ export async function login(
   if (!valid) {
     recordFailedLogin(ip, username)
     return { success: false, error: "Invalid username or password" }
+  }
+
+  // 2FA challenge — if the user has TOTP enabled, gate session creation
+  // on a valid code. We use the same rate-limit record so brute-forcing
+  // codes burns into the per-(IP,username) failure budget.
+  const twoFactorRow = sqlite
+    .prepare(`SELECT totp_enabled FROM users WHERE id = ?`)
+    .get(user.id) as { totp_enabled: number } | undefined
+  if (twoFactorRow?.totp_enabled === 1) {
+    if (!twoFactorCode) {
+      // Don't record a failure — they passed the password check; this
+      // is just a UI prompt.
+      return { success: false, needsTwoFactor: true, error: "Two-factor code required" }
+    }
+    const { verifyTwoFactorForLogin } = await import("@/lib/auth/two-factor-verify")
+    if (!verifyTwoFactorForLogin(user.id, twoFactorCode)) {
+      recordFailedLogin(ip, username)
+      return { success: false, needsTwoFactor: true, error: "Two-factor code didn't match" }
+    }
   }
 
   // Successful login — clear the per-(IP,username) record so the user

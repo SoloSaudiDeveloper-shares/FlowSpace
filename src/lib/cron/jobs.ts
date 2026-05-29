@@ -285,5 +285,31 @@ registerJob({
   },
 })
 
+// ─── Job 5: Google Calendar sync (every 5 minutes) ──────────────────────
+//
+// Pushes tasks-with-due-dates to each connected user's Google Calendar
+// as all-day events. Idempotent: tracked by google_calendar_events
+// (task_id ↔ event_id). Skips silently when GOOGLE_CLIENT_ID isn't set.
+
+let gcalLastRun = 0
+registerJob({
+  name: "calendar:google-sync",
+  async run() {
+    // Throttle to every 5 minutes (300_000ms).
+    const now = Date.now()
+    if (now - gcalLastRun < 300_000) return
+    gcalLastRun = now
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      return
+    }
+    const { syncGoogleCalendarForAllUsers } = await import(
+      "@/lib/calendar/google-sync"
+    )
+    await syncGoogleCalendarForAllUsers().catch((err) =>
+      console.error("[gcal-sync]", err),
+    )
+  },
+})
+
 // Keep the imported-but-unused symbol around so esbuild doesn't drop it.
 void dispatchTelegramMessage

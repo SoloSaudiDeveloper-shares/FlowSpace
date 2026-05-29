@@ -6,6 +6,7 @@ import { PreferencesProvider } from "@/lib/hooks/use-preferences"
 import { SpeechProvider } from "@/lib/hooks/use-speech-recognition"
 import { AIProvider } from "@/lib/hooks/use-ai"
 import { AuthProvider } from "@/lib/hooks/use-auth"
+import { I18nProvider } from "@/lib/hooks/use-i18n"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -15,6 +16,9 @@ import { KeyboardShortcuts } from "@/components/layout/keyboard-shortcuts"
 import { TopbarClock } from "@/components/layout/topbar-clock"
 import { TaskTimerWidget } from "@/components/layout/task-timer-widget"
 import { MainShell } from "@/components/layout/main-shell"
+import { PWABootstrap } from "@/components/layout/pwa-bootstrap"
+import { OnboardingTour } from "@/components/layout/onboarding-tour"
+import { PomodoroWidget } from "@/components/layout/pomodoro-widget"
 import { Toaster } from "sonner"
 import { getElements, getFavoriteElements } from "@/lib/actions/element-actions"
 import { getCurrentUser, hasAnyUsers } from "@/lib/actions/user-actions"
@@ -47,6 +51,20 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "FlowSpace",
   description: "Your personal productivity workspace",
+  manifest: "/manifest.json",
+  themeColor: "#0a0a0a",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "FlowSpace",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.svg", sizes: "192x192", type: "image/svg+xml" },
+      { url: "/icons/icon-512.svg", sizes: "512x512", type: "image/svg+xml" },
+    ],
+    apple: "/icons/icon-192.svg",
+  },
 }
 
 export default async function RootLayout({
@@ -78,6 +96,7 @@ export default async function RootLayout({
         <ThemeProvider defaultTheme="dark">
           <AuthProvider initialUser={currentUser} initialNeedsSetup={needsSetup}>
           <PreferencesProvider>
+            <I18nProvider>
             <SpeechProvider>
             <AIProvider>
             <TooltipProvider>
@@ -102,13 +121,17 @@ export default async function RootLayout({
                     <TaskTimerWidget />
                     <CommandPalette />
                     <KeyboardShortcuts />
+                    <OnboardingTour />
+                    <PomodoroWidget />
                   </>
                 )}
               </SidebarProvider>
               <Toaster richColors position="bottom-right" />
+              <PWABootstrap />
             </TooltipProvider>
             </AIProvider>
             </SpeechProvider>
+            </I18nProvider>
           </PreferencesProvider>
           </AuthProvider>
         </ThemeProvider>

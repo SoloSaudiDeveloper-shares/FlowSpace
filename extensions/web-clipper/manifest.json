@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "FlowSpace Web Clipper",
+  "version": "0.1.0",
+  "description": "One-click clip of the current page into your FlowSpace inbox.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "Clip to FlowSpace",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.svg",
+      "48": "icon.svg",
+      "128": "icon.svg"
+    }
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js"
+  }
+}

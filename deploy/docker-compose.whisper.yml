@@ -1,0 +1,34 @@
+# Self-hosted faster-whisper sidecar for FlowSpace voice transcription.
+# See docs/SELF_HOSTED_WHISPER.md for the full setup, trade-offs, and
+# migration plan.
+#
+# Run on the VM with:
+#   docker compose -f deploy/docker-compose.whisper.yml up -d
+
+services:
+  whisper:
+    image: ghcr.io/fedirz/faster-whisper-server:latest-cpu
+    container_name: flowspace-whisper
+    environment:
+      # `Systran/faster-whisper-small` is the 244 MB sweet spot — good
+      # English, acceptable Arabic, fits in 2 GB RAM with int8 quant.
+      # Bump to `Systran/faster-whisper-large-v3` for higher accuracy
+      # if you've got the RAM/VRAM.
+      WHISPER__MODEL: Systran/faster-whisper-small
+      WHISPER__INFERENCE_DEVICE: cpu
+      WHISPER__COMPUTE_TYPE: int8
+      ENABLE_UI: "false"
+    ports:
+      # Bind to loopback only — FlowSpace hits this from its own host,
+      # we don't want to expose it to the internet.
+      - "127.0.0.1:8001:8000"
+    restart: unless-stopped
+    volumes:
+      - whisper-models:/root/.cache/huggingface
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+volumes:
+  whisper-models:

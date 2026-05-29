@@ -32,6 +32,7 @@ import {
   Pin,
   PinOff,
   Palette,
+  Repeat,
 } from "lucide-react"
 import {
   DndContext,
@@ -1429,6 +1430,16 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                 >
                   <ShieldCheck className="size-4" />
                   <span>Approvals</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/habits"}
+                  onClick={() => router.push("/habits")}
+                  tooltip="Habits"
+                >
+                  <Repeat className="size-4" />
+                  <span>Habits</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

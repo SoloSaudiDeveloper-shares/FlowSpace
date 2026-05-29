@@ -22,7 +22,11 @@ interface AuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   needsSetup: boolean
-  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login: (
+    username: string,
+    password: string,
+    twoFactorCode?: string,
+  ) => Promise<{ success: boolean; error?: string; needsTwoFactor?: boolean }>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -66,16 +70,21 @@ export function AuthProvider({
   const login = useCallback(
     async (
       username: string,
-      password: string
-    ): Promise<{ success: boolean; error?: string }> => {
+      password: string,
+      twoFactorCode?: string,
+    ): Promise<{ success: boolean; error?: string; needsTwoFactor?: boolean }> => {
       try {
         setIsLoading(true)
-        const result = await loginAction(username, password)
+        const result = await loginAction(username, password, twoFactorCode)
         if (result.success && result.user) {
           setUser(result.user)
           setNeedsSetup(false)
         }
-        return { success: result.success, error: result.error }
+        return {
+          success: result.success,
+          error: result.error,
+          needsTwoFactor: result.needsTwoFactor,
+        }
       } catch {
         return { success: false, error: "An unexpected error occurred" }
       } finally {
