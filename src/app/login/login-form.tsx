@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/hooks/use-auth"
 import { createUser } from "@/lib/actions/user-actions"
 import { useRouter } from "next/navigation"
 import { Loader2, LogIn, UserPlus, Eye, EyeOff, Zap } from "lucide-react"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type Mode = "login" | "register"
 
@@ -32,6 +33,7 @@ function GoogleLogo({ className }: { className?: string }) {
 
 export function LoginForm({ signupsEnabled, googleConfigured, initialError }: LoginFormProps) {
   const { login, needsSetup, isAuthenticated } = useAuth()
+  const { locale, setLocale, t } = useT()
   const router = useRouter()
 
   // First-ever setup forces register mode. Otherwise the user picks.
@@ -135,11 +137,41 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
     isSetupMode
       ? "Create your account to get started"
       : effectiveMode === "register"
-        ? "Create your workspace"
-        : "Sign in to your workspace"
+        ? t("login.register.title")
+        : t("login.title")
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh] px-4">
+    <div className="relative flex items-center justify-center min-h-[80vh] px-4">
+      {/* Flag picker top-right (top-left on RTL). Two-flag chip — single
+          click flips the locale, keyboard-accessible. */}
+      <div className="absolute top-4 right-4 rtl:right-auto rtl:left-4 flex items-center gap-0.5 rounded-full border border-border/40 bg-card/70 backdrop-blur-md p-0.5 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setLocale("en")}
+          className={`size-8 rounded-full flex items-center justify-center text-base transition-all ${
+            locale === "en"
+              ? "ring-2 ring-primary bg-primary/10"
+              : "opacity-50 hover:opacity-100"
+          }`}
+          aria-label="English"
+          title="English"
+        >
+          🇺🇸
+        </button>
+        <button
+          type="button"
+          onClick={() => setLocale("ar")}
+          className={`size-8 rounded-full flex items-center justify-center text-base transition-all ${
+            locale === "ar"
+              ? "ring-2 ring-primary bg-primary/10"
+              : "opacity-50 hover:opacity-100"
+          }`}
+          aria-label="العربية"
+          title="العربية"
+        >
+          🇸🇦
+        </button>
+      </div>
       <div className="w-full max-w-sm">
         {/* Branding */}
         <div className="text-center mb-8">
@@ -193,7 +225,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
           <form onSubmit={handleSubmit} className="space-y-4">
             {effectiveMode === "register" && (
               <div className="space-y-2">
-                <label htmlFor="displayName" className="text-sm font-medium text-foreground">Display Name</label>
+                <label htmlFor="displayName" className="text-sm font-medium text-foreground">{t("login.register.displayName")}</label>
                 <input
                   id="displayName"
                   type="text"
@@ -207,7 +239,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
             )}
 
             <div className="space-y-2">
-              <label htmlFor="username" className="text-sm font-medium text-foreground">Username</label>
+              <label htmlFor="username" className="text-sm font-medium text-foreground">{t("login.username")}</label>
               <input
                 id="username"
                 type="text"
@@ -221,7 +253,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-foreground">Password</label>
+              <label htmlFor="password" className="text-sm font-medium text-foreground">{t("login.password")}</label>
               <div className="relative">
                 <input
                   id="password"
@@ -245,7 +277,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
 
             {effectiveMode === "register" && (
               <div className="space-y-2">
-                <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">Confirm Password</label>
+                <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">{t("login.register.confirm")}</label>
                 <input
                   id="confirmPassword"
                   type={showPassword ? "text" : "password"}
@@ -261,7 +293,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
             {needsTwoFactor && effectiveMode === "login" && (
               <div className="space-y-2 animate-in fade-in-0 slide-in-from-top-1 duration-200">
                 <label htmlFor="twoFactor" className="text-sm font-medium text-foreground">
-                  Authenticator code
+                  {t("login.twofactor.label")}
                 </label>
                 <input
                   id="twoFactor"
@@ -276,7 +308,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                   className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm tracking-widest text-center font-mono placeholder:text-muted-foreground placeholder:font-sans placeholder:tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                 />
                 <p className="text-[11px] text-muted-foreground/80">
-                  Open your authenticator app for a code, or use a recovery code if you lost your phone.
+                  {t("login.twofactor.help")}
                 </p>
               </div>
             )}
@@ -298,8 +330,8 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                   ? <UserPlus className="w-4 h-4" />
                   : <LogIn className="w-4 h-4" />}
               {isLoading
-                ? (effectiveMode === "register" ? "Creating account..." : "Signing in...")
-                : (effectiveMode === "register" ? "Create Account" : "Sign In")}
+                ? (effectiveMode === "register" ? "Creating account..." : t("login.creating"))
+                : (effectiveMode === "register" ? t("login.register.submit") : t("login.submit"))}
             </button>
 
             {effectiveMode === "login" && !isSetupMode && (
@@ -308,7 +340,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                   href="/forgot-password"
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Forgot password?
+                  {t("login.forgot")}
                 </Link>
               </div>
             )}

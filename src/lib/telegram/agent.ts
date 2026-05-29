@@ -69,6 +69,7 @@ export async function dispatchTelegramMessage(
       case "/voice":    return voiceLanguage(bot, args)
       case "/nl":       return toggleNL(bot, args)
       case "/voiceout": return toggleVoiceOut(bot, args)
+      case "/clear":    return clearMyHistory(bot, args)
       default:
         return `Unknown command "${cmd}". Try /help or /menu.`
     }
@@ -747,6 +748,40 @@ function toggleVoiceOut(bot: BotRow, args: string): string {
     return "🔊 Voice OUT *OFF*. Text replies only."
   }
   return "Usage: `/voiceout on` or `/voiceout off`"
+}
+
+// ─── /clear — wipe the user's bot message history ──────────────────────
+//
+// Two modes:
+//   /clear           → ask for confirmation (sends a count + instructions)
+//   /clear confirm   → actually delete
+//
+// Two-step on purpose: the history table is the user's audit trail; we
+// don't want a fat-fingered `/clear` to nuke it.
+function clearMyHistory(bot: BotRow, args: string): string {
+  const a = args.trim().toLowerCase()
+  const row = sqlite
+    .prepare(
+      `SELECT COUNT(*) AS n FROM telegram_messages WHERE user_id = ?`,
+    )
+    .get(bot.user_id) as { n: number } | undefined
+  const count = row?.n ?? 0
+  if (a !== "confirm") {
+    if (count === 0) return "Your bot history is already empty."
+    return [
+      `🗑 *Clear ${count} message${count === 1 ? "" : "s"}?*`,
+      "",
+      "This wipes the inbound + outbound bot log from Settings →",
+      "Telegram → Message history. The actual elements you captured",
+      "stay; only the chat audit goes away.",
+      "",
+      "Send `/clear confirm` to proceed.",
+    ].join("\n")
+  }
+  sqlite
+    .prepare(`DELETE FROM telegram_messages WHERE user_id = ?`)
+    .run(bot.user_id)
+  return `✅ Cleared ${count} message${count === 1 ? "" : "s"} from your bot history.`
 }
 
 // ─── /voice — set transcription language for voice messages ─────────────
