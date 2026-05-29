@@ -10,6 +10,7 @@ import { InlineTitle } from "@/components/shared/inline-title"
 import { CanvasEditor } from "@/components/canvas/canvas-editor"
 import { PageContextMenu } from "@/components/shared/page-context-menu"
 import { WatchButton } from "@/components/shared/watch-button"
+import { SendEmailButton } from "@/components/shared/send-email-button"
 import type { Node, Edge, Viewport } from "@xyflow/react"
 
 export default async function CanvasPage({
@@ -68,7 +69,8 @@ export default async function CanvasPage({
           initialTitle={element.title}
           className="!text-lg !font-semibold"
         />
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <SendEmailButton elementId={element.id} />
           <WatchButton
             elementId={element.id}
             initialWatching={watching}

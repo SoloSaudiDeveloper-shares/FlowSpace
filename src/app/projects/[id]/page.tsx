@@ -13,6 +13,7 @@ import { ProjectViews } from "@/components/project/project-views"
 import { SubProjectBar } from "@/components/project/sub-project-bar"
 import { PageContextMenu } from "@/components/shared/page-context-menu"
 import { WatchButton } from "@/components/shared/watch-button"
+import { SendEmailButton } from "@/components/shared/send-email-button"
 import { CustomFieldsPanel } from "@/components/shared/custom-fields-panel"
 
 export default async function ProjectPage({
@@ -51,7 +52,8 @@ export default async function ProjectPage({
           <FolderKanban className="size-4" />
         </span>
         <InlineTitle elementId={element.id} initialTitle={element.title} />
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <SendEmailButton elementId={element.id} />
           <WatchButton
             elementId={element.id}
             initialWatching={watching}

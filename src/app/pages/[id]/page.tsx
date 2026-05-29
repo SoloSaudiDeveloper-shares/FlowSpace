@@ -12,6 +12,7 @@ import { PageEditor } from "@/components/editor/page-editor"
 import { ElementLinker } from "@/components/shared/element-linker"
 import { PageContextMenu } from "@/components/shared/page-context-menu"
 import { WatchButton } from "@/components/shared/watch-button"
+import { SendEmailButton } from "@/components/shared/send-email-button"
 
 export default async function PageDetailPage({
   params,
@@ -41,7 +42,8 @@ export default async function PageDetailPage({
           <FileText className="size-4" />
         </span>
         <span className="text-sm font-medium truncate">{element.title}</span>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <SendEmailButton elementId={element.id} />
           <WatchButton
             elementId={element.id}
             initialWatching={watching}
