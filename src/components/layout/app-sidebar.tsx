@@ -33,6 +33,7 @@ import {
   PinOff,
   Palette,
   Repeat,
+  ScanEye,
 } from "lucide-react"
 import {
   DndContext,
@@ -1469,6 +1470,16 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                 >
                   <Repeat className="size-4" />
                   <span>Habits</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/vision"}
+                  onClick={() => router.push("/vision")}
+                  tooltip="Vision (image analysis)"
+                >
+                  <ScanEye className="size-4" />
+                  <span>Vision</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

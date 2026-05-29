@@ -54,6 +54,7 @@ import {
   type HomeSectionKey,
 } from "@/lib/hooks/use-preferences"
 import { SpeechButton } from "@/components/shared/speech-button"
+import { FileIngestDropzone } from "@/components/shared/file-ingest-dropzone"
 import { createElement } from "@/lib/actions/element-actions"
 import type { DashboardSummary } from "@/lib/actions/dashboard-actions"
 import type { Element, ElementType } from "@/lib/db/schema"
@@ -529,6 +530,11 @@ function QuickCaptureCompact() {
             </button>
           )
         })}
+      </div>
+
+      {/* File-ingest dropzone — drop a PDF/CSV/MD → becomes a Page. */}
+      <div className="mt-4">
+        <FileIngestDropzone />
       </div>
     </div>
   )
