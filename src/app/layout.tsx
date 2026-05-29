@@ -18,6 +18,7 @@ import { TaskTimerWidget } from "@/components/layout/task-timer-widget"
 import { MainShell } from "@/components/layout/main-shell"
 import { PWABootstrap } from "@/components/layout/pwa-bootstrap"
 import { OnboardingTour } from "@/components/layout/onboarding-tour"
+import { PomodoroWidget } from "@/components/layout/pomodoro-widget"
 import { Toaster } from "sonner"
 import { getElements, getFavoriteElements } from "@/lib/actions/element-actions"
 import { getCurrentUser, hasAnyUsers } from "@/lib/actions/user-actions"
@@ -121,6 +122,7 @@ export default async function RootLayout({
                     <CommandPalette />
                     <KeyboardShortcuts />
                     <OnboardingTour />
+                    <PomodoroWidget />
                   </>
                 )}
               </SidebarProvider>

@@ -14,6 +14,7 @@ import { SubProjectBar } from "@/components/project/sub-project-bar"
 import { PageContextMenu } from "@/components/shared/page-context-menu"
 import { WatchButton } from "@/components/shared/watch-button"
 import { SendEmailButton } from "@/components/shared/send-email-button"
+import { SaveAsTemplateButton } from "@/components/shared/save-as-template-button"
 import { CustomFieldsPanel } from "@/components/shared/custom-fields-panel"
 
 export default async function ProjectPage({
@@ -53,6 +54,7 @@ export default async function ProjectPage({
         </span>
         <InlineTitle elementId={element.id} initialTitle={element.title} />
         <div className="ml-auto flex items-center gap-1">
+          <SaveAsTemplateButton projectId={element.id} initialName={element.title} />
           <SendEmailButton elementId={element.id} />
           <WatchButton
             elementId={element.id}

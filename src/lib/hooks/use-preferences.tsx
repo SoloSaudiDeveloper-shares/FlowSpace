@@ -129,6 +129,8 @@ export interface Preferences {
   onboardingCompletedAt: string
   /** UI language. "en" or "ar" (more later). RTL is implied by "ar". */
   locale: "en" | "ar"
+  /** Floating Pomodoro widget. Default off — opt-in. */
+  pomodoroVisible: boolean
 }
 
 // Home dashboard sections — each one can be toggled on/off by the user.
@@ -239,6 +241,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   botReplies: {},
   onboardingCompletedAt: "",
   locale: "en",
+  pomodoroVisible: false,
 }
 
 export const HOME_SECTION_LABELS: Record<HomeSectionKey, string> = {
