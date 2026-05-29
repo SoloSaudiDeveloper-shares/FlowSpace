@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Loader2, KeyRound, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import { changeMyPassword } from "@/lib/actions/user-actions"
+import { TwoFactorSection } from "@/components/settings/two-factor-section"
+import { ApiTokensSection } from "@/components/settings/api-tokens-section"
 
 /**
  * Change-password form. Verifies the current password before accepting a
@@ -44,6 +46,7 @@ export function AccountSection() {
   }
 
   return (
+    <div className="space-y-3">
     <div className="px-4 py-3 rounded-lg border bg-card">
       <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
         <KeyRound className="size-3.5 text-muted-foreground" />
@@ -114,6 +117,10 @@ export function AccountSection() {
           {loading ? "Updating…" : "Change password"}
         </button>
       </form>
+    </div>
+
+    <TwoFactorSection />
+    <ApiTokensSection />
     </div>
   )
 }

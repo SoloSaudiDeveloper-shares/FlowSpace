@@ -49,6 +49,11 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
   const [error, setError] = useState(initialError ?? "")
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  // Two-step login: when needsTwoFactor flips on the user enters a code
+  // from their authenticator app (or a recovery code) before a session
+  // is created.
+  const [needsTwoFactor, setNeedsTwoFactor] = useState(false)
+  const [twoFactorCode, setTwoFactorCode] = useState("")
 
   useEffect(() => {
     if (isAuthenticated) router.push("/")
@@ -94,9 +99,20 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
     } else {
       setIsLoading(true)
       try {
-        const result = await login(username.trim(), password)
+        const result = await login(
+          username.trim(),
+          password,
+          needsTwoFactor ? twoFactorCode.trim() : undefined,
+        )
         if (!result.success) {
-          setError(result.error ?? "Invalid credentials")
+          if (result.needsTwoFactor) {
+            // Promote to the 2FA prompt — keep password in state so the
+            // server has both halves to verify together.
+            setNeedsTwoFactor(true)
+            setError(needsTwoFactor ? (result.error ?? "Code didn't match") : "")
+          } else {
+            setError(result.error ?? "Invalid credentials")
+          }
         } else {
           // refresh() invalidates the cached layout payload so the parent
           // RootLayout re-runs with the new session and renders the sidebar.
@@ -239,6 +255,29 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                   autoComplete="new-password"
                   className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                 />
+              </div>
+            )}
+
+            {needsTwoFactor && effectiveMode === "login" && (
+              <div className="space-y-2 animate-in fade-in-0 slide-in-from-top-1 duration-200">
+                <label htmlFor="twoFactor" className="text-sm font-medium text-foreground">
+                  Authenticator code
+                </label>
+                <input
+                  id="twoFactor"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                  placeholder="6-digit code or recovery code"
+                  maxLength={12}
+                  className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm tracking-widest text-center font-mono placeholder:text-muted-foreground placeholder:font-sans placeholder:tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
+                />
+                <p className="text-[11px] text-muted-foreground/80">
+                  Open your authenticator app for a code, or use a recovery code if you lost your phone.
+                </p>
               </div>
             )}
 

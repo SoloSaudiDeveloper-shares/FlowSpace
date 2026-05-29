@@ -180,6 +180,127 @@ try {
   console.error("[migration] reminders.bot_fired_at:", err)
 }
 
+// ─── Two-factor authentication (per-user) ──────────────────────────────
+// `totp_secret`: base32 secret stored once enrolled; null = 2FA off
+// `totp_enabled`: 1 once the user has verified at least one code (so
+//                 we don't lock people out of accounts they haven't
+//                 finished enrolling yet)
+// `totp_recovery_hashes`: JSON array of SHA-256 hashes; each one-time
+//                         use. Re-issued whenever the user resets 2FA.
+try {
+  const cols = sqlite.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]
+  const has = (n: string) => cols.some((c) => c.name === n)
+  if (!has("totp_secret"))           sqlite.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT`)
+  if (!has("totp_enabled"))          sqlite.exec(`ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0`)
+  if (!has("totp_recovery_hashes"))  sqlite.exec(`ALTER TABLE users ADD COLUMN totp_recovery_hashes TEXT`)
+} catch (err) {
+  console.error("[migration] users.totp_*:", err)
+}
+
+// ─── Personal API tokens (per-user) ────────────────────────────────────
+// Long-lived bearer tokens for scripts / integrations that don't want to
+// log in interactively. Each token: SHA-256 hashed, scope label, last
+// used timestamp. Users can revoke any token from Settings → Account.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS api_tokens (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    token_hash  TEXT NOT NULL UNIQUE,
+    last_used_at TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at  TEXT
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);`)
+
+// ─── Inbound emails (for Email IN) ─────────────────────────────────────
+// One row per received email. Default state is `pending` — the user
+// approves them via the bell badge, just like Telegram-import flow.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS inbound_emails (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    from_addr   TEXT NOT NULL,
+    from_name   TEXT,
+    subject     TEXT NOT NULL DEFAULT '',
+    body_text   TEXT NOT NULL DEFAULT '',
+    body_html   TEXT,
+    status      TEXT NOT NULL DEFAULT 'pending',  -- pending | imported | dismissed
+    target_list_id TEXT,                          -- where it went after approval
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    handled_at  TEXT
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_inbound_emails_user ON inbound_emails(user_id, status);`)
+
+// ─── Habits (per-user) ─────────────────────────────────────────────────
+// A habit is "do X every day/week"; entries record check-ins. Streaks
+// are computed from entries.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS habits (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    icon        TEXT,
+    color       TEXT,
+    cadence     TEXT NOT NULL DEFAULT 'daily',  -- daily | weekly | custom
+    is_archived INTEGER NOT NULL DEFAULT 0,
+    sort_order  REAL NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS habit_entries (
+    id          TEXT PRIMARY KEY,
+    habit_id    TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+    date        TEXT NOT NULL,  -- ISO yyyy-mm-dd
+    note        TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (habit_id, date)
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_habits_user ON habits(user_id, is_archived);`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_habit_entries_date ON habit_entries(habit_id, date);`)
+
+// ─── Pomodoro sessions (per-user) ──────────────────────────────────────
+// Logging for the focus timer. Used for the home dashboard's "today's
+// focus" tile and for weekly stats.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    task_id     TEXT,
+    started_at  TEXT NOT NULL,
+    ended_at    TEXT,
+    duration_sec INTEGER NOT NULL DEFAULT 0,
+    kind        TEXT NOT NULL DEFAULT 'focus',  -- focus | short_break | long_break
+    completed   INTEGER NOT NULL DEFAULT 0
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pomodoro_user ON pomodoro_sessions(user_id, started_at);`)
+
+// ─── Google Calendar sync state (per-user) ─────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS google_calendar_sync (
+    user_id          TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    refresh_token    TEXT NOT NULL,
+    access_token     TEXT,
+    access_expires_at TEXT,
+    calendar_id      TEXT NOT NULL DEFAULT 'primary',
+    last_sync_at     TEXT,
+    enabled          INTEGER NOT NULL DEFAULT 1
+  );
+`)
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS google_calendar_events (
+    task_id     TEXT PRIMARY KEY,
+    event_id    TEXT NOT NULL,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+
 // ─── Telegram digest preferences (per-bot) ─────────────────────────────
 try {
   const cols = sqlite.prepare(`PRAGMA table_info(telegram_bots)`).all() as { name: string }[]
