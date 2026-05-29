@@ -116,16 +116,25 @@ export async function transcribeTelegramVoice(
   }
   form.append("response_format", "json")
 
+  // Allow a self-hosted Whisper endpoint to take over by setting
+  // TELEGRAM_VOICE_LOCAL_URL (e.g. http://127.0.0.1:8001/v1). Falls
+  // back to Groq when unset. The local endpoint exposes the same
+  // /audio/transcriptions shape so the body/form stay identical.
+  const localUrl = process.env.TELEGRAM_VOICE_LOCAL_URL?.replace(/\/+$/, "")
+  const endpoint = localUrl
+    ? `${localUrl}/audio/transcriptions`
+    : "https://api.groq.com/openai/v1/audio/transcriptions"
+  // Faster-whisper-server doesn't require a key; Groq does.
+  const headers: Record<string, string> = {}
+  if (!localUrl && groqApiKey) headers.Authorization = `Bearer ${groqApiKey}`
+
   try {
-    const res = await fetch(
-      "https://api.groq.com/openai/v1/audio/transcriptions",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${groqApiKey}` },
-        body: form,
-        signal: AbortSignal.timeout(30_000),
-      },
-    )
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: form,
+      signal: AbortSignal.timeout(60_000),
+    })
     if (!res.ok) {
       const txt = await res.text().catch(() => "")
       const friendly =
