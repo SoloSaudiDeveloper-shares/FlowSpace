@@ -285,7 +285,7 @@ async function addToDefaultList(bot: BotRow, text: string): Promise<string> {
   // Smart-capture: pull out `!high`/`!urgent` priority, `@YYYY-MM-DD` due
   // date, and `#tag`s from the message. The rest becomes the title.
   const captured = parseSmartCapture(text)
-  addTodoItemRaw(listId, captured.title, {
+  const newId = addTodoItemRaw(listId, captured.title, {
     dueDate: captured.dueDate,
     notes: captured.tags.length > 0 ? captured.tags.map((t) => `#${t}`).join(" ") : undefined,
   })
@@ -295,10 +295,11 @@ async function addToDefaultList(bot: BotRow, text: string): Promise<string> {
   if (captured.dueDate)  hits.push(`due *${captured.dueDate}*`)
   if (captured.tags.length) hits.push(`tags ${captured.tags.map((t) => `\`#${t}\``).join(" ")}`)
   const detail = hits.length > 0 ? `\n· captured: ${hits.join(" · ")}` : ""
-  return renderBotReply(bot.user_id, "capture_added", {
+  const body = renderBotReply(bot.user_id, "capture_added", {
     list: escapeMd(getElementTitle(listId) ?? "Inbox"),
     detail,
   })
+  return `__UNDO:todo:${newId}__\n${body}`
 }
 
 /**
@@ -896,7 +897,7 @@ function addTodoItemRaw(
   listId: string,
   title: string,
   extras: { dueDate?: string | null; notes?: string } = {},
-) {
+): string {
   const id = createId()
   // Find current max sort order so new items land at the end.
   const max = sqlite
@@ -909,6 +910,43 @@ function addTodoItemRaw(
     )
     .run(id, listId, title, max.m + 1, extras.dueDate ?? null, extras.notes ?? null)
   sqlite.prepare(`UPDATE elements SET updated_at = datetime('now') WHERE id = ?`).run(listId)
+  return id
+}
+
+/**
+ * Magic prefix the webhook layer recognises and converts into an inline
+ * keyboard with an "↩️ Undo" button. We stick the new todo's ID into the
+ * prefix so the callback can delete the right row. Stripped from the
+ * actual message body before posting.
+ *
+ * Format: `__UNDO:todo:<id>__\n<rest of reply>`
+ */
+const UNDO_PREFIX_RE = /^__UNDO:todo:([A-Za-z0-9_-]+)__\n/
+
+export function parseUndoMarker(reply: string): {
+  text: string
+  todoId: string | null
+} {
+  const m = reply.match(UNDO_PREFIX_RE)
+  if (!m) return { text: reply, todoId: null }
+  return { text: reply.slice(m[0].length), todoId: m[1] }
+}
+
+export function softDeleteTodoForUser(
+  userId: string,
+  todoId: string,
+): boolean {
+  // Verify ownership through the list element, then delete the item.
+  const ok = sqlite
+    .prepare(
+      `SELECT 1 FROM todo_items ti
+       INNER JOIN elements e ON e.id = ti.list_id
+        WHERE ti.id = ? AND e.created_by = ?`,
+    )
+    .get(todoId, userId) as { 1: number } | undefined
+  if (!ok) return false
+  sqlite.prepare(`DELETE FROM todo_items WHERE id = ?`).run(todoId)
+  return true
 }
 
 // Call createElement on behalf of a user — bypasses the require-auth check

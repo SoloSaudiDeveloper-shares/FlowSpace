@@ -22,11 +22,20 @@ import nodemailer, { type Transporter } from "nodemailer"
  *                         email bodies (set in env, not here).
  */
 
+export interface EmailAttachment {
+  filename: string
+  /** Buffer (preferred for binary like xlsx/pdf) or a UTF-8 string. */
+  content: Buffer | string
+  /** MIME type. Resend infers it from filename but supplying it is safer. */
+  contentType?: string
+}
+
 export interface EmailMessage {
   to: string
   subject: string
   html: string
   text?: string
+  attachments?: EmailAttachment[]
 }
 
 export type SendResult = { ok: true } | { ok: false; error: string }
@@ -57,6 +66,16 @@ async function sendViaResend(msg: EmailMessage): Promise<SendResult> {
         subject: msg.subject,
         html: msg.html,
         text: msg.text,
+        attachments: msg.attachments?.map((a) => ({
+          filename: a.filename,
+          // Resend wants base64-encoded content over JSON. We accept
+          // either a Buffer (binary like xlsx/pdf) or a UTF-8 string.
+          content:
+            typeof a.content === "string"
+              ? Buffer.from(a.content, "utf8").toString("base64")
+              : Buffer.from(a.content).toString("base64"),
+          contentType: a.contentType,
+        })),
       }),
     })
     if (!res.ok) {
@@ -98,6 +117,11 @@ async function sendViaGmail(msg: EmailMessage): Promise<SendResult> {
       subject: msg.subject,
       html: msg.html,
       text: msg.text,
+      attachments: msg.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     })
     return { ok: true }
   } catch (err) {

@@ -132,7 +132,14 @@ export function AdminContent({
 }: AdminContentProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview")
   const [isPending, startTransition] = useTransition()
+  const [searchQuery, setSearchQuery] = useState("")
   const router = useRouter()
+
+  // Per-tab fuzzy filter source. Each tab's content reads searchQuery
+  // and decides what to hide; the search box itself just stores the
+  // string and shows a clear-button when there's text.
+  const q = searchQuery.trim().toLowerCase()
+  const isSearching = q.length > 0
 
   // ─── Backup Actions ───────────────────────────────────────────
 
@@ -214,12 +221,34 @@ export function AdminContent({
             </button>
           )
         })}
-        {isPending && (
-          <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
-            Updating...
+        <div className="ml-auto flex items-center gap-2 pb-1">
+          <div className="relative">
+            <svg
+              className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/60"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+            </svg>
+            <input
+              type="search"
+              placeholder="Search this tab…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 w-44 sm:w-56 rounded-md border border-input bg-background pl-7 pr-2 text-xs placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
           </div>
-        )}
+          {isPending && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" />
+              Updating…
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tab Content */}
@@ -236,21 +265,49 @@ export function AdminContent({
       )}
       {activeTab === "users" && (
         <UsersTab
-          users={users}
+          users={
+            isSearching
+              ? users.filter((u: any) =>
+                  [u.username, u.displayName, u.email, u.role]
+                    .filter(Boolean)
+                    .some((v: string) => v.toLowerCase().includes(q)),
+                )
+              : users
+          }
           onToggleActive={handleToggleUserActive}
           isPending={isPending}
         />
       )}
       {activeTab === "backups" && (
         <BackupsTab
-          backups={backups}
+          backups={
+            isSearching
+              ? backups.filter((b: any) =>
+                  [b.name, b.description, b.kind]
+                    .filter(Boolean)
+                    .some((v: string) => v.toLowerCase().includes(q)),
+                )
+              : backups
+          }
           onCreateBackup={handleCreateBackup}
           onDeleteBackup={handleDeleteBackup}
           onRestoreBackup={handleRestoreBackup}
           isPending={isPending}
         />
       )}
-      {activeTab === "events" && <EventsTab events={events} />}
+      {activeTab === "events" && (
+        <EventsTab
+          events={
+            isSearching
+              ? events.filter((e: any) =>
+                  [e.event_type, e.eventType, e.details, e.message, e.username, e.user]
+                    .filter(Boolean)
+                    .some((v: string) => String(v).toLowerCase().includes(q)),
+                )
+              : events
+          }
+        />
+      )}
       {activeTab === "database" && <DatabaseTab dbStats={dbStats} />}
       {activeTab === "integrations" && <IntegrationsTab />}
     </div>

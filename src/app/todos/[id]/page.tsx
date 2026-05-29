@@ -13,6 +13,7 @@ import { ElementLinker } from "@/components/shared/element-linker"
 import { PageContextMenu } from "@/components/shared/page-context-menu"
 import { WatchButton } from "@/components/shared/watch-button"
 import { SendEmailButton } from "@/components/shared/send-email-button"
+import { ExportXlsxButton } from "@/components/shared/export-xlsx-button"
 
 export default async function TodoListPage({
   params,
@@ -43,6 +44,7 @@ export default async function TodoListPage({
         </span>
         <span className="text-sm font-medium truncate">{element.title}</span>
         <div className="ml-auto flex items-center gap-1">
+          <ExportXlsxButton listId={element.id} />
           <SendEmailButton elementId={element.id} />
           <WatchButton
             elementId={element.id}

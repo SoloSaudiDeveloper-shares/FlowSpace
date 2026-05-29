@@ -73,6 +73,20 @@ export async function handleCallback(
       return { toast: "Cancelled", edit: mainMenu() }
     }
 
+    // Undo a capture — softdeletes the just-created todo if it still
+    // belongs to this user. Replaces the message body so the user sees
+    // the undo took effect, with no buttons (idempotent — second tap
+    // does nothing dangerous).
+    if (data.startsWith("undo:todo:")) {
+      const id = data.slice("undo:todo:".length)
+      const { softDeleteTodoForUser } = await import("@/lib/telegram/agent")
+      const ok = softDeleteTodoForUser(userId, id)
+      return {
+        toast: ok ? "Undone" : "Already gone",
+        replace: { text: ok ? "↩️ _Undone._" : "↩️ _Already gone._" },
+      }
+    }
+
     // View routes
     if (data === "v:tasks")      return { edit: tasksMenu(userId) }
     if (data === "v:projects")   return { edit: projectsMenu(userId, 0) }

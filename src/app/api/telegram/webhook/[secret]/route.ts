@@ -32,7 +32,7 @@ import {
 } from "@/lib/telegram/client"
 import { isVoiceOutEnabled, synthesizeSpeech } from "@/lib/telegram/tts"
 import type { TelegramUpdate } from "@/lib/telegram/client"
-import { dispatchTelegramMessage } from "@/lib/telegram/agent"
+import { dispatchTelegramMessage, parseUndoMarker } from "@/lib/telegram/agent"
 import { handleCallback } from "@/lib/telegram/callbacks"
 import {
   mainMenu,
@@ -317,7 +317,7 @@ export async function POST(
     }
 
     // ── Default: text-only reply via the agent dispatcher ────────────
-    const reply = await dispatchTelegramMessage(
+    const rawReply = await dispatchTelegramMessage(
       {
         user_id: bot.user_id,
         bot_token: bot.bot_token,
@@ -325,12 +325,23 @@ export async function POST(
       },
       text,
     )
+    // Agent may have stashed an undo marker on capture-success replies.
+    // Pull it out so it doesn't show in the message body; build the
+    // inline keyboard accordingly.
+    const { text: reply, todoId: undoTodoId } = parseUndoMarker(rawReply)
     logMessage(bot.user_id, "out", reply)
-    // Trailing nudge: add a single "🏠 Menu" button so a user who texted
-    // a free-form thought has a one-tap path back to the rich UI.
+    // Inline keyboard — always shows the Menu shortcut. When the reply
+    // is a capture-success, we ALSO add an "↩️ Undo" button on the same
+    // row so the user can immediately reverse a fat-finger or mistaken
+    // capture without scrolling to find the item.
+    const keyboardRow: { text: string; callback_data: string }[] = []
+    if (undoTodoId) {
+      keyboardRow.push({ text: "↩️ Undo", callback_data: `undo:todo:${undoTodoId}` })
+    }
+    keyboardRow.push({ text: "🏠 Menu", callback_data: "menu:main" })
     await sendMessage(bot.bot_token, msg.chat.id, reply, {
       parseMode: "Markdown",
-      replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+      replyMarkup: inlineKeyboard([keyboardRow]),
     })
     // Voice OUT — if the user opted in, also send a TTS rendering. This
     // is fire-and-forget so a slow TTS provider can't hold up the
