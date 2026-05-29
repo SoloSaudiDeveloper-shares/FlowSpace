@@ -265,34 +265,82 @@ export function SettingsContent() {
     { label: "30 days", min: 30 * 1440 },
   ]
 
-  // ── Settings navigation (in-page anchor links) ──────────────────
+  // ── Top-tab groups — each tab gathers a few related sub-sections ──
+  type SettingsGroup =
+    | "account"
+    | "data"
+    | "look"
+    | "integrations"
+    | "help"
+  const SETTINGS_GROUPS: { id: SettingsGroup; label: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
+    { id: "account",      label: "Account",      icon: KeyIcon,  description: "Sign-in, password, workspace administration." },
+    { id: "data",         label: "Data",         icon: Database, description: "Export your data and define custom fields." },
+    { id: "look",         label: "Look & feel",  icon: Palette,  description: "Theme, sidebar, clock, feed ticker, Gantt." },
+    { id: "integrations", label: "Integrations", icon: Sparkles, description: "Voice, AI provider, Telegram bot." },
+    { id: "help",         label: "Help",         icon: Info,     description: "Keyboard shortcuts and app info." },
+  ]
+
+  // ── Settings navigation (in-page anchor links within each tab) ──
   const SETTINGS_NAV: {
     id: string
     label: string
     icon: React.ComponentType<{ className?: string }>
     description: string
     ownerOnly?: boolean
+    group: SettingsGroup
   }[] = [
-    { id: "account",        label: "Account",       icon: KeyIcon,    description: "Your personal sign-in details. Change your password — other devices get signed out automatically." },
-    { id: "workspace",      label: "Workspace",     icon: Shield,     ownerOnly: true, description: "Owner-only controls. Allow or block new signups, set how long user sessions stay valid." },
-    { id: "data-export",    label: "Data export",   icon: Database,   description: "Export everything you own — projects, pages, tasks, comments — as JSON or spreadsheet-friendly formats. For backups and migrations." },
-    { id: "custom-fields",  label: "Custom fields", icon: Settings2,  description: "Define your own fields (text, number, select, date, etc.) and attach them to elements or tasks. Use these to model anything your work needs." },
-    { id: "appearance",     label: "Appearance",    icon: Palette,    description: "Font, font size, accent color, border radius. The whole UI re-themes instantly when you change these." },
-    { id: "sidebar",        label: "Sidebar",       icon: PanelLeft,  description: "Show/hide and reorder the sidebar sections. Give them custom names that fit your workflow." },
-    { id: "clock",          label: "Clock",         icon: ClockIcon,  description: "The clock pinned in the corner. Right-click it for quick changes (color, format) or use this section for finer control." },
-    { id: "feed-ticker",    label: "Feed ticker",   icon: Rss,        description: "The scrolling activity bar at the top of every page. Choose top or bottom, direction, speed." },
-    { id: "gantt",          label: "Gantt chart",   icon: BarChart2,  description: "Which fields show in Gantt task tooltips." },
-    { id: "speech",         label: "Speech",        icon: Mic,        description: "Voice input. Pick between the browser's built-in Web Speech API (Chrome/Edge, fast) or a local Whisper model (private, all browsers, downloads a model)." },
-    { id: "ai",             label: "AI features",   icon: Sparkles,   description: "Hook the AI features up to a provider — local Ollama, OpenAI, Gemini, LM Studio, or any custom OpenAI-compatible endpoint. Keys stay in your browser." },
-    { id: "telegram",       label: "Telegram",      icon: Bot,        description: "Connect your own Telegram bot. Text it from anywhere — ideas become real items in FlowSpace. Each user has their own bot; nothing is shared." },
-    { id: "shortcuts",      label: "Shortcuts",     icon: Keyboard,   description: "Keyboard shortcuts reference. Saves you a lot of clicking once you remember a few." },
-    { id: "about",          label: "About",         icon: Info,       description: "Version info and project links." },
+    { id: "account",        label: "Account",       icon: KeyIcon,    group: "account",      description: "Your personal sign-in details. Change your password — other devices get signed out automatically." },
+    { id: "workspace",      label: "Workspace",     icon: Shield,     group: "account", ownerOnly: true, description: "Owner-only controls. Allow or block new signups, set how long user sessions stay valid." },
+    { id: "data-export",    label: "Data export",   icon: Database,   group: "data",         description: "Export everything you own — projects, pages, tasks, comments — as JSON or spreadsheet-friendly formats. For backups and migrations." },
+    { id: "custom-fields",  label: "Custom fields", icon: Settings2,  group: "data",         description: "Define your own fields (text, number, select, date, etc.) and attach them to elements or tasks. Use these to model anything your work needs." },
+    { id: "appearance",     label: "Appearance",    icon: Palette,    group: "look",         description: "Font, font size, accent color, border radius. The whole UI re-themes instantly when you change these." },
+    { id: "sidebar",        label: "Sidebar",       icon: PanelLeft,  group: "look",         description: "Show/hide and reorder the sidebar sections. Give them custom names that fit your workflow." },
+    { id: "clock",          label: "Clock",         icon: ClockIcon,  group: "look",         description: "The clock pinned in the corner. Right-click it for quick changes (color, format) or use this section for finer control." },
+    { id: "feed-ticker",    label: "Feed ticker",   icon: Rss,        group: "look",         description: "The scrolling activity bar at the top of every page. Choose top or bottom, direction, speed." },
+    { id: "gantt",          label: "Gantt chart",   icon: BarChart2,  group: "look",         description: "Which fields show in Gantt task tooltips." },
+    { id: "speech",         label: "Speech",        icon: Mic,        group: "integrations", description: "Voice input. Pick between the browser's built-in Web Speech API (Chrome/Edge, fast) or a local Whisper model (private, all browsers, downloads a model)." },
+    { id: "ai",             label: "AI features",   icon: Sparkles,   group: "integrations", description: "Hook the AI features up to a provider — local Ollama, OpenAI, Gemini, LM Studio, or any custom OpenAI-compatible endpoint. Keys stay in your browser." },
+    { id: "telegram",       label: "Telegram",      icon: Bot,        group: "integrations", description: "Connect your own Telegram bot. Text it from anywhere — ideas become real items in FlowSpace. Each user has their own bot; nothing is shared." },
+    { id: "shortcuts",      label: "Shortcuts",     icon: Keyboard,   group: "help",         description: "Keyboard shortcuts reference. Saves you a lot of clicking once you remember a few." },
+    { id: "about",          label: "About",         icon: Info,       group: "help",         description: "Version info and project links." },
   ]
+
+  // ── Active top-tab group — controls which sub-sections render ──
+  const [activeGroup, setActiveGroup] = useState<SettingsGroup>("account")
+  const groupSectionIds = new Set(
+    SETTINGS_NAV.filter((s) => s.group === activeGroup && (!s.ownerOnly || isOwner)).map(
+      (s) => s.id,
+    ),
+  )
 
   // Track which section is most-visible so we can fade the others out + highlight the matching nav item.
   const [activeSectionId, setActiveSectionId] = useState<string>(SETTINGS_NAV[0].id)
+
+  // Hide sections that aren't part of the active top-tab group. Using
+  // the `hidden` attribute (not CSS display:none) keeps the layout simple
+  // and avoids interfering with smooth-scroll-into-view on tab switch.
   useEffect(() => {
-    const ids = SETTINGS_NAV.map((s) => s.id)
+    SETTINGS_NAV.forEach((s) => {
+      const el = document.getElementById(s.id)
+      if (!el) return
+      const inGroup = s.group === activeGroup && (!s.ownerOnly || isOwner)
+      el.toggleAttribute("hidden", !inGroup)
+    })
+    // Scroll to the first section of the new tab.
+    const first = SETTINGS_NAV.find(
+      (s) => s.group === activeGroup && (!s.ownerOnly || isOwner),
+    )
+    if (first) {
+      setActiveSectionId(first.id)
+      requestAnimationFrame(() => {
+        document.getElementById(first.id)?.scrollIntoView({ behavior: "auto", block: "start" })
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGroup, isOwner])
+
+  useEffect(() => {
+    const ids = SETTINGS_NAV.filter((s) => groupSectionIds.has(s.id)).map((s) => s.id)
     const elements = ids
       .map((id) => document.getElementById(id))
       .filter((el): el is HTMLElement => !!el)
@@ -314,9 +362,10 @@ export function SettingsContent() {
     )
     elements.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
-    // SETTINGS_NAV is stable per render; we want to observe after sections mount
+    // SETTINGS_NAV is stable per render; we re-observe whenever the active
+    // top-tab changes since the section set changes with it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOwner])
+  }, [isOwner, activeGroup])
 
   function scrollToSection(id: string) {
     setActiveSectionId(id)
@@ -334,17 +383,46 @@ export function SettingsContent() {
   }, [activeSectionId])
 
   return (
-    <div className="flex" data-active-section={activeSectionId}>
-      {/* ─── Sticky section nav, sidebar-style — md+ only ───────────── */}
+    <div className="flex flex-col" data-active-section={activeSectionId} data-active-group={activeGroup}>
+      {/* ─── Top tab bar — mirrors the admin page chrome ──────────────── */}
+      <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 px-6">
+        <div className="flex items-center gap-1 pt-3">
+          {SETTINGS_GROUPS.map((g) => {
+            const Icon = g.icon
+            const isActive = activeGroup === g.id
+            return (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setActiveGroup(g.id)}
+                aria-current={isActive ? "true" : undefined}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-md transition-colors border-b-2 -mb-px ${
+                  isActive
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+                }`}
+              >
+                <Icon className="size-3.5" />
+                {g.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="flex">
+      {/* ─── In-tab sub-section rail — md+ only ──────────────────────── */}
       <nav
-        className="sticky top-0 self-start hidden md:flex flex-col gap-0.5 w-52 shrink-0 border-r border-border/40 bg-card/30 max-h-screen overflow-y-auto p-3"
-        aria-label="Settings sections"
+        className="sticky top-12 self-start hidden md:flex flex-col gap-0.5 w-52 shrink-0 border-r border-border/40 bg-card/30 max-h-[calc(100vh-3rem)] overflow-y-auto p-3"
+        aria-label="Settings sub-sections"
       >
         <div className="px-2 pb-2 pt-1 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium flex items-center gap-1.5">
           <Settings2 className="size-3" />
-          Settings
+          {SETTINGS_GROUPS.find((g) => g.id === activeGroup)?.label}
         </div>
-        {SETTINGS_NAV.filter((s) => !s.ownerOnly || isOwner).map((s) => {
+        {SETTINGS_NAV.filter(
+          (s) => s.group === activeGroup && (!s.ownerOnly || isOwner),
+        ).map((s) => {
           const Icon = s.icon
           const isActive = activeSectionId === s.id
           return (
@@ -1979,6 +2057,7 @@ export function SettingsContent() {
 
       {/* ─── Description panel (xl+ only) ──────────────────────────── */}
       <DescriptionPanel item={activeNavItem} />
+      </div>{/* /flex (in-tab rail + main + description) */}
     </div>
   )
 }
