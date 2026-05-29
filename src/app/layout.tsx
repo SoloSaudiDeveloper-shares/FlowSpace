@@ -15,6 +15,7 @@ import { KeyboardShortcuts } from "@/components/layout/keyboard-shortcuts"
 import { TopbarClock } from "@/components/layout/topbar-clock"
 import { TaskTimerWidget } from "@/components/layout/task-timer-widget"
 import { MainShell } from "@/components/layout/main-shell"
+import { PWABootstrap } from "@/components/layout/pwa-bootstrap"
 import { Toaster } from "sonner"
 import { getElements, getFavoriteElements } from "@/lib/actions/element-actions"
 import { getCurrentUser, hasAnyUsers } from "@/lib/actions/user-actions"
@@ -47,6 +48,20 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "FlowSpace",
   description: "Your personal productivity workspace",
+  manifest: "/manifest.json",
+  themeColor: "#0a0a0a",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "FlowSpace",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.svg", sizes: "192x192", type: "image/svg+xml" },
+      { url: "/icons/icon-512.svg", sizes: "512x512", type: "image/svg+xml" },
+    ],
+    apple: "/icons/icon-192.svg",
+  },
 }
 
 export default async function RootLayout({
@@ -106,6 +121,7 @@ export default async function RootLayout({
                 )}
               </SidebarProvider>
               <Toaster richColors position="bottom-right" />
+              <PWABootstrap />
             </TooltipProvider>
             </AIProvider>
             </SpeechProvider>
