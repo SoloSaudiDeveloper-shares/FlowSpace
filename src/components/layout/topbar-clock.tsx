@@ -130,6 +130,17 @@ export function TopbarClock() {
     ctx.open(e, items)
   }
 
+  // Long-press → same context menu as right-click. The hook synthesises
+  // a React.PointerEvent so we cast it to MouseEvent-shape for
+  // handleContextMenu which only reads clientX/clientY + preventDefault.
+  //
+  // MUST be declared before any early return — calling a hook
+  // conditionally violates the Rules of Hooks (the clock early-returns
+  // null when hidden / not-yet-hydrated).
+  const longPress = useLongPress((e) => {
+    handleContextMenu(e as unknown as React.MouseEvent)
+  }, 500)
+
   if (!clock.show || !now) return null
 
   const accent = clock.accentColor || undefined
@@ -138,13 +149,6 @@ export function TopbarClock() {
   const altStr = clock.secondTimezoneLabel
     ? formatInTimezone(now, clock.secondTimezoneLabel, clock.format24, clock.showSeconds)
     : null
-
-  // Long-press → same context menu as right-click. The hook synthesises
-  // a React.PointerEvent so we cast it to MouseEvent-shape for
-  // handleContextMenu which only reads clientX/clientY + preventDefault.
-  const longPress = useLongPress((e) => {
-    handleContextMenu(e as unknown as React.MouseEvent)
-  }, 500)
 
   // Common wrapper for drag + context menu
   const wrapperCls = `z-30 select-none flex flex-col items-end gap-1 ${

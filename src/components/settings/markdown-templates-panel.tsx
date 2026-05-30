@@ -199,36 +199,38 @@ function TemplateCard({ template }: { template: Template }) {
 
   return (
     <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-start gap-3 px-3 py-3 text-left hover:bg-accent/30 transition-colors"
-        aria-expanded={open}
-      >
-        <ChevronDown
-          className={`size-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
-        />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">{template.title}</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">
-            {template.description}
-          </p>
-        </div>
+      {/* Header row — a div (not a button) so the Copy button can live
+          inside without nesting <button> in <button> (invalid HTML /
+          hydration error). The expand toggle is its own button. */}
+      <div className="w-full flex items-start gap-3 px-3 py-3 hover:bg-accent/30 transition-colors">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-start gap-3 flex-1 min-w-0 text-left"
+          aria-expanded={open}
+        >
+          <ChevronDown
+            className={`size-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${
+              open ? "rotate-180" : ""
+            }`}
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">{template.title}</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">
+              {template.description}
+            </p>
+          </div>
+        </button>
         <Button
           variant="ghost"
           size="sm"
           className="h-7 text-xs gap-1.5 shrink-0"
-          onClick={(e) => {
-            e.stopPropagation()
-            handleCopy()
-          }}
+          onClick={handleCopy}
         >
           {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
           {copied ? "Copied" : "Copy"}
         </Button>
-      </button>
+      </div>
 
       {open && (
         <div className="border-t bg-background/40">

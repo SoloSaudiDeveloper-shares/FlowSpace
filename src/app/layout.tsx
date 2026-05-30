@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Inter, Plus_Jakarta_Sans, DM_Sans } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -53,7 +53,6 @@ export const metadata: Metadata = {
   title: "FlowSpace",
   description: "Your personal productivity workspace",
   manifest: "/manifest.json",
-  themeColor: "#0a0a0a",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -66,6 +65,11 @@ export const metadata: Metadata = {
     ],
     apple: "/icons/icon-192.svg",
   },
+}
+
+// Next.js 15: themeColor belongs in the viewport export, not metadata.
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
 }
 
 export default async function RootLayout({
