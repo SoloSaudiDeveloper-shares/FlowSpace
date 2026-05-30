@@ -693,7 +693,7 @@ export const templates = sqliteTable("templates", {
   name: text("name").notNull(),
   description: text("description"),
   type: text("type", {
-    enum: ["project", "task", "checklist", "page", "canvas", "process", "dashboard", "form"],
+    enum: ["project", "task", "checklist", "page", "canvas", "process", "todo_list", "dashboard", "form"],
   }).notNull(),
   icon: text("icon"),
   color: text("color"),

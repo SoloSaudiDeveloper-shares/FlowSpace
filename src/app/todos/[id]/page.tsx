@@ -14,6 +14,7 @@ import { PageContextMenu } from "@/components/shared/page-context-menu"
 import { WatchButton } from "@/components/shared/watch-button"
 import { SendEmailButton } from "@/components/shared/send-email-button"
 import { ExportXlsxButton } from "@/components/shared/export-xlsx-button"
+import { SaveAsTemplateButton } from "@/components/shared/save-as-template-button"
 
 export default async function TodoListPage({
   params,
@@ -44,6 +45,7 @@ export default async function TodoListPage({
         </span>
         <span className="text-sm font-medium truncate">{element.title}</span>
         <div className="ml-auto flex items-center gap-1">
+          <SaveAsTemplateButton elementId={element.id} initialName={element.title} />
           <ExportXlsxButton listId={element.id} />
           <SendEmailButton elementId={element.id} />
           <WatchButton

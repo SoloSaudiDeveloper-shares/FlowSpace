@@ -13,14 +13,15 @@ import {
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Hint } from "@/components/shared/hint"
-import { saveProjectAsTemplate } from "@/lib/actions/save-as-template-actions"
+import { saveElementAsTemplate } from "@/lib/actions/save-as-template-actions"
 
 interface Props {
-  projectId: string
+  /** Any element id — project, canvas, todo list, process, or page. */
+  elementId: string
   initialName?: string
 }
 
-export function SaveAsTemplateButton({ projectId, initialName }: Props) {
+export function SaveAsTemplateButton({ elementId, initialName }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(initialName ?? "")
@@ -31,8 +32,8 @@ export function SaveAsTemplateButton({ projectId, initialName }: Props) {
     if (!name.trim() || saving) return
     setSaving(true)
     try {
-      const r = await saveProjectAsTemplate({
-        projectId,
+      const r = await saveElementAsTemplate({
+        elementId,
         templateName: name.trim(),
         templateDescription: description.trim() || undefined,
       })
@@ -72,8 +73,8 @@ export function SaveAsTemplateButton({ projectId, initialName }: Props) {
               Save as template
             </DialogTitle>
             <DialogDescription>
-              Snapshots the structure — statuses, tasks, subtasks. Dates
-              and assignees are intentionally left out.
+              Snapshots the structure so you can reuse it. Dates,
+              completion, and assignees are intentionally left out.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

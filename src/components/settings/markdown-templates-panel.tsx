@@ -30,127 +30,137 @@ interface Template {
   body: string
 }
 
+// NOTE: these bodies MUST match the AI-import parser (src/lib/import/
+// ai-import-parser.ts): header is `# <Type>: <Title>`, priority is
+// `(high)` in parens, dates are ISO `@YYYY-MM-DD`, tags go on a `Tags:`
+// line, and only `## Tasks` / `## Notes` are recognized sections. Earlier
+// versions used `!high` / `@today` / `#tag` and a header with no Type,
+// which the parser rejected (it returned null — "didn't recognize it").
 const TEMPLATES: Template[] = [
   {
     slug: "sprint-kickoff",
     title: "Sprint kickoff",
     description:
-      "Two-week sprint with goals, capacity check-in, first slate of tasks. Paste into the importer to spin up a fresh project board.",
-    body: `# Sprint 24 — Two-week kickoff
-
-> One paragraph about the sprint's theme — what we're trying to learn,
-> ship, or unblock. Keep it short; you'll forget the rest anyway.
-
-## Goals
-- [ ] Goal 1 — measurable, single sentence
-- [ ] Goal 2 — measurable, single sentence
-- [ ] Goal 3 — measurable, single sentence
+      "Two-week sprint with goals + the first slate of tasks. Paste into the importer to spin up a fresh project board.",
+    body: `# Project: Sprint kickoff
+Status: active
+Tags: sprint, planning
 
 ## Tasks
-- [ ] Kickoff meeting !high @today
-- [ ] Spec writeup @tomorrow #docs
-- [ ] Implement feature A !high #release
+- [ ] (high) Kickoff meeting
+- [ ] Spec writeup
+- [ ] (high) Implement feature A
 - [ ] Implement feature B
-- [ ] Code review pass !medium #review
-- [ ] Demo to stakeholders @next-week
+- [ ] (medium) Code review pass
+- [ ] Demo to stakeholders
 - [ ] Retrospective notes
+
+## Notes
+Two-week sprint. One paragraph about the theme — what we're trying to
+learn, ship, or unblock.
+
+Goals:
+- Goal 1 — measurable, single sentence
+- Goal 2 — measurable, single sentence
+- Goal 3 — measurable, single sentence
 `,
   },
   {
     slug: "content-calendar",
     title: "Content calendar (weekly)",
     description:
-      "Plan out a week of content — blog, social, email — with due dates and channel tags.",
-    body: `# Content week — May 27
-
-## Goals
-- [ ] Publish 1 long-form post
-- [ ] 5 social posts (1/day weekdays)
-- [ ] 1 newsletter
+      "Plan a week of content — blog, social, email — as a project board.",
+    body: `# Project: Content calendar (weekly)
+Status: active
+Tags: content, marketing
 
 ## Tasks
-- [ ] Blog: "Title here" !high @2026-05-29 #blog
-- [ ] Outline + research @today #blog
-- [ ] First draft @tomorrow #blog
-- [ ] Edit pass #blog
-- [ ] Twitter thread @2026-05-28 #social
-- [ ] LinkedIn post @2026-05-29 #social
-- [ ] Newsletter draft @2026-05-30 #email
-- [ ] Newsletter send @2026-05-31 !urgent #email
+- [ ] (high) Blog: "Title here"
+- [ ] Outline + research
+- [ ] First draft
+- [ ] Edit pass
+- [ ] Twitter thread
+- [ ] LinkedIn post
+- [ ] Newsletter draft
+- [ ] (urgent) Newsletter send
+
+## Notes
+Plan a week of content. Goals: 1 long-form post, 5 social posts
+(1/weekday), 1 newsletter.
 `,
   },
   {
     slug: "okr-review",
     title: "Quarterly OKR review",
     description:
-      "Structured review of last quarter's OKRs + drafting next quarter's. Used as a project so each OKR can have its own task list.",
-    body: `# Q2 2026 — OKR review
-
-> 90-minute review session. Score each KR 0.0–1.0, write a one-line
-> learning per objective, draft next quarter's objectives.
+      "Structured review of last quarter's OKRs + drafting next quarter's, as a project so each step is a task.",
+    body: `# Project: Quarterly OKR review
+Status: active
+Tags: okr, review
 
 ## Tasks
-- [ ] Review O1: <objective> — score each KR !high
-- [ ] Review O2: <objective> — score each KR !high
-- [ ] Review O3: <objective> — score each KR !high
-- [ ] Cross-cut: what surprised us this quarter? #retro
-- [ ] Cross-cut: what slipped + why? #retro
-- [ ] Cross-cut: what should we stop doing? #retro
-- [ ] Draft Q3 objectives !urgent @next-week
+- [ ] (high) Review O1: <objective> — score each KR
+- [ ] (high) Review O2: <objective> — score each KR
+- [ ] (high) Review O3: <objective> — score each KR
+- [ ] Cross-cut: what surprised us this quarter?
+- [ ] Cross-cut: what slipped + why?
+- [ ] Cross-cut: what should we stop doing?
+- [ ] (urgent) Draft next quarter's objectives
 - [ ] Stakeholder review of drafts
-- [ ] Publish final Q3 OKRs
+- [ ] Publish final OKRs
+
+## Notes
+90-minute review session. Score each KR 0.0–1.0, write a one-line
+learning per objective, draft next quarter's objectives.
 `,
   },
   {
     slug: "weekly-1on1",
     title: "Weekly 1:1 agenda",
     description:
-      "Recurring agenda for a 1:1 with a teammate. Reuse weekly — copy + change the date.",
-    body: `# 1:1 with <name> — 2026-05-29
+      "Recurring agenda for a 1:1 with a teammate. Reuse weekly.",
+    body: `# Project: Weekly 1:1 agenda
+Status: active
+Tags: 1on1
 
-## Quick check-in
+## Tasks
 - [ ] Energy level / blockers
 - [ ] Anything off your plate I can take?
+- [ ] Their topic 1
+- [ ] Their topic 2
+- [ ] My topic 1
+- [ ] My topic 2
+- [ ] Follow-ups from last week
+- [ ] Actions out of this 1:1
 
-## Their topics
-- [ ]
-- [ ]
-
-## My topics
-- [ ]
-- [ ]
-
-## Follow-ups (from last week)
-- [ ]
-
-## Actions out of this 1:1
-- [ ] @today
-- [ ] @tomorrow
+## Notes
+Recurring 1:1 agenda. Reuse weekly — copy and adjust.
 `,
   },
   {
     slug: "design-review",
     title: "Design review",
     description:
-      "Pre-review prep + the review itself + post-review action items. Useful for committed-to-decision design reviews.",
-    body: `# Design review — <project name>
+      "Pre-review prep + the review itself + post-review action items.",
+    body: `# Project: Design review
+Status: active
+Tags: design, review
 
-## Pre-review (owner)
-- [ ] Lock the brief — what are we deciding? !high
-- [ ] Build the option set (3+ alternatives) #design
-- [ ] Annotate trade-offs per option #design
+## Tasks
+- [ ] (high) Lock the brief — what are we deciding?
+- [ ] Build the option set (3+ alternatives)
+- [ ] Annotate trade-offs per option
 - [ ] Send agenda 24h before
-
-## Review session
 - [ ] Walk through the brief (5 min)
-- [ ] Each option, no Q (15 min)
+- [ ] Each option, no questions (15 min)
 - [ ] Open Q&A (20 min)
 - [ ] Vote / decide (10 min)
-
-## Post-review
-- [ ] Write the decision doc !urgent @tomorrow #docs
+- [ ] (urgent) Write the decision doc
 - [ ] Update related projects
 - [ ] Schedule kickoff for the chosen direction
+
+## Notes
+Pre-review prep + the review session itself + post-review action items.
 `,
   },
 ]

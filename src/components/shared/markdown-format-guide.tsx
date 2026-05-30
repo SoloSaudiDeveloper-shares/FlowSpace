@@ -55,7 +55,10 @@ export function MarkdownFormatGuide({
           hide
         </span>
       </summary>
-      <div className="px-3 pb-3 space-y-3">
+      {/* Bounded height + internal scroll so the guide can never get clipped
+          by a constrained parent (the earlier bug where the bottom of the
+          legend "disappeared" inside the import dialog's flex column). */}
+      <div className="px-3 pb-3 space-y-3 max-h-[50vh] overflow-y-auto">
         <p className="text-xs text-muted-foreground leading-relaxed">
           Write text in this format and FlowSpace turns it into a structured
           element. It works in <strong>Import from AI</strong> and when you{" "}

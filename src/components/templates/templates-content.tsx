@@ -44,6 +44,7 @@ import {
   duplicateTemplate,
 } from "@/lib/actions/template-actions"
 import { toast } from "sonner"
+import { MarkdownTemplatesPanel } from "@/components/settings/markdown-templates-panel"
 import type { templates } from "@/lib/db/schema"
 
 type Template = typeof templates.$inferSelect
@@ -314,6 +315,23 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
           New Template
         </Button>
       </div>
+
+      {/* Markdown blueprints — paste-to-import starters, surfaced here in
+          /templates (they used to live only in Settings → Help). */}
+      {typeFilter === "all" && !search && (
+        <details className="rounded-lg border border-border/60 bg-card/40">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 font-medium select-none hover:bg-accent/30 rounded-lg">
+            <Sparkles className="size-4 text-primary" />
+            Markdown blueprints
+            <span className="text-xs text-muted-foreground font-normal">
+              — paste-to-import starters (Sprint, OKR, Content calendar…)
+            </span>
+          </summary>
+          <div className="px-4 pb-4">
+            <MarkdownTemplatesPanel />
+          </div>
+        </details>
+      )}
 
       {/* Recent section */}
       {recent.length > 0 && typeFilter === "all" && !search && (

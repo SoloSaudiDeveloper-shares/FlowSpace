@@ -9,9 +9,12 @@ import {
   projects,
   taskStatuses,
   canvases,
+  canvasNodes,
+  canvasEdges,
   processes,
   processSteps,
   todoLists,
+  todoItems,
   tasks,
 } from "@/lib/db/schema"
 import { createId } from "@/lib/utils/ids"
@@ -24,7 +27,7 @@ import { currentUserId, requireAuth } from "@/lib/auth/scope"
 export async function createTemplate(data: {
   name: string
   description?: string
-  type: "project" | "task" | "checklist" | "page" | "canvas" | "process" | "dashboard" | "form"
+  type: "project" | "task" | "checklist" | "page" | "canvas" | "process" | "todo_list" | "dashboard" | "form"
   icon?: string
   color?: string
   content?: string
@@ -422,8 +425,108 @@ export async function createFromTemplate(
         updatedAt: now,
       })
 
-      await db.insert(canvases).values({ id })
+      // Canvas display config from the snapshot (falls back to defaults).
+      const cfg = (contentJson.canvas as Record<string, unknown>) || {}
+      await db.insert(canvases).values({
+        id,
+        backgroundVariant: (cfg.backgroundVariant as "dots" | "lines" | "cross" | "none") ?? "dots",
+        backgroundGap: (cfg.backgroundGap as number) ?? 20,
+        snapToGrid: Boolean(cfg.snapToGrid),
+        showMinimap: cfg.showMinimap === undefined ? true : Boolean(cfg.showMinimap),
+      })
 
+      // Recreate nodes (new IDs), then edges by node index → new ID. We drop
+      // elementRefId so templates don't carry references to specific elements.
+      const snapNodes = (contentJson.nodes as Record<string, unknown>[]) || []
+      const newNodeIds: string[] = []
+      for (const n of snapNodes) {
+        const nid = createId()
+        newNodeIds.push(nid)
+        await db.insert(canvasNodes).values({
+          id: nid,
+          canvasId: id,
+          type: (n.type as typeof canvasNodes.$inferInsert.type) ?? "card",
+          positionX: (n.positionX as number) ?? 0,
+          positionY: (n.positionY as number) ?? 0,
+          width: (n.width as number) ?? null,
+          height: (n.height as number) ?? null,
+          data: (n.data as string) ?? null,
+          style: (n.style as string) ?? null,
+        })
+      }
+      const snapEdges = (contentJson.edges as Record<string, unknown>[]) || []
+      for (const e of snapEdges) {
+        const si = e.sourceIndex as number
+        const ti = e.targetIndex as number
+        if (newNodeIds[si] && newNodeIds[ti]) {
+          await db.insert(canvasEdges).values({
+            id: createId(),
+            canvasId: id,
+            sourceNodeId: newNodeIds[si],
+            targetNodeId: newNodeIds[ti],
+            sourceHandle: (e.sourceHandle as string) ?? null,
+            targetHandle: (e.targetHandle as string) ?? null,
+            type: (e.type as string) ?? "default",
+            label: (e.label as string) ?? null,
+            style: (e.style as string) ?? null,
+            animated: Boolean(e.animated),
+          })
+        }
+      }
+
+      createdId = id
+      break
+    }
+
+    case "todo_list": {
+      const id = createId()
+      await db.insert(elements).values({
+        id,
+        type: "todo_list",
+        title,
+        icon: template.icon || "ListTodo",
+        color: template.color || "#fbbf24",
+        createdBy: user.id,
+        createdAt: now,
+        updatedAt: now,
+      })
+      await db.insert(todoLists).values({ id })
+      const snapItems = (contentJson.items as Record<string, unknown>[]) || []
+      for (let i = 0; i < snapItems.length; i++) {
+        const it = snapItems[i]
+        await db.insert(todoItems).values({
+          id: createId(),
+          listId: id,
+          title: ((it.title as string) || "Untitled").slice(0, 500),
+          notes: (it.notes as string) ?? null,
+          priority: (it.priority as "urgent" | "high" | "medium" | "low" | null) ?? null,
+          isCompleted: false,
+          sortOrder: i,
+          createdAt: now,
+        })
+      }
+      createdId = id
+      break
+    }
+
+    case "page": {
+      const id = createId()
+      await db.insert(elements).values({
+        id,
+        type: "page",
+        title,
+        icon: template.icon || "FileText",
+        color: template.color || "#60a5fa",
+        createdBy: user.id,
+        createdAt: now,
+        updatedAt: now,
+      })
+      const pageSnap = (contentJson.page as { content?: string | null; coverImage?: string | null }) || {}
+      await db.insert(pages).values({
+        id,
+        content: pageSnap.content ?? null,
+        coverImage: pageSnap.coverImage ?? null,
+      })
       createdId = id
       break
     }
@@ -444,14 +547,18 @@ export async function createFromTemplate(
 
       await db.insert(processes).values({ id })
 
-      // Create steps from template items
-      const stepItems = items.filter((i) => i.itemType === "step")
-      for (let i = 0; i < stepItems.length; i++) {
+      // Steps come from the content snapshot (save-as-template) or, for
+      // older templates, from template_items rows.
+      const contentSteps = (contentJson.steps as { title?: string; description?: string | null }[]) || []
+      const stepSource = contentSteps.length > 0
+        ? contentSteps.map((s) => ({ title: s.title ?? "Untitled", description: s.description ?? null }))
+        : items.filter((i) => i.itemType === "step").map((i) => ({ title: i.title, description: i.description ?? null }))
+      for (let i = 0; i < stepSource.length; i++) {
         await db.insert(processSteps).values({
           id: createId(),
           processId: id,
-          title: stepItems[i].title,
-          description: stepItems[i].description ?? null,
+          title: stepSource[i].title,
+          description: stepSource[i].description,
           sortOrder: i,
           createdAt: now,
         })

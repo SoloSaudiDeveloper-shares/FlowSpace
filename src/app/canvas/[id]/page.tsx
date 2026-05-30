@@ -11,6 +11,7 @@ import { CanvasEditor } from "@/components/canvas/canvas-editor"
 import { PageContextMenu } from "@/components/shared/page-context-menu"
 import { WatchButton } from "@/components/shared/watch-button"
 import { SendEmailButton } from "@/components/shared/send-email-button"
+import { SaveAsTemplateButton } from "@/components/shared/save-as-template-button"
 import type { Node, Edge, Viewport } from "@xyflow/react"
 
 export default async function CanvasPage({
@@ -70,6 +71,7 @@ export default async function CanvasPage({
           className="!text-lg !font-semibold"
         />
         <div className="ml-auto flex items-center gap-1">
+          <SaveAsTemplateButton elementId={element.id} initialName={element.title} />
           <SendEmailButton elementId={element.id} />
           <WatchButton
             elementId={element.id}

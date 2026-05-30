@@ -54,7 +54,7 @@ export default async function ProjectPage({
         </span>
         <InlineTitle elementId={element.id} initialTitle={element.title} />
         <div className="ml-auto flex items-center gap-1">
-          <SaveAsTemplateButton projectId={element.id} initialName={element.title} />
+          <SaveAsTemplateButton elementId={element.id} initialName={element.title} />
           <SendEmailButton elementId={element.id} />
           <WatchButton
             elementId={element.id}
