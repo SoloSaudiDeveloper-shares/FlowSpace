@@ -17,6 +17,8 @@
 import { sqlite } from "@/lib/db"
 import { requireAuth } from "@/lib/auth/scope"
 import { createId } from "@/lib/utils/ids"
+import { parseAIImport } from "@/lib/import/ai-import-parser"
+import { importFromAIAs } from "@/lib/actions/import-actions"
 
 export interface PendingInboundEmail {
   id: string
@@ -65,6 +67,27 @@ export async function approveInboundEmail(
     | { id: string; from_addr: string; subject: string; body_text: string }
     | undefined
   if (!email) return { ok: false, error: "Email not found or already handled." }
+
+  // ── Smart import ─────────────────────────────────────────────────────
+  // If the email body is written in FlowSpace's import format (it contains a
+  // `# <Type>: <title>` header), build the full structure — a project with
+  // tasks, a todo list, a page, etc. Otherwise fall through to the plain
+  // Inbox to-do below.
+  const parsed = parseAIImport(email.body_text)
+  if (parsed) {
+    const r = await importFromAIAs(me.id, parsed)
+    if (r.ok) {
+      sqlite
+        .prepare(
+          `UPDATE inbound_emails
+              SET status = 'imported', handled_at = datetime('now')
+            WHERE id = ?`,
+        )
+        .run(id)
+      return { ok: true }
+    }
+    // Import failed for some reason — fall through to the plain to-do path.
+  }
 
   // Find or create the user's Inbox todo list (same one Telegram uses).
   let listId = sqlite

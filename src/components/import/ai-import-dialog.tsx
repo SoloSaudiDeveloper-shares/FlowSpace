@@ -16,6 +16,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { MarkdownFormatGuide } from "@/components/shared/markdown-format-guide"
 import {
   Dialog,
   DialogContent,
@@ -191,6 +192,7 @@ Heading to Tokyo for two weeks…`}
               <p className="text-[11px] text-muted-foreground leading-snug">
                 Tip: hit <strong>&ldquo;Copy AI prompt&rdquo;</strong> above, paste it into Claude/ChatGPT after your brainstorm — they&apos;ll output exactly what you need to paste back here.
               </p>
+              <MarkdownFormatGuide />
             </div>
 
             {/* ── Preview ────────────────────────────────────────── */}

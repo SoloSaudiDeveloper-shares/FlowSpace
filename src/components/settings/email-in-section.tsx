@@ -20,6 +20,7 @@ import {
   dismissInboundEmail,
   type PendingInboundEmail,
 } from "@/lib/actions/inbound-email-actions"
+import { MarkdownFormatGuide } from "@/components/shared/markdown-format-guide"
 
 export function EmailInSection() {
   const { user } = useAuth()
@@ -72,8 +73,10 @@ export function EmailInSection() {
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
         Forward emails from anywhere into FlowSpace. Each accepted email
-        becomes a pending item in your bell — approve to add to your
-        Inbox list, or dismiss.
+        becomes a pending item in your bell — approve to keep it, or
+        dismiss. A plain email becomes a simple to-do in your Inbox; if the
+        email is written in the format below, approving builds the full
+        structure (a project with tasks, a page, etc.).
       </p>
 
       <div className="rounded-md border border-border/60 p-3 space-y-2">
@@ -115,6 +118,8 @@ export function EmailInSection() {
           </Button>
         </div>
       </div>
+
+      <MarkdownFormatGuide />
 
       <div>
         <div className="flex items-center justify-between mb-1.5">
