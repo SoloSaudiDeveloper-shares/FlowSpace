@@ -23,7 +23,7 @@ import { useTheme } from "@/components/theme-provider"
 import {
   ZoomIn, ZoomOut, Maximize2, StickyNote, Type, CreditCard, Copy, Trash2,
   ArrowUp, ArrowDown, Shapes, ImageIcon, Group, Link2,
-  Layers, AlignStartVertical, AlignEndVertical, AlignCenterVertical,
+  Layers, Settings as SettingsIcon, AlignStartVertical, AlignEndVertical, AlignCenterVertical,
   AlignStartHorizontal, AlignEndHorizontal, AlignCenterHorizontal,
   Eye, EyeOff,
 } from "lucide-react"
@@ -59,6 +59,12 @@ interface CanvasEditorProps {
   initialNodes: Node[]
   initialEdges: Edge[]
   initialViewport: Viewport
+  initialConfig?: {
+    backgroundVariant: "dots" | "lines" | "cross" | "none"
+    backgroundGap: number
+    snapToGrid: boolean
+    showMinimap: boolean
+  }
 }
 
 interface DropMenuState {
@@ -132,6 +138,7 @@ function CanvasEditorInner({
   initialNodes,
   initialEdges,
   initialViewport,
+  initialConfig,
 }: CanvasEditorProps) {
   const { resolvedTheme } = useTheme()
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
@@ -139,9 +146,29 @@ function CanvasEditorInner({
   const [dropMenu, setDropMenu] = useState<DropMenuState | null>(null)
   const [showShapePicker, setShowShapePicker] = useState(false)
   const [showLayerPanel, setShowLayerPanel] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  // Canvas display config — optimistic local state, persisted to the DB
+  // on change via saveCanvasConfig.
+  const [config, setConfig] = useState({
+    backgroundVariant: initialConfig?.backgroundVariant ?? "dots",
+    backgroundGap: initialConfig?.backgroundGap ?? 20,
+    snapToGrid: initialConfig?.snapToGrid ?? false,
+    showMinimap: initialConfig?.showMinimap ?? true,
+  })
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { zoomIn, zoomOut, fitView, screenToFlowPosition, getNodes, getEdges } = useReactFlow()
   const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
+
+  function updateConfig(patch: Partial<typeof config>) {
+    setConfig((c) => {
+      const next = { ...c, ...patch }
+      // Fire-and-forget — UI updates instantly, server catches up.
+      import("@/lib/actions/canvas-actions")
+        .then((m) => m.saveCanvasConfig(canvasId, patch))
+        .catch(() => undefined)
+      return next
+    })
+  }
 
   const debouncedSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
@@ -450,9 +477,25 @@ function CanvasEditorInner({
         selectionOnDrag
         proOptions={{ hideAttribution: true }}
         deleteKeyCode={["Backspace", "Delete"]}
+        snapToGrid={config.snapToGrid}
+        snapGrid={[config.backgroundGap, config.backgroundGap]}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <MiniMap zoomable pannable className="!bg-background !border-border" />
+        {config.backgroundVariant !== "none" && (
+          <Background
+            variant={
+              config.backgroundVariant === "lines"
+                ? BackgroundVariant.Lines
+                : config.backgroundVariant === "cross"
+                  ? BackgroundVariant.Cross
+                  : BackgroundVariant.Dots
+            }
+            gap={config.backgroundGap}
+            size={1}
+          />
+        )}
+        {config.showMinimap && (
+          <MiniMap zoomable pannable className="!bg-background !border-border" />
+        )}
 
         <Panel position="top-left">
           <div className="flex gap-1 bg-background/90 backdrop-blur border rounded-lg p-1 shadow-sm">
@@ -540,8 +583,100 @@ function CanvasEditorInner({
             >
               <Layers className="size-4" />
             </Button>
+            <Button
+              variant={showSettings ? "secondary" : "ghost"}
+              size="icon"
+              className="size-7"
+              onClick={() => setShowSettings((v) => !v)}
+              title="Canvas settings"
+            >
+              <SettingsIcon className="size-4" />
+            </Button>
           </div>
         </Panel>
+
+        {/* Canvas settings popover */}
+        {showSettings && (
+          <Panel position="bottom-left" className="!bottom-2 !left-12">
+            <div className="bg-background/95 backdrop-blur border rounded-lg shadow-lg w-64 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold">Canvas settings</span>
+                <button
+                  type="button"
+                  onClick={() => setShowSettings(false)}
+                  className="size-5 rounded text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              {/* Background pattern */}
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mb-1.5">
+                  Background
+                </p>
+                <div className="grid grid-cols-4 gap-1">
+                  {(["dots", "lines", "cross", "none"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => updateConfig({ backgroundVariant: v })}
+                      className={`px-1.5 py-1 rounded text-[11px] border transition-colors capitalize ${
+                        config.backgroundVariant === v
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Grid gap */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">
+                    Grid gap
+                  </p>
+                  <span className="text-[10px] tabular-nums text-muted-foreground">
+                    {config.backgroundGap}px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={8}
+                  max={80}
+                  step={4}
+                  value={config.backgroundGap}
+                  onChange={(e) => updateConfig({ backgroundGap: Number(e.target.value) })}
+                  className="w-full accent-primary"
+                />
+              </div>
+              {/* Toggles */}
+              <label className="flex items-center justify-between text-xs cursor-pointer">
+                <span>Snap to grid</span>
+                <input
+                  type="checkbox"
+                  checked={config.snapToGrid}
+                  onChange={(e) => updateConfig({ snapToGrid: e.target.checked })}
+                  className="accent-primary"
+                />
+              </label>
+              <label className="flex items-center justify-between text-xs cursor-pointer">
+                <span>Show minimap</span>
+                <input
+                  type="checkbox"
+                  checked={config.showMinimap}
+                  onChange={(e) => updateConfig({ showMinimap: e.target.checked })}
+                  className="accent-primary"
+                />
+              </label>
+              <p className="text-[10px] text-muted-foreground/60 leading-snug">
+                Saved per-canvas. Restored next time you open this canvas.
+              </p>
+            </div>
+          </Panel>
+        )}
 
         {/* Layer Panel */}
         {showLayerPanel && (

@@ -74,6 +74,10 @@ export async function transcribeTelegramVoice(
   /** ISO 639-1 code (e.g. "en", "ar", "es"), or "auto" to let Whisper
    *  detect. Short utterances detect more reliably when this is pinned. */
   language: string = "en",
+  /** Optional — the FlowSpace user the bot belongs to. Used to bump
+   *  per-day voice-transcription stats so Settings → Speech can show
+   *  "today's usage" (Groq has no balance endpoint). */
+  ownerUserId?: string,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   // Step 1: ask Telegram for the file path on its CDN.
   const fileResp = await getFile(botToken, fileId)
@@ -145,9 +149,28 @@ export async function transcribeTelegramVoice(
             : `Groq ${res.status}: ${txt.slice(0, 120)}`
       return { ok: false, error: friendly }
     }
-    const data = (await res.json()) as { text?: string }
+    const data = (await res.json()) as { text?: string; duration?: number }
     const text = (data.text ?? "").trim()
     if (!text) return { ok: false, error: "Empty transcription." }
+    // Bump daily-usage counter — fire-and-forget. The Telegram bot
+    // doesn't always have the audio duration handy here; we pass 0
+    // when missing and the UI degrades gracefully.
+    if (ownerUserId) {
+      const today = new Date().toISOString().slice(0, 10)
+      const seconds = Math.max(0, Math.round(data.duration ?? 0))
+      try {
+        sqlite
+          .prepare(
+            `INSERT INTO voice_usage_daily (user_id, date, count, seconds)
+             VALUES (?, ?, 1, ?)
+             ON CONFLICT(user_id, date)
+             DO UPDATE SET count = count + 1, seconds = seconds + excluded.seconds`,
+          )
+          .run(ownerUserId, today, seconds)
+      } catch {
+        /* don't let stats failures break transcription */
+      }
+    }
     return { ok: true, text }
   } catch (err) {
     return {

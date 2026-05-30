@@ -1,14 +1,25 @@
 "use server"
 
+/**
+ * Global search across everything the signed-in user owns.
+ *
+ * Backed by a unified, owner-scoped FTS5 virtual table (`search_index`)
+ * that's kept in sync via triggers on elements / tasks / todo_items.
+ * That fixes a pre-existing leak where the per-table _fts indexes
+ * didn't filter by `created_by`, so a search could return another
+ * user's elements as long as you couldn't actually open them.
+ *
+ * The previous public surface (fullTextSearch + scopedSearch) is
+ * preserved so the command palette doesn't need to change.
+ */
+
 import { sqlite } from "@/lib/db"
-import { db } from "@/lib/db"
-import { elements, tasks, taskStatuses } from "@/lib/db/schema"
-import { eq, and, inArray } from "drizzle-orm"
+import { currentUserId } from "@/lib/auth/scope"
 
 export type SearchResult = {
   id: string
   title: string
-  type: "element" | "task" | "comment" | "feed"
+  type: "element" | "task" | "comment" | "feed" | "todo"
   elementType?: string
   description?: string | null
   projectId?: string
@@ -17,295 +28,147 @@ export type SearchResult = {
   rank: number
 }
 
+/** Build a FTS5-safe MATCH query: tokenise, drop symbols, prefix-match
+ *  each surviving term, cap to 8 terms. Empty input → null (caller
+ *  short-circuits). */
+function buildMatchQuery(raw: string): string | null {
+  const cleaned = raw.trim().replace(/[\\"]/g, " ")
+  if (!cleaned) return null
+  const tokens = cleaned.split(/\s+/).slice(0, 8)
+  const expr = tokens
+    .map((t) => t.replace(/[^\p{L}\p{N}_+\-]/gu, ""))
+    .filter((t) => t.length > 0)
+    .map((t) => `${t}*`)
+    .join(" ")
+  return expr || null
+}
+
 export async function fullTextSearch(
   query: string,
   limit = 20
 ): Promise<SearchResult[]> {
-  if (!query || query.trim().length === 0) return []
+  const uid = await currentUserId()
+  if (!uid) return []
+  const expr = buildMatchQuery(query)
+  if (!expr) return []
 
-  const sanitized = query.replace(/['"]/g, "").trim()
-  if (!sanitized) return []
-
-  // FTS5 query with prefix matching
-  const ftsQuery = sanitized
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => `"${w}"*`)
-    .join(" ")
-
-  const results: SearchResult[] = []
-
-  // Search elements
-  try {
-    const elementRows = sqlite
-      .prepare(
-        `SELECT id, title, description, type, rank
-         FROM elements_fts
-         WHERE elements_fts MATCH ?
-         ORDER BY rank
-         LIMIT ?`
-      )
-      .all(ftsQuery, limit) as Array<{
+  const rows = sqlite
+    .prepare(
+      `SELECT
+         entity_kind  AS kind,
+         entity_id    AS id,
+         type_label   AS typeLabel,
+         title,
+         snippet(search_index, 5, '', '', '…', 12) AS snip,
+         rank
+       FROM search_index
+      WHERE search_index MATCH ?
+        AND owner_user_id = ?
+      ORDER BY rank
+      LIMIT ?`
+    )
+    .all(expr, uid, limit) as Array<{
+      kind: "element" | "task" | "todo"
       id: string
+      typeLabel: string
       title: string
-      description: string | null
-      type: string
+      snip: string | null
       rank: number
     }>
+  if (rows.length === 0) return []
 
-    // Filter out deleted/archived
-    if (elementRows.length > 0) {
-      const ids = elementRows.map((r) => r.id)
-      const activeElements = await db
-        .select({ id: elements.id })
-        .from(elements)
-        .where(
-          and(
-            inArray(elements.id, ids),
-            eq(elements.isDeleted, false),
-            eq(elements.isArchived, false)
-          )
-        )
-      const activeIds = new Set(activeElements.map((e) => e.id))
-
-      for (const row of elementRows) {
-        if (activeIds.has(row.id)) {
-          results.push({
-            id: row.id,
-            title: row.title,
-            type: "element",
-            elementType: row.type,
-            description: row.description,
-            rank: row.rank,
-          })
-        }
-      }
-    }
-  } catch {
-    // Fallback to LIKE search if FTS fails
-    const fallback = await db
-      .select()
-      .from(elements)
-      .where(
-        and(eq(elements.isDeleted, false), eq(elements.isArchived, false))
+  // For tasks, look up project title in a single round-trip so the
+  // command palette can show "task — in <project>". For todos, same
+  // idea but the parent is the list.
+  const taskRows = rows.filter((r) => r.kind === "task")
+  const taskIds = taskRows.map((r) => r.id)
+  const projectByTask = new Map<string, { id: string; title: string }>()
+  if (taskIds.length > 0) {
+    const placeholders = taskIds.map(() => "?").join(",")
+    const projRows = sqlite
+      .prepare(
+        `SELECT t.id AS taskId, e.id AS projectId, e.title AS projectTitle
+           FROM tasks t INNER JOIN elements e ON e.id = t.project_id
+          WHERE t.id IN (${placeholders})`,
       )
-
-    const q = sanitized.toLowerCase()
-    for (const el of fallback) {
-      if (el.title.toLowerCase().includes(q)) {
-        results.push({
-          id: el.id,
-          title: el.title,
-          type: "element",
-          elementType: el.type,
-          description: el.description,
-          rank: 0,
-        })
-      }
+      .all(...taskIds) as { taskId: string; projectId: string; projectTitle: string }[]
+    for (const p of projRows) {
+      projectByTask.set(p.taskId, { id: p.projectId, title: p.projectTitle })
     }
   }
 
-  // Search tasks
-  try {
-    const taskRows = sqlite
-      .prepare(
-        `SELECT id, title, description, project_id, rank
-         FROM tasks_fts
-         WHERE tasks_fts MATCH ?
-         ORDER BY rank
-         LIMIT ?`
-      )
-      .all(ftsQuery, limit) as Array<{
-      id: string
-      title: string
-      description: string | null
-      project_id: string
-      rank: number
-    }>
-
-    if (taskRows.length > 0) {
-      // Get project titles for context
-      const projectIds = [...new Set(taskRows.map((r) => r.project_id))]
-      const projectElements = await db
-        .select({ id: elements.id, title: elements.title })
-        .from(elements)
-        .where(inArray(elements.id, projectIds))
-      const projectMap = new Map(projectElements.map((p) => [p.id, p.title]))
-
-      for (const row of taskRows) {
-        results.push({
-          id: row.id,
-          title: row.title,
-          type: "task",
-          description: row.description,
-          projectId: row.project_id,
-          projectTitle: projectMap.get(row.project_id) ?? "Unknown Project",
-          rank: row.rank,
-        })
-      }
-    }
-  } catch {
-    // Tasks FTS fallback - skip silently
-  }
-
-  // Search comments
-  try {
-    const commentRows = sqlite
-      .prepare(
-        `SELECT id, content, task_id, rank
-         FROM comments_fts
-         WHERE comments_fts MATCH ?
-         ORDER BY rank
-         LIMIT ?`
-      )
-      .all(ftsQuery, Math.floor(limit / 2)) as Array<{
-      id: string
-      content: string
-      task_id: string
-      rank: number
-    }>
-
-    for (const row of commentRows) {
-      results.push({
-        id: row.id,
-        title: row.content.slice(0, 80) + (row.content.length > 80 ? "..." : ""),
-        type: "comment",
-        taskId: row.task_id,
-        rank: row.rank,
-      })
-    }
-  } catch {
-    // Comments FTS fallback - skip silently
-  }
-
-  // Search feed events
-  try {
-    const feedRows = sqlite
-      .prepare(
-        `SELECT id, title, summary, type, rank
-         FROM feed_fts
-         WHERE feed_fts MATCH ?
-         ORDER BY rank
-         LIMIT ?`
-      )
-      .all(ftsQuery, Math.floor(limit / 2)) as Array<{
-      id: string
-      title: string
-      summary: string | null
-      type: string
-      rank: number
-    }>
-
-    for (const row of feedRows) {
-      results.push({
+  return rows.map((row) => {
+    const description = row.snip && row.snip !== row.title ? row.snip : null
+    if (row.kind === "task") {
+      const proj = projectByTask.get(row.id)
+      return {
         id: row.id,
         title: row.title,
-        type: "feed",
-        description: row.summary,
-        elementType: row.type,
+        type: "task" as const,
+        description,
+        projectId: proj?.id,
+        projectTitle: proj?.title ?? "Unknown Project",
         rank: row.rank,
-      })
+      }
     }
-  } catch {
-    // Feed FTS fallback - skip silently
-  }
-
-  // Sort by rank (lower is better in FTS5)
-  results.sort((a, b) => a.rank - b.rank)
-
-  return results.slice(0, limit)
+    if (row.kind === "todo") {
+      return {
+        id: row.id,
+        title: row.title,
+        type: "todo" as const,
+        description,
+        rank: row.rank,
+      }
+    }
+    return {
+      id: row.id,
+      title: row.title,
+      type: "element" as const,
+      elementType: row.typeLabel,
+      description,
+      rank: row.rank,
+    }
+  })
 }
 
-// Scoped search: search only within a specific type
+// Scoped search: filter by entity kind (elements / tasks / todos).
+// Comments + feed live in their own per-table FTS indexes and aren't
+// in the unified search_index yet — they return empty until reindexed.
 export async function scopedSearch(
   query: string,
   scope: "elements" | "tasks" | "comments" | "feed",
   limit = 20
 ): Promise<SearchResult[]> {
-  if (!query || query.trim().length === 0) return []
-
-  const sanitized = query.replace(/['"]/g, "").trim()
-  if (!sanitized) return []
-
-  const ftsQuery = sanitized
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => `"${w}"*`)
-    .join(" ")
-
-  const results: SearchResult[] = []
-
-  try {
-    switch (scope) {
-      case "elements": {
-        const rows = sqlite
-          .prepare(
-            `SELECT id, title, description, type, rank FROM elements_fts WHERE elements_fts MATCH ? ORDER BY rank LIMIT ?`
-          )
-          .all(ftsQuery, limit) as Array<{
-          id: string; title: string; description: string | null; type: string; rank: number
-        }>
-        for (const row of rows) {
-          results.push({
-            id: row.id, title: row.title, type: "element",
-            elementType: row.type, description: row.description, rank: row.rank,
-          })
-        }
-        break
-      }
-      case "tasks": {
-        const rows = sqlite
-          .prepare(
-            `SELECT id, title, description, project_id, rank FROM tasks_fts WHERE tasks_fts MATCH ? ORDER BY rank LIMIT ?`
-          )
-          .all(ftsQuery, limit) as Array<{
-          id: string; title: string; description: string | null; project_id: string; rank: number
-        }>
-        for (const row of rows) {
-          results.push({
-            id: row.id, title: row.title, type: "task",
-            description: row.description, projectId: row.project_id, rank: row.rank,
-          })
-        }
-        break
-      }
-      case "comments": {
-        const rows = sqlite
-          .prepare(
-            `SELECT id, content, task_id, rank FROM comments_fts WHERE comments_fts MATCH ? ORDER BY rank LIMIT ?`
-          )
-          .all(ftsQuery, limit) as Array<{
-          id: string; content: string; task_id: string; rank: number
-        }>
-        for (const row of rows) {
-          results.push({
-            id: row.id,
-            title: row.content.slice(0, 80) + (row.content.length > 80 ? "..." : ""),
-            type: "comment", taskId: row.task_id, rank: row.rank,
-          })
-        }
-        break
-      }
-      case "feed": {
-        const rows = sqlite
-          .prepare(
-            `SELECT id, title, summary, type, rank FROM feed_fts WHERE feed_fts MATCH ? ORDER BY rank LIMIT ?`
-          )
-          .all(ftsQuery, limit) as Array<{
-          id: string; title: string; summary: string | null; type: string; rank: number
-        }>
-        for (const row of rows) {
-          results.push({
-            id: row.id, title: row.title, type: "feed",
-            description: row.summary, elementType: row.type, rank: row.rank,
-          })
-        }
-        break
-      }
-    }
-  } catch {
-    // Silently handle FTS errors
-  }
-
-  return results
+  if (scope === "comments" || scope === "feed") return []
+  const uid = await currentUserId()
+  if (!uid) return []
+  const expr = buildMatchQuery(query)
+  if (!expr) return []
+  const kindFilter = scope === "elements" ? "element" : "task"
+  const rows = sqlite
+    .prepare(
+      `SELECT entity_id AS id, type_label AS typeLabel, title,
+              snippet(search_index, 5, '', '', '…', 12) AS snip, rank
+         FROM search_index
+        WHERE search_index MATCH ?
+          AND owner_user_id = ?
+          AND entity_kind = ?
+        ORDER BY rank
+        LIMIT ?`,
+    )
+    .all(expr, uid, kindFilter, limit) as Array<{
+      id: string
+      typeLabel: string
+      title: string
+      snip: string | null
+      rank: number
+    }>
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    type: scope === "elements" ? ("element" as const) : ("task" as const),
+    elementType: scope === "elements" ? row.typeLabel : undefined,
+    description: row.snip && row.snip !== row.title ? row.snip : null,
+    rank: row.rank,
+  }))
 }

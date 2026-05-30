@@ -84,6 +84,16 @@ export default async function CanvasPage({
           initialNodes={initialNodes}
           initialEdges={initialEdges}
           initialViewport={initialViewport}
+          initialConfig={{
+            backgroundVariant: (canvasData.canvas?.backgroundVariant ?? "dots") as
+              | "dots"
+              | "lines"
+              | "cross"
+              | "none",
+            backgroundGap: canvasData.canvas?.backgroundGap ?? 20,
+            snapToGrid: !!canvasData.canvas?.snapToGrid,
+            showMinimap: canvasData.canvas?.showMinimap ?? true,
+          }}
         />
       </PageContextMenu>
     </div>

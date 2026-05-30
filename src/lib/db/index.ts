@@ -180,6 +180,37 @@ try {
   console.error("[migration] reminders.bot_fired_at:", err)
 }
 
+// ─── Canvas configuration (per-canvas) ────────────────────────────────
+// Per-canvas display settings: background pattern, grid snap, minimap
+// visibility, dot/line gap. Stored on the existing `canvases` table so
+// they're loaded alongside viewport state in one query.
+try {
+  const cols = sqlite.prepare(`PRAGMA table_info(canvases)`).all() as { name: string }[]
+  const has = (n: string) => cols.some((c) => c.name === n)
+  // 'dots' | 'lines' | 'cross' | 'none'
+  if (!has("background_variant")) sqlite.exec(`ALTER TABLE canvases ADD COLUMN background_variant TEXT NOT NULL DEFAULT 'dots'`)
+  if (!has("background_gap"))     sqlite.exec(`ALTER TABLE canvases ADD COLUMN background_gap INTEGER NOT NULL DEFAULT 20`)
+  if (!has("snap_to_grid"))       sqlite.exec(`ALTER TABLE canvases ADD COLUMN snap_to_grid INTEGER NOT NULL DEFAULT 0`)
+  if (!has("show_minimap"))       sqlite.exec(`ALTER TABLE canvases ADD COLUMN show_minimap INTEGER NOT NULL DEFAULT 1`)
+} catch (err) {
+  console.error("[migration] canvases config:", err)
+}
+
+// ─── Telegram voice usage stats (per-user, per-day) ───────────────────
+// Groq doesn't expose a balance endpoint, so the next-best signal is
+// "what we've spent ourselves today". One row per (user, day); the
+// count + duration columns get incremented whenever a transcription
+// completes successfully.
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS voice_usage_daily (
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date        TEXT NOT NULL,  -- yyyy-mm-dd in UTC
+    count       INTEGER NOT NULL DEFAULT 0,
+    seconds     INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, date)
+  );
+`)
+
 // ─── Todo items: priority (per-item) ───────────────────────────────────
 // Mirrors the tasks table — urgent / high / medium / low / null. Lets
 // the user mark a quick todo as urgent without promoting it to a full
@@ -313,6 +344,217 @@ sqlite.exec(`
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `)
+
+// ─── Full-text search (FTS5) ───────────────────────────────────────────
+//
+// Single virtual table indexed across elements + tasks + todo_items.
+// Each row carries:
+//   - entity_kind  ('element' | 'task' | 'todo')
+//   - entity_id    the actual row id in the source table
+//   - type_label   user-friendly type (project/page/canvas/todo_list/
+//                  reminder/process/task/todo) — used to filter results
+//   - title        searchable
+//   - body         searchable (description / notes / page content text)
+//   - owner_user_id  for scoping; UNINDEXED so we don't search it
+//
+// Triggers keep the index in sync on every write. For pages we strip
+// the BlockNote JSON down to plain text so search hits real prose,
+// not JSON keys. Safe to rebuild on startup if FTS5 ever drifts:
+//   DELETE FROM search_index; INSERT INTO search_index SELECT … (below)
+sqlite.exec(`
+  CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
+    entity_kind UNINDEXED,
+    entity_id   UNINDEXED,
+    type_label  UNINDEXED,
+    owner_user_id UNINDEXED,
+    title,
+    body,
+    tokenize = 'porter unicode61 remove_diacritics 2'
+  );
+`)
+
+// Populate from scratch the first time the table is empty. Strip
+// BlockNote JSON to plain text via a regex pass (good enough for
+// search — extracts "text" string values).
+try {
+  const countRow = sqlite
+    .prepare(`SELECT COUNT(*) AS n FROM search_index`)
+    .get() as { n: number }
+  if (countRow.n === 0) {
+    const ins = sqlite.prepare(
+      `INSERT INTO search_index
+         (entity_kind, entity_id, type_label, owner_user_id, title, body)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    // Elements (project, page, canvas, todo_list, reminder, process)
+    const elements = sqlite
+      .prepare(
+        `SELECT id, type, title, description, created_by FROM elements
+          WHERE is_deleted = 0`,
+      )
+      .all() as { id: string; type: string; title: string; description: string | null; created_by: string | null }[]
+    for (const e of elements) {
+      if (!e.created_by) continue
+      let body = e.description ?? ""
+      if (e.type === "page") {
+        const pageRow = sqlite
+          .prepare(`SELECT content FROM pages WHERE id = ?`)
+          .get(e.id) as { content: string | null } | undefined
+        if (pageRow?.content) body += " " + extractTextFromBlocknoteJson(pageRow.content)
+      }
+      ins.run("element", e.id, e.type, e.created_by, e.title, body)
+    }
+    // Tasks
+    const tasks = sqlite
+      .prepare(
+        `SELECT t.id, t.title, t.description, e.created_by
+           FROM tasks t
+           INNER JOIN elements e ON e.id = t.project_id
+          WHERE e.is_deleted = 0`,
+      )
+      .all() as { id: string; title: string; description: string | null; created_by: string | null }[]
+    for (const t of tasks) {
+      if (!t.created_by) continue
+      ins.run("task", t.id, "task", t.created_by, t.title, t.description ?? "")
+    }
+    // Todo items
+    const todos = sqlite
+      .prepare(
+        `SELECT ti.id, ti.title, ti.notes, e.created_by
+           FROM todo_items ti
+           INNER JOIN elements e ON e.id = ti.list_id
+          WHERE e.is_deleted = 0`,
+      )
+      .all() as { id: string; title: string; notes: string | null; created_by: string | null }[]
+    for (const t of todos) {
+      if (!t.created_by) continue
+      ins.run("todo", t.id, "todo", t.created_by, t.title, t.notes ?? "")
+    }
+    console.log(`[search] indexed ${elements.length + tasks.length + todos.length} rows`)
+  }
+} catch (err) {
+  console.error("[search] initial population:", err)
+}
+
+// Triggers — keep search_index in sync on every write.
+sqlite.exec(`
+  CREATE TRIGGER IF NOT EXISTS search_index_elements_ai
+    AFTER INSERT ON elements WHEN NEW.is_deleted = 0
+  BEGIN
+    INSERT INTO search_index (entity_kind, entity_id, type_label, owner_user_id, title, body)
+    VALUES ('element', NEW.id, NEW.type, NEW.created_by, NEW.title, COALESCE(NEW.description, ''));
+  END;
+`)
+sqlite.exec(`
+  CREATE TRIGGER IF NOT EXISTS search_index_elements_au
+    AFTER UPDATE ON elements
+  BEGIN
+    DELETE FROM search_index WHERE entity_kind = 'element' AND entity_id = OLD.id;
+    INSERT INTO search_index (entity_kind, entity_id, type_label, owner_user_id, title, body)
+    SELECT 'element', NEW.id, NEW.type, NEW.created_by, NEW.title, COALESCE(NEW.description, '')
+    WHERE NEW.is_deleted = 0;
+  END;
+`)
+sqlite.exec(`
+  CREATE TRIGGER IF NOT EXISTS search_index_elements_ad
+    AFTER DELETE ON elements
+  BEGIN
+    DELETE FROM search_index WHERE entity_kind = 'element' AND entity_id = OLD.id;
+  END;
+`)
+
+sqlite.exec(`
+  CREATE TRIGGER IF NOT EXISTS search_index_tasks_ai
+    AFTER INSERT ON tasks
+  BEGIN
+    INSERT INTO search_index (entity_kind, entity_id, type_label, owner_user_id, title, body)
+    SELECT 'task', NEW.id, 'task', e.created_by, NEW.title, COALESCE(NEW.description, '')
+      FROM elements e WHERE e.id = NEW.project_id;
+  END;
+`)
+sqlite.exec(`
+  CREATE TRIGGER IF NOT EXISTS search_index_tasks_au
+    AFTER UPDATE ON tasks
+  BEGIN
+    DELETE FROM search_index WHERE entity_kind = 'task' AND entity_id = OLD.id;
+    INSERT INTO search_index (entity_kind, entity_id, type_label, owner_user_id, title, body)
+    SELECT 'task', NEW.id, 'task', e.created_by, NEW.title, COALESCE(NEW.description, '')
+      FROM elements e WHERE e.id = NEW.project_id;
+  END;
+`)
+sqlite.exec(`
+  CREATE TRIGGER IF NOT EXISTS search_index_tasks_ad
+    AFTER DELETE ON tasks
+  BEGIN
+    DELETE FROM search_index WHERE entity_kind = 'task' AND entity_id = OLD.id;
+  END;
+`)
+
+sqlite.exec(`
+  CREATE TRIGGER IF NOT EXISTS search_index_todos_ai
+    AFTER INSERT ON todo_items
+  BEGIN
+    INSERT INTO search_index (entity_kind, entity_id, type_label, owner_user_id, title, body)
+    SELECT 'todo', NEW.id, 'todo', e.created_by, NEW.title, COALESCE(NEW.notes, '')
+      FROM elements e WHERE e.id = NEW.list_id;
+  END;
+`)
+sqlite.exec(`
+  CREATE TRIGGER IF NOT EXISTS search_index_todos_au
+    AFTER UPDATE ON todo_items
+  BEGIN
+    DELETE FROM search_index WHERE entity_kind = 'todo' AND entity_id = OLD.id;
+    INSERT INTO search_index (entity_kind, entity_id, type_label, owner_user_id, title, body)
+    SELECT 'todo', NEW.id, 'todo', e.created_by, NEW.title, COALESCE(NEW.notes, '')
+      FROM elements e WHERE e.id = NEW.list_id;
+  END;
+`)
+sqlite.exec(`
+  CREATE TRIGGER IF NOT EXISTS search_index_todos_ad
+    AFTER DELETE ON todo_items
+  BEGIN
+    DELETE FROM search_index WHERE entity_kind = 'todo' AND entity_id = OLD.id;
+  END;
+`)
+
+/**
+ * Walks a BlockNote JSON document and pulls out every `text` string
+ * value into a single space-joined plain-text bag. Cheap regex pass;
+ * not perfect (it'd find a stray `"text":"…"` inside a styles object)
+ * but FTS5 doesn't care about the noise and the result is searchable.
+ */
+function extractTextFromBlocknoteJson(json: string): string {
+  if (!json) return ""
+  // Walk JSON.parse'd doc tree if possible (cleaner); fall back to a
+  // regex on parse failure (corrupted or partial content).
+  try {
+    const root = JSON.parse(json) as unknown
+    const out: string[] = []
+    const stack: unknown[] = [root]
+    while (stack.length) {
+      const node = stack.pop()
+      if (!node) continue
+      if (typeof node === "string") continue
+      if (Array.isArray(node)) {
+        for (const c of node) stack.push(c)
+      } else if (typeof node === "object") {
+        const obj = node as Record<string, unknown>
+        if (typeof obj.text === "string") out.push(obj.text)
+        for (const v of Object.values(obj)) {
+          if (v && typeof v === "object") stack.push(v)
+        }
+      }
+    }
+    return out.join(" ").slice(0, 200_000)
+  } catch {
+    const matches = json.match(/"text"\s*:\s*"([^"\\]|\\.)*"/g)
+    if (!matches) return ""
+    return matches
+      .map((m) => m.replace(/^"text"\s*:\s*"/, "").replace(/"$/, ""))
+      .join(" ")
+      .slice(0, 200_000)
+  }
+}
 
 // ─── Telegram digest preferences (per-bot) ─────────────────────────────
 try {

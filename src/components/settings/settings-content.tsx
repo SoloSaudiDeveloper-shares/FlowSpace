@@ -80,6 +80,7 @@ import { LocaleSwitcher } from "@/components/settings/locale-switcher"
 import { MarkdownTemplatesPanel } from "@/components/settings/markdown-templates-panel"
 import { EmailInSection } from "@/components/settings/email-in-section"
 import { CalendarSyncSection } from "@/components/settings/calendar-sync-section"
+import { VoiceUsageCard } from "@/components/settings/voice-usage-card"
 import { getTelegramFeatureEnabled } from "@/lib/actions/telegram-actions"
 
 /** Small sub-component so we can use the JSX-tag form on a dynamic icon. */
@@ -1236,6 +1237,10 @@ export function SettingsContent() {
         </p>
 
         <div className="space-y-3">
+          {/* Usage indicator — Groq has no balance endpoint, this is our
+              local-side proxy for "how much have we sent today". */}
+          <VoiceUsageCard />
+
           {/* Global on/off toggle */}
           <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card">
             <div>

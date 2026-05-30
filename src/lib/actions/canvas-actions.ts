@@ -98,6 +98,31 @@ export async function saveCanvasViewport(
     .where(eq(canvases.id, canvasId))
 }
 
+/** Persist user-tweakable canvas display settings (background pattern,
+ *  grid snap, minimap visibility, grid gap). Each call patches only the
+ *  fields the user changed so the existing viewport state isn't lost. */
+export async function saveCanvasConfig(
+  canvasId: string,
+  patch: {
+    backgroundVariant?: "dots" | "lines" | "cross" | "none"
+    backgroundGap?: number
+    snapToGrid?: boolean
+    showMinimap?: boolean
+  },
+): Promise<{ ok: true }> {
+  const update: Record<string, unknown> = {}
+  if (patch.backgroundVariant !== undefined) update.backgroundVariant = patch.backgroundVariant
+  if (patch.backgroundGap !== undefined) {
+    // Clamp to sane bounds so the user can't crash react-flow with gap=0.
+    update.backgroundGap = Math.max(8, Math.min(80, Math.round(patch.backgroundGap)))
+  }
+  if (patch.snapToGrid !== undefined) update.snapToGrid = patch.snapToGrid
+  if (patch.showMinimap !== undefined) update.showMinimap = patch.showMinimap
+  if (Object.keys(update).length === 0) return { ok: true }
+  await db.update(canvases).set(update).where(eq(canvases.id, canvasId))
+  return { ok: true }
+}
+
 export async function addCanvasNode(
   canvasId: string,
   type: "card" | "sticky_note" | "text",

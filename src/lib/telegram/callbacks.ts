@@ -619,7 +619,7 @@ async function runTranscription(v: PendingVoice, language: string): Promise<Call
     .get(v.user_id) as { bot_token: string } | undefined
   if (!botRow) return { toast: "Bot not configured." }
 
-  const result = await transcribeTelegramVoice(botRow.bot_token, groqKey, v.file_id, language)
+  const result = await transcribeTelegramVoice(botRow.bot_token, groqKey, v.file_id, language, v.user_id)
   if (!result.ok) {
     return {
       toast: "Couldn't transcribe.",

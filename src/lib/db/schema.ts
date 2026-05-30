@@ -160,6 +160,13 @@ export const canvases = sqliteTable("canvases", {
   viewportX: real("viewport_x").notNull().default(0),
   viewportY: real("viewport_y").notNull().default(0),
   viewportZoom: real("viewport_zoom").notNull().default(1),
+  // Display config
+  backgroundVariant: text("background_variant", {
+    enum: ["dots", "lines", "cross", "none"],
+  }).notNull().default("dots"),
+  backgroundGap: integer("background_gap").notNull().default(20),
+  snapToGrid: integer("snap_to_grid", { mode: "boolean" }).notNull().default(false),
+  showMinimap: integer("show_minimap", { mode: "boolean" }).notNull().default(true),
 })
 
 export const canvasNodes = sqliteTable("canvas_nodes", {
