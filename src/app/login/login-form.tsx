@@ -232,7 +232,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your name"
+                  placeholder={t("login.name.ph")}
                   autoComplete="name"
                   className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                 />
@@ -246,7 +246,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
+                placeholder={t("login.username.ph")}
                 autoComplete="username"
                 autoFocus
                 className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
@@ -261,7 +261,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={effectiveMode === "register" ? "Choose a password" : "Enter your password"}
+                  placeholder={effectiveMode === "register" ? t("login.password.ph.register") : t("login.password.ph")}
                   autoComplete={effectiveMode === "register" ? "new-password" : "current-password"}
                   className="flex h-10 w-full rounded-lg border border-input bg-background px-3 pr-10 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                 />
@@ -284,7 +284,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                   type={showPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm your password"
+                  placeholder={t("login.confirm.ph")}
                   autoComplete="new-password"
                   className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                 />
@@ -304,7 +304,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                   autoFocus
                   value={twoFactorCode}
                   onChange={(e) => setTwoFactorCode(e.target.value)}
-                  placeholder="6-digit code or recovery code"
+                  placeholder={t("login.twofactor.ph")}
                   maxLength={12}
                   className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm tracking-widest text-center font-mono placeholder:text-muted-foreground placeholder:font-sans placeholder:tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors"
                 />
@@ -331,7 +331,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
                   ? <UserPlus className="w-4 h-4" />
                   : <LogIn className="w-4 h-4" />}
               {isLoading
-                ? (effectiveMode === "register" ? "Creating account..." : t("login.creating"))
+                ? (effectiveMode === "register" ? t("login.creating.register") : t("login.creating"))
                 : (effectiveMode === "register" ? t("login.register.submit") : t("login.submit"))}
             </button>
 
@@ -350,10 +350,10 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
 
         <p className="text-center text-xs text-muted-foreground mt-6">
           {isSetupMode
-            ? "This will be the owner account for your workspace."
+            ? t("login.footer.setup")
             : !canRegister
-              ? "New signups are currently closed. Ask the owner for an invite."
-              : "Your personal productivity workspace."}
+              ? t("login.footer.closed")
+              : t("login.footer.default")}
         </p>
       </div>
     </div>

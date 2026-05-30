@@ -32,6 +32,7 @@ interface UserAIConfig {
   baseUrl: string
   apiKey: string
   model: string
+  locale: "en" | "ar"
 }
 
 function readUserAI(userId: string): UserAIConfig | null {
@@ -44,12 +45,14 @@ function readUserAI(userId: string): UserAIConfig | null {
       aiOpenAIBaseUrl?: string
       aiOpenAIApiKey?: string
       aiOpenAIModel?: string
+      locale?: string
     }
     if (!prefs.aiOpenAIBaseUrl || !prefs.aiOpenAIApiKey) return null
     return {
       baseUrl: prefs.aiOpenAIBaseUrl.replace(/\/+$/, ""),
       apiKey: prefs.aiOpenAIApiKey,
       model: prefs.aiOpenAIModel?.trim() || "gpt-4o-mini",
+      locale: prefs.locale === "ar" ? "ar" : "en",
     }
   } catch {
     return null
@@ -196,6 +199,15 @@ export async function chatWithPlatform(
         model: cfg.model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
+          ...(cfg.locale === "ar"
+            ? [
+                {
+                  role: "system" as const,
+                  content:
+                    "Respond in Arabic (العربية) using Modern Standard Arabic. Keep proper nouns (project names, people's names, file names) exactly as written in the workspace context — do not transliterate or translate them.",
+                },
+              ]
+            : []),
           { role: "system", content: context },
           ...messages.map((m) => ({ role: m.role, content: m.content })),
         ],

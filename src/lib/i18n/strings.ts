@@ -40,6 +40,16 @@ const EN: Dict = {
   "login.register.submit": "Create Account",
   "login.twofactor.label": "Authenticator code",
   "login.twofactor.help": "Open your authenticator app for a code, or use a recovery code if you lost your phone.",
+  "login.username.ph": "Enter your username",
+  "login.password.ph": "Enter your password",
+  "login.password.ph.register": "Choose a password",
+  "login.name.ph": "Your name",
+  "login.confirm.ph": "Confirm your password",
+  "login.twofactor.ph": "6-digit code or recovery code",
+  "login.creating.register": "Creating account...",
+  "login.footer.setup": "This will be the owner account for your workspace.",
+  "login.footer.closed": "New signups are currently closed. Ask the owner for an invite.",
+  "login.footer.default": "Your personal productivity workspace.",
 
   // Sidebar groups
   "sidebar.favorites":      "Favorites",
@@ -70,6 +80,22 @@ const EN: Dict = {
   "settings.tab.integrations": "Integrations",
   "settings.tab.help":         "Help",
 
+  // Page header titles
+  "page.home":          "Home",
+  "page.settings":      "Settings",
+  "page.people":        "People & Teams",
+  "page.feed":          "Feed",
+  "page.myFeed":        "My Feed",
+  "page.adminFeed":     "Admin Feed",
+  "page.reminders":     "Reminders",
+  "page.notifications": "Notifications",
+  "page.templates":     "Templates",
+  "page.forms":         "Forms",
+  "page.automations":   "Automations",
+  "page.approvals":     "Approvals",
+  "page.admin":         "Administration",
+  "page.trash":         "Trash & Archive",
+
   // Common buttons
   "common.cancel":   "Cancel",
   "common.save":     "Save",
@@ -98,6 +124,16 @@ const AR: Dict = {
   "login.register.submit": "إنشاء حساب",
   "login.twofactor.label": "رمز التحقق",
   "login.twofactor.help": "افتح تطبيق المصادقة للحصول على الرمز، أو استخدم رمز الاسترداد إذا فقدت هاتفك.",
+  "login.username.ph": "أدخل اسم المستخدم",
+  "login.password.ph": "أدخل كلمة المرور",
+  "login.password.ph.register": "اختر كلمة مرور",
+  "login.name.ph": "اسمك",
+  "login.confirm.ph": "أكِّد كلمة المرور",
+  "login.twofactor.ph": "رمز من 6 أرقام أو رمز استرداد",
+  "login.creating.register": "جارٍ إنشاء الحساب...",
+  "login.footer.setup": "سيكون هذا حساب المالك لمساحة عملك.",
+  "login.footer.closed": "التسجيل مغلق حاليًا. اطلب دعوة من المالك.",
+  "login.footer.default": "مساحة عملك الشخصية للإنتاجية.",
 
   // Sidebar groups
   "sidebar.favorites":      "المفضلة",
@@ -127,6 +163,22 @@ const AR: Dict = {
   "settings.tab.look":         "المظهر",
   "settings.tab.integrations": "التكاملات",
   "settings.tab.help":         "المساعدة",
+
+  // Page header titles
+  "page.home":          "الرئيسية",
+  "page.settings":      "الإعدادات",
+  "page.people":        "الأشخاص والفِرق",
+  "page.feed":          "المستجدات",
+  "page.myFeed":        "مستجداتي",
+  "page.adminFeed":     "مستجدات الإدارة",
+  "page.reminders":     "التذكيرات",
+  "page.notifications": "الإشعارات",
+  "page.templates":     "القوالب",
+  "page.forms":         "النماذج",
+  "page.automations":   "الأتمتة",
+  "page.approvals":     "الموافقات",
+  "page.admin":         "الإدارة",
+  "page.trash":         "المهملات والأرشيف",
 
   // Common buttons
   "common.cancel":   "إلغاء",

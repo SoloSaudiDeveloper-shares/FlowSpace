@@ -3,6 +3,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Bell } from "lucide-react"
 import { NotificationList } from "@/components/notifications/notification-list"
+import { PageTitle } from "@/components/layout/page-title"
 
 export default async function NotificationsPage() {
   // Generate any new notifications from due reminders/tasks
@@ -16,7 +17,7 @@ export default async function NotificationsPage() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 h-4" />
         <Bell className="size-4 text-muted-foreground" />
-        <h1 className="text-lg font-semibold">Notifications</h1>
+        <PageTitle titleKey="page.notifications" fallback="Notifications" />
       </header>
 
       <div className="flex-1 overflow-auto p-6">

@@ -820,7 +820,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   const { user, logout } = useAuth()
   const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
   const { preferences, updatePreference } = usePreferences()
-  const { t } = useT()
+  const { t, locale } = useT()
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
 
   // Tracks the id of the row currently being dragged, so we can render a
@@ -1576,7 +1576,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   }
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" side={locale === "ar" ? "right" : "left"}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

@@ -87,23 +87,34 @@ export function PlatformChatDrawer() {
 
   return (
     <>
-      {/* Floating launch button — bottom-right; matches the timer FAB style. */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`fixed bottom-4 right-4 z-40 size-12 rounded-full shadow-lg border border-primary/30 backdrop-blur-md transition-all flex items-center justify-center ${
-          open
-            ? "bg-card text-foreground rotate-90"
-            : "bg-card/80 text-primary hover:bg-card hover:scale-105"
-        }`}
-        aria-label={open ? "Close assistant" : "Open assistant"}
-      >
-        {open ? <X className="size-5" /> : <MessageCircle className="size-5" />}
-      </button>
+      {/* Floating launch button — bottom-right; matches the timer FAB style.
+          Hidden while the drawer is open: the drawer (full-width on mobile)
+          would cover it, and we provide an explicit close button in the
+          drawer header instead. z-50 keeps it above the drawer when shown. */}
+      {!open && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="fixed bottom-4 right-4 z-50 size-12 rounded-full shadow-lg border border-primary/30 backdrop-blur-md transition-all flex items-center justify-center bg-card/80 text-primary hover:bg-card hover:scale-105"
+          aria-label="Open assistant"
+        >
+          <MessageCircle className="size-5" />
+        </button>
+      )}
+
+      {/* Click-catcher backdrop — tapping outside the drawer closes it
+          (essential on mobile where the drawer fills the screen). */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/20 sm:bg-transparent"
+          onClick={() => setOpen(false)}
+          aria-hidden
+        />
+      )}
 
       {/* Drawer */}
       <aside
-        className={`fixed top-0 right-0 z-40 h-full w-full sm:w-[440px] max-w-full bg-card border-l border-border shadow-2xl transition-transform duration-300 ${
+        className={`fixed top-0 right-0 z-50 h-full w-full sm:w-[440px] max-w-full bg-card border-l border-border shadow-2xl transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
         aria-hidden={!open}
@@ -132,6 +143,14 @@ export function PlatformChatDrawer() {
                 Clear
               </Button>
             )}
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center shrink-0"
+              aria-label="Close assistant"
+            >
+              <X className="size-4" />
+            </button>
           </div>
 
           {/* Messages */}

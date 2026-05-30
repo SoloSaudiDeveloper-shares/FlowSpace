@@ -12,6 +12,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────
 
 export type FontFamily = "geist" | "inter" | "jakarta" | "dm-sans"
+export type ArabicFont = "cairo" | "tajawal" | "ibm-arabic" | "noto-kufi" | "amiri"
 export type FontSize = "small" | "default" | "large"
 export type AccentColor = "neutral" | "blue" | "violet" | "rose" | "green" | "orange" | "teal"
 export type BorderRadius = "none" | "small" | "default" | "large" | "full"
@@ -60,6 +61,9 @@ export interface FeedTickerPreferences {
 
 export interface Preferences {
   fontFamily: FontFamily
+  /** Which Arabic webfont to use when the locale is Arabic. The Latin
+   *  `fontFamily` above has no Arabic glyphs, so we swap to this. */
+  arabicFont: ArabicFont
   fontSize: FontSize
   accentColor: AccentColor
   borderRadius: BorderRadius
@@ -147,6 +151,7 @@ export type HomeSectionKey =
 
 export const DEFAULT_PREFERENCES: Preferences = {
   fontFamily: "geist",
+  arabicFont: "cairo",
   fontSize: "default",
   accentColor: "neutral",
   borderRadius: "default",
@@ -307,6 +312,54 @@ export const FONT_CSS: Record<FontFamily, string> = {
   "dm-sans": "var(--font-dm-sans), 'DM Sans', system-ui, sans-serif",
 }
 
+// Arabic webfonts — applied to --font-sans whenever the locale is Arabic.
+// Each previews in Arabic so the user can see the actual shaping.
+export const ARABIC_FONT_OPTIONS: {
+  value: ArabicFont
+  label: string
+  description: string
+  preview: string
+}[] = [
+  {
+    value: "cairo",
+    label: "Cairo",
+    description: "Modern, rounded — great default",
+    preview: "مساحة العمل — أهلاً بك",
+  },
+  {
+    value: "tajawal",
+    label: "Tajawal",
+    description: "Clean and geometric",
+    preview: "مساحة العمل — أهلاً بك",
+  },
+  {
+    value: "ibm-arabic",
+    label: "IBM Plex Arabic",
+    description: "Professional and precise",
+    preview: "مساحة العمل — أهلاً بك",
+  },
+  {
+    value: "noto-kufi",
+    label: "Noto Kufi",
+    description: "Distinctive geometric Kufi",
+    preview: "مساحة العمل — أهلاً بك",
+  },
+  {
+    value: "amiri",
+    label: "Amiri",
+    description: "Elegant classical Naskh",
+    preview: "مساحة العمل — أهلاً بك",
+  },
+]
+
+export const ARABIC_FONT_CSS: Record<ArabicFont, string> = {
+  cairo: "var(--font-cairo), 'Cairo', system-ui, sans-serif",
+  tajawal: "var(--font-tajawal), 'Tajawal', system-ui, sans-serif",
+  "ibm-arabic": "var(--font-ibm-arabic), 'IBM Plex Sans Arabic', system-ui, sans-serif",
+  "noto-kufi": "var(--font-noto-kufi), 'Noto Kufi Arabic', system-ui, sans-serif",
+  amiri: "var(--font-amiri), 'Amiri', Georgia, serif",
+}
+
 export const FONT_SIZE_OPTIONS: { value: FontSize; label: string; size: string }[] = [
   { value: "small", label: "Small", size: "14px" },
   { value: "default", label: "Default", size: "16px" },
@@ -438,8 +491,15 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     if (!mounted) return
     const root = document.documentElement
 
-    // Font family
-    root.style.setProperty("--font-sans", FONT_CSS[preferences.fontFamily])
+    // Font family. Arabic has no glyphs in the Latin UI fonts, so when the
+    // locale is Arabic we drive --font-sans from the chosen Arabic webfont
+    // instead (and fall back to the Latin choice for everything else).
+    root.style.setProperty(
+      "--font-sans",
+      preferences.locale === "ar"
+        ? ARABIC_FONT_CSS[preferences.arabicFont] ?? ARABIC_FONT_CSS.cairo
+        : FONT_CSS[preferences.fontFamily],
+    )
 
     // Font size on html
     root.style.fontSize = FONT_SIZE_OPTIONS.find((o) => o.value === preferences.fontSize)?.size ?? "16px"

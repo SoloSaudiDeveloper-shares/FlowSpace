@@ -5,6 +5,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { User } from "lucide-react"
 import { FeedContent } from "@/components/feed/feed-content"
+import { PageTitle } from "@/components/layout/page-title"
 
 export default async function MyFeedPage() {
   const currentUser = await getCurrentUser().catch(() => null)
@@ -22,7 +23,7 @@ export default async function MyFeedPage() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 h-4" />
         <User className="size-4 text-primary" />
-        <h1 className="text-sm font-semibold">My Feed</h1>
+        <PageTitle titleKey="page.myFeed" fallback="My Feed" className="text-sm font-semibold" />
         {unreadCount > 0 && (
           <span className="ml-2 text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">{unreadCount} new</span>
         )}

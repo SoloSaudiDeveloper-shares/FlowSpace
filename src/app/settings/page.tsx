@@ -2,6 +2,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Settings } from "lucide-react"
 import { SettingsContent } from "@/components/settings/settings-content"
+import { PageTitle } from "@/components/layout/page-title"
 
 export default function SettingsPage() {
   return (
@@ -10,7 +11,7 @@ export default function SettingsPage() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 h-4" />
         <Settings className="size-4 text-muted-foreground" />
-        <h1 className="text-lg font-semibold">Settings</h1>
+        <PageTitle titleKey="page.settings" fallback="Settings" />
       </header>
 
       <div className="flex-1 overflow-auto">

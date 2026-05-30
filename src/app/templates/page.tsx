@@ -3,6 +3,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { BookTemplate } from "lucide-react"
 import { TemplatesContent } from "@/components/templates/templates-content"
+import { PageTitle } from "@/components/layout/page-title"
 
 export default async function TemplatesPage() {
   const [allTemplates, favorites, recent] = await Promise.all([
@@ -17,7 +18,7 @@ export default async function TemplatesPage() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 h-4" />
         <BookTemplate className="size-4 text-primary" />
-        <h1 className="text-sm font-semibold">Templates</h1>
+        <PageTitle titleKey="page.templates" fallback="Templates" className="text-sm font-semibold" />
       </header>
       <div className="flex-1 overflow-auto p-6">
         <TemplatesContent templates={allTemplates} favorites={favorites} recent={recent} />

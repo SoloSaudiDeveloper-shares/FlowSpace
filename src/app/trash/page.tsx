@@ -3,6 +3,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Trash2 } from "lucide-react"
 import { TrashList } from "@/components/trash/trash-list"
+import { PageTitle } from "@/components/layout/page-title"
 
 export default async function TrashPage() {
   const [deleted, archived] = await Promise.all([
@@ -16,7 +17,7 @@ export default async function TrashPage() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 h-4" />
         <Trash2 className="size-4 text-muted-foreground" />
-        <h1 className="text-lg font-semibold">Trash & Archive</h1>
+        <PageTitle titleKey="page.trash" fallback="Trash & Archive" />
       </header>
 
       <div className="flex-1 overflow-auto p-6 animate-page-enter">

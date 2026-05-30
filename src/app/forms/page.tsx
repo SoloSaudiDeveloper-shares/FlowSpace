@@ -3,6 +3,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { FileInput } from "lucide-react"
 import { FormsContent } from "@/components/forms/forms-content"
+import { PageTitle } from "@/components/layout/page-title"
 
 export default async function FormsPage() {
   const forms = await getForms()
@@ -12,7 +13,7 @@ export default async function FormsPage() {
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 h-4" />
         <FileInput className="size-4 text-primary" />
-        <h1 className="text-sm font-semibold">Forms</h1>
+        <PageTitle titleKey="page.forms" fallback="Forms" className="text-sm font-semibold" />
       </header>
       <div className="flex-1 overflow-auto p-6">
         <FormsContent forms={forms} />
