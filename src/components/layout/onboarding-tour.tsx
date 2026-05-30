@@ -108,12 +108,40 @@ export function OnboardingTour() {
   }, [preferences.onboardingCompletedAt])
 
   // Recompute target position when the step or viewport changes.
+  //
+  // Position tracking is event-driven — NO perpetual polling. There's no
+  // native "this element moved" event, so the original code brute-forced
+  // it with a 500ms setInterval that ran for the whole tour and kept the
+  // page permanently busy (battery drain, blocks the browser from going
+  // idle). Instead we:
+  //   1. recompute on resize + scroll (catches the common cases)
+  //   2. observe the target element with a ResizeObserver (its own size
+  //      changes) and the document body (layout reflow that shifts it)
+  //   3. run a SHORT settling loop via rAF for ~1s after each step change
+  //      — this catches async layout shifts (sidebar finishing an
+  //      animation, the highlighted element mounting a beat late) without
+  //      polling forever.
+  // After the settle window the page is idle until the user actually
+  // scrolls/resizes or the layout reflows.
   const step = STEPS[stepIdx]
   useEffect(() => {
     if (!open || !step) return
+
+    // Remember the last applied rect so the settle loop only triggers a
+    // re-render when the position actually moved. A stable layout =>
+    // exactly one update, then idle.
+    let lastKey = ""
+    function apply(next: { rect: DOMRect; centered: boolean } | null) {
+      const key = next
+        ? `${next.centered}:${Math.round(next.rect.left)}:${Math.round(next.rect.top)}:${Math.round(next.rect.width)}:${Math.round(next.rect.height)}`
+        : "null"
+      if (key === lastKey) return
+      lastKey = key
+      setTarget(next)
+    }
     function compute() {
       if (step.center) {
-        setTarget({
+        apply({
           rect: new DOMRect(
             window.innerWidth / 2 - 200,
             window.innerHeight / 2 - 60,
@@ -126,20 +154,43 @@ export function OnboardingTour() {
       }
       const el = document.querySelector(step.selector) as HTMLElement | null
       if (!el) {
-        setTarget(null)
+        apply(null)
         return
       }
-      const rect = el.getBoundingClientRect()
-      setTarget({ rect, centered: false })
+      apply({ rect: el.getBoundingClientRect(), centered: false })
     }
+
     compute()
     window.addEventListener("resize", compute)
     window.addEventListener("scroll", compute, true)
-    const interval = window.setInterval(compute, 500)
+
+    // Observe layout changes that move the target without firing
+    // resize/scroll (e.g. content above it growing). Cheap and only
+    // fires when something actually changes.
+    const ro = new ResizeObserver(() => compute())
+    ro.observe(document.body)
+    const targetEl = step.center
+      ? null
+      : (document.querySelector(step.selector) as HTMLElement | null)
+    if (targetEl) ro.observe(targetEl)
+
+    // Brief settle loop: recompute each frame for the first ~1s after the
+    // step opens, then stop. Handles elements that animate/mount late.
+    let rafId = 0
+    const settleUntil = performance.now() + 1000
+    const settle = () => {
+      compute()
+      if (performance.now() < settleUntil) {
+        rafId = requestAnimationFrame(settle)
+      }
+    }
+    rafId = requestAnimationFrame(settle)
+
     return () => {
       window.removeEventListener("resize", compute)
       window.removeEventListener("scroll", compute, true)
-      window.clearInterval(interval)
+      ro.disconnect()
+      cancelAnimationFrame(rafId)
     }
   }, [open, step])
 
