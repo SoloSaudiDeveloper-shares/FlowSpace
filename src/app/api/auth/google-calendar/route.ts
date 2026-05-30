@@ -18,9 +18,8 @@
 
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { cookies } from "next/headers"
 import { getCurrentUser } from "@/lib/actions/user-actions"
-import { isGoogleConfigured } from "@/lib/auth/google"
+import { isGoogleConfigured, resolveAppBaseUrl } from "@/lib/auth/google"
 import crypto from "crypto"
 
 export async function GET(req: NextRequest) {
@@ -36,15 +35,13 @@ export async function GET(req: NextRequest) {
   }
 
   const state = crypto.randomBytes(16).toString("base64url")
-  const cookieStore = await cookies()
-  cookieStore.set("gcal-oauth-state", state, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 600,
-  })
 
-  const callback = new URL("/api/auth/google-calendar/callback", req.url).toString()
+  // Build the callback from the canonical origin (PUBLIC_APP_URL / host
+  // header) — NOT req.url, which is the server's 0.0.0.0 bind address and
+  // gets rejected by Google as an invalid redirect_uri.
+  const baseUrl = await resolveAppBaseUrl()
+  const callback = `${baseUrl}/api/auth/google-calendar/callback`
+
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth")
   url.searchParams.set("client_id", process.env.GOOGLE_CLIENT_ID!)
   url.searchParams.set("redirect_uri", callback)
@@ -56,5 +53,17 @@ export async function GET(req: NextRequest) {
   url.searchParams.set("access_type", "offline")
   url.searchParams.set("prompt", "consent")
   url.searchParams.set("state", state)
-  return NextResponse.redirect(url.toString())
+
+  // Set the state cookie directly on the redirect response. In Next.js 16,
+  // cookies set via the ambient cookies() helper aren't reliably attached to
+  // a custom NextResponse — which surfaced as OAuth state mismatches.
+  const res = NextResponse.redirect(url.toString())
+  res.cookies.set("gcal-oauth-state", state, {
+    httpOnly: true,
+    secure: baseUrl.startsWith("https://"),
+    sameSite: "lax",
+    path: "/",
+    maxAge: 600,
+  })
+  return res
 }

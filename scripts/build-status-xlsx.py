@@ -81,6 +81,7 @@ ws["A2"].font = Font(name="Arial", italic=True, color="64748B", size=10)
 ws["A4"] = "Where things stand"
 ws["A4"].font = Font(name="Arial", bold=True, size=12)
 kpis = [
+    ("Fixes in the latest batch (verify these)", "=COUNTA('Recent fixes - verify'!A:A)-1"),
     ("Features delivered & shipped", "=COUNTA(Delivered!A:A)-1"),
     ("Things for YOU to verify on the live site", "=COUNTA('Needs your check'!A:A)-1"),
     ("Open to-dos / maintenance", "=COUNTA('To-do & Maintenance'!A:A)-1"),
@@ -153,6 +154,40 @@ write_table(ws, ["Area", "Feature", "Status"], [(a, f, "Done") for a, f in deliv
 auto_width(ws, [18, 92, 12])
 for r in range(2, len(delivered) + 2): ws.row_dimensions[r].height = 26
 
+# ─── Recent fixes — verify ──────────────────────────────────────────────
+ws = wb.create_sheet("Recent fixes - verify")
+recent = [
+    (1, "Language popup not clipped",
+     "Sidebar footer -> click the globe icon. The language menu opens fully on-screen (not cut off at the edge), including on a narrow / mobile-width window.", "Check", ""),
+    (2, "Language menu no longer crashes",
+     "Click the globe -> pick a language. It used to show 'This page couldn't load' — now it switches with no error.", "Check", ""),
+    (3, "Logged-out shows Login (not dashboard)",
+     "Sign out, or open the site in a private window. You should land on the LOGIN page — not empty dashboard cards.", "Check", ""),
+    (4, "AI assistant can be closed",
+     "Bottom-right chat button opens the drawer. Close it with the X in its header, by clicking outside it, or with Esc.", "Check", ""),
+    (5, "Arabic UI + RTL flip",
+     "Globe -> Arabic. The sidebar moves to the RIGHT, the layout mirrors, and page titles (Settings/People/...) + the login page read in Arabic.", "Check", ""),
+    (6, "Arabic font picker (5 fonts)",
+     "Settings -> Look & feel -> Language -> 'Arabic font'. Try Cairo / Tajawal / IBM Plex Arabic / Noto Kufi / Amiri — the whole app's Arabic font changes.", "Check", ""),
+    (7, "AI assistant replies in Arabic",
+     "With language = Arabic, open the assistant and ask anything. The answer comes back in Arabic. (Needs an AI provider configured.)", "Check", ""),
+    (8, "Google Calendar redirect fixed",
+     "Settings -> Calendar sync -> Connect. The Google screen should show your real domain, NOT 0.0.0.0:3000. ALSO REQUIRED: set PUBLIC_APP_URL on the VM, and add https://<your-domain>/api/auth/google-calendar/callback to Google Cloud Console -> Authorized redirect URIs.", "Check", ""),
+    (9, "Dark dropdown menus",
+     "Open a native dropdown (e.g. Automations -> Create Automation -> a Conditions field). The option list is dark with readable text — no more white-on-white.", "Check", ""),
+    (10, "Dialogs / Settings readable in Arabic",
+     "In Arabic mode, open Settings and any dialog (e.g. Create Automation). The English panels lay out left-to-right correctly — no stray periods on the wrong side, no title/X overlap.", "Check", ""),
+    (11, "Automation templates",
+     "Automations -> Create Automation -> 'Start from a template'. Pick one (e.g. 'Alert on high-priority tasks') — the form pre-fills. Tweak and Create.", "Check", ""),
+    (12, "Canvas minimap colours",
+     "Open a canvas with coloured cards/notes. The minimap (bottom-right) shows each node in its real colour instead of grey.", "Check", ""),
+    (13, "Canvas edge reconnect",
+     "On a canvas, right-click a connecting line -> 'Reconnect nearest end' -> click another node to reattach it. (You can also drag an edge's endpoint onto another node.)", "Check", ""),
+]
+write_table(ws, ["#", "Fix (this batch)", "How to test it", "Status", "Your check"], recent, status_col_index=4)
+auto_width(ws, [5, 32, 98, 12, 14])
+for r in range(2, len(recent) + 2): ws.row_dimensions[r].height = 54
+
 # ─── Needs your check ───────────────────────────────────────────────────
 ws = wb.create_sheet("Needs your check")
 checks = [
@@ -212,7 +247,7 @@ write_table(ws, ["#", "Feature", "Status", "Cost / constraint", "Notes"], heavy,
 auto_width(ws, [5, 34, 14, 28, 84])
 for r in range(2, len(heavy) + 2): ws.row_dimensions[r].height = 60
 
-wb._sheets = [wb["Summary"], wb["Delivered"], wb["Needs your check"], wb["To-do & Maintenance"], wb["Heavy & External"]]
+wb._sheets = [wb["Summary"], wb["Recent fixes - verify"], wb["Delivered"], wb["Needs your check"], wb["To-do & Maintenance"], wb["Heavy & External"]]
 
 OUT = r"C:\Users\malfa\OneDrive\سطح المكتب\flowspace-status.xlsx"
 wb.save(OUT)

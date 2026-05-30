@@ -99,6 +99,107 @@ const CONDITION_FIELDS = [
   "dueDate",
 ] as const
 
+// ─── Prebuilt templates ─────────────────────────────────────────────────
+// Ready-made automations the user can start from. Picking one pre-fills the
+// builder (name, trigger, conditions, actions); the user can tweak before
+// saving. Configs use only the action types that expose inputs in the
+// builder (create_task → title, post_notification → title+message) so the
+// pre-filled values are visible and editable.
+
+interface AutomationTemplate {
+  id: string
+  name: string
+  description: string
+  icon: string
+  trigger: TriggerType
+  conditions: { field: string; operator: Operator; value: string; logicGate: "and" | "or" }[]
+  actions: { actionType: ActionType; config: Record<string, string> }[]
+}
+
+const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
+  {
+    id: "high-priority-alert",
+    name: "Alert on high-priority tasks",
+    description: "Notify me whenever a new high-priority task is created.",
+    icon: "🔥",
+    trigger: "task_created",
+    conditions: [{ field: "priority", operator: "equals", value: "high", logicGate: "and" }],
+    actions: [
+      {
+        actionType: "post_notification",
+        config: { title: "High-priority task created", message: "A new high-priority task was just added." },
+      },
+    ],
+  },
+  {
+    id: "bug-flag",
+    name: "Flag bugs from the title",
+    description: "When a task title mentions \"bug\", raise a notification.",
+    icon: "🐞",
+    trigger: "task_created",
+    conditions: [{ field: "title", operator: "contains", value: "bug", logicGate: "and" }],
+    actions: [
+      {
+        actionType: "post_notification",
+        config: { title: "Possible bug reported", message: "A task mentioning 'bug' was created — triage it." },
+      },
+    ],
+  },
+  {
+    id: "celebrate-done",
+    name: "Celebrate completed work",
+    description: "Post a notification when a task is moved to Done.",
+    icon: "🎉",
+    trigger: "status_changed",
+    conditions: [{ field: "status", operator: "equals", value: "done", logicGate: "and" }],
+    actions: [
+      {
+        actionType: "post_notification",
+        config: { title: "Task completed 🎉", message: "A task just moved to Done. Nice work!" },
+      },
+    ],
+  },
+  {
+    id: "due-date-nudge",
+    name: "Due-date reminder",
+    description: "Get a heads-up the moment a task hits its due date.",
+    icon: "⏰",
+    trigger: "due_date_reached",
+    conditions: [],
+    actions: [
+      {
+        actionType: "post_notification",
+        config: { title: "Task is due", message: "A task has reached its due date." },
+      },
+    ],
+  },
+  {
+    id: "form-to-task",
+    name: "Form submission → follow-up task",
+    description: "Create a follow-up task whenever a form is submitted.",
+    icon: "📥",
+    trigger: "form_submitted",
+    conditions: [],
+    actions: [
+      { actionType: "create_task", config: { title: "Follow up on new form submission" } },
+    ],
+  },
+  {
+    id: "dependency-unblocked",
+    name: "Notify when unblocked",
+    description: "Tell me when a blocking dependency is resolved.",
+    icon: "🔓",
+    trigger: "dependency_resolved",
+    conditions: [],
+    actions: [
+      {
+        actionType: "post_notification",
+        config: { title: "Task unblocked", message: "A blocking dependency was just resolved." },
+      },
+    ],
+  },
+]
+
 function humanize(str: string): string {
   return str
     .replace(/_/g, " ")
@@ -187,6 +288,19 @@ export function AutomationsContent({
   function openCreate() {
     resetBuilder()
     setShowBuilder(true)
+  }
+
+  /** Pre-fill the builder from a prebuilt template (create mode only). */
+  function applyTemplate(tpl: AutomationTemplate) {
+    setEditingId(null)
+    setName(tpl.name)
+    setDescription(tpl.description)
+    setTrigger(tpl.trigger)
+    setProjectId("")
+    setConditions(tpl.conditions.map((c) => ({ ...c })))
+    setActions(tpl.actions.map((a) => ({ actionType: a.actionType, config: { ...a.config } })))
+    setConditionsOpen(tpl.conditions.length > 0)
+    setActionsOpen(tpl.actions.length > 0)
   }
 
   function openEdit(automation: any) {
@@ -725,6 +839,37 @@ export function AutomationsContent({
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Templates — quick-start presets (create mode only) */}
+            {!editingId && (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                  Start from a template
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {AUTOMATION_TEMPLATES.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      onClick={() => applyTemplate(tpl)}
+                      title={tpl.description}
+                      className="flex items-start gap-2 rounded-lg border border-border/60 p-2 text-left transition-colors hover:border-primary/40 hover:bg-accent/30"
+                    >
+                      <span className="text-base leading-none mt-0.5">{tpl.icon}</span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-medium truncate">{tpl.name}</span>
+                        <span className="block text-[10px] text-muted-foreground leading-tight line-clamp-2">
+                          {tpl.description}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 mt-1.5">
+                  Picking a template fills in the form below — tweak anything before you create it.
+                </p>
+              </div>
+            )}
+
             {/* Name */}
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">

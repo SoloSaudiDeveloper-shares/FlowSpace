@@ -24,6 +24,28 @@ export function isGoogleConfigured(): boolean {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
 }
 
+/**
+ * Resolve the canonical app origin for building OAuth redirect URIs.
+ *
+ * Google validates redirect_uri byte-for-byte against the Cloud Console
+ * allowlist, so it MUST be a real, stable origin — never the server's bind
+ * address. We prefer the operator-set PUBLIC_APP_URL; otherwise we derive it
+ * from the request's forwarded host. The dev server binds to 0.0.0.0, which
+ * leaks into `req.url`; the `host` header carries what the browser actually
+ * typed (e.g. localhost:3000), so we use that and defensively rewrite any
+ * stray 0.0.0.0 to localhost.
+ */
+export async function resolveAppBaseUrl(): Promise<string> {
+  const env = process.env.PUBLIC_APP_URL?.replace(/\/$/, "")
+  if (env) return env
+  const { headers } = await import("next/headers")
+  const h = await headers()
+  const proto = h.get("x-forwarded-proto") || "http"
+  let host = h.get("host") || "localhost:3000"
+  if (host.startsWith("0.0.0.0")) host = host.replace("0.0.0.0", "localhost")
+  return `${proto}://${host}`
+}
+
 /** Build a base64url string from random bytes (URL-safe, no padding). */
 function randomB64Url(bytes = 32): string {
   return crypto.randomBytes(bytes).toString("base64url")

@@ -183,6 +183,10 @@
 }
 
 :root {
+  /* Tell the browser to render native controls (select option lists, date
+     pickers, scrollbars) in light mode by default. Without this, the native
+     <select> dropdown popup renders white-on-white in dark mode. */
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -218,6 +222,8 @@
 }
 
 .dark {
+  /* Native controls (select dropdowns, scrollbars) follow dark mode too. */
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);

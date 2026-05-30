@@ -7,6 +7,7 @@ import {
   Background,
   MiniMap,
   addEdge,
+  reconnectEdge,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -28,6 +29,7 @@ import {
   Eye, EyeOff,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 import {
   saveCanvasNodes,
   saveCanvasEdges,
@@ -208,6 +210,71 @@ function CanvasEditorInner({
     },
     [setEdges, debouncedSave]
   )
+
+  // ─── Edge reconnection ──────────────────────────────────────────────
+  // Two ways to redirect an edge:
+  //  1. Native: hover an edge and drag either endpoint onto another node's
+  //     handle (React Flow fires onReconnect).
+  //  2. Right-click → "Reconnect nearest end": releases the endpoint closest
+  //     to the cursor; the next node you click becomes the new attachment.
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      setEdges((eds) => reconnectEdge(oldEdge, newConnection, eds))
+      setTimeout(debouncedSave, 100)
+    },
+    [setEdges, debouncedSave]
+  )
+
+  const [reconnecting, setReconnecting] = useState<
+    { edgeId: string; end: "source" | "target" } | null
+  >(null)
+
+  const startReconnect = useCallback(
+    (edge: Edge, cx: number, cy: number) => {
+      const click = screenToFlowPosition({ x: cx, y: cy })
+      const all = getNodes()
+      const centerOf = (id: string) => {
+        const n = all.find((node) => node.id === id)
+        if (!n) return null
+        return {
+          x: n.position.x + (Number(n.style?.width) || n.measured?.width || 150) / 2,
+          y: n.position.y + (Number(n.style?.height) || n.measured?.height || 100) / 2,
+        }
+      }
+      const distTo = (p: { x: number; y: number } | null) =>
+        p ? Math.hypot(p.x - click.x, p.y - click.y) : Infinity
+      const end: "source" | "target" =
+        distTo(centerOf(edge.source)) <= distTo(centerOf(edge.target))
+          ? "source"
+          : "target"
+      setReconnecting({ edgeId: edge.id, end })
+      toast.info(
+        `Click a node to reattach the ${end === "source" ? "start" : "end"} of this edge — or click empty space to cancel.`,
+      )
+    },
+    [screenToFlowPosition, getNodes]
+  )
+
+  const handleNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      if (!reconnecting) return
+      setEdges((eds) =>
+        eds.map((ed) =>
+          ed.id === reconnecting.edgeId
+            ? { ...ed, [reconnecting.end]: node.id }
+            : ed,
+        ),
+      )
+      setReconnecting(null)
+      toast.success("Edge reconnected")
+      setTimeout(debouncedSave, 100)
+    },
+    [reconnecting, setEdges, debouncedSave]
+  )
+
+  const cancelReconnect = useCallback(() => {
+    if (reconnecting) setReconnecting(null)
+  }, [reconnecting])
 
   const handleNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChange>[0]) => {
@@ -433,7 +500,15 @@ function CanvasEditorInner({
   const selectedCount = nodes.filter((n) => n.selected).length
 
   function handleEdgeContextMenu(e: React.MouseEvent, edge: Edge) {
+    const cx = e.clientX
+    const cy = e.clientY
     const items: ContextMenuEntry[] = [
+      {
+        label: "Reconnect nearest end",
+        icon: Link2,
+        onClick: () => startReconnect(edge, cx, cy),
+      },
+      { separator: true },
       {
         label: edge.animated ? "Remove Animation" : "Animate Edge",
         onClick: () => {
@@ -464,6 +539,9 @@ function CanvasEditorInner({
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
+        onReconnect={onReconnect}
+        onNodeClick={handleNodeClick}
+        onPaneClick={cancelReconnect}
         onMoveEnd={handleMoveEnd}
         onPaneContextMenu={handlePaneContextMenu}
         onNodeContextMenu={handleNodeContextMenu}
@@ -494,7 +572,22 @@ function CanvasEditorInner({
           />
         )}
         {config.showMinimap && (
-          <MiniMap zoomable pannable className="!bg-background !border-border" />
+          <MiniMap
+            zoomable
+            pannable
+            className="!bg-background !border-border"
+            // Render each node in the minimap with its real colour (sticky
+            // notes / groups store it in data.color); fall back to a neutral
+            // tone for plain cards so they're still visible.
+            nodeColor={(n) => {
+              const c = (n.data as { color?: string } | undefined)?.color
+              if (typeof c === "string" && c) return c
+              return resolvedTheme === "dark" ? "#52525b" : "#d4d4d8"
+            }}
+            nodeStrokeColor={resolvedTheme === "dark" ? "#27272a" : "#e4e4e7"}
+            nodeStrokeWidth={2}
+            maskColor={resolvedTheme === "dark" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)"}
+          />
         )}
 
         <Panel position="top-left">

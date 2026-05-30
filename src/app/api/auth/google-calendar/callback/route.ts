@@ -10,6 +10,7 @@ import type { NextRequest } from "next/server"
 import { cookies } from "next/headers"
 import { sqlite } from "@/lib/db"
 import { getCurrentUser } from "@/lib/actions/user-actions"
+import { resolveAppBaseUrl } from "@/lib/auth/google"
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser()
@@ -33,8 +34,10 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  // Exchange the code for tokens
-  const callback = new URL("/api/auth/google-calendar/callback", req.url).toString()
+  // Exchange the code for tokens. The redirect_uri MUST be byte-identical to
+  // the one used in the start request, so resolve it the same way (canonical
+  // origin, never the 0.0.0.0 bind address).
+  const callback = `${await resolveAppBaseUrl()}/api/auth/google-calendar/callback`
   const body = new URLSearchParams({
     code,
     client_id: process.env.GOOGLE_CLIENT_ID!,

@@ -392,7 +392,10 @@ export function SettingsContent() {
   }, [activeSectionId])
 
   return (
-    <div className="flex flex-col" data-active-section={activeSectionId} data-active-group={activeGroup}>
+    // Settings panels are still English-only; render the whole body LTR so
+    // its text and controls lay out correctly even when the app chrome is in
+    // Arabic (RTL). The page title/sidebar around it stay RTL.
+    <div className="flex flex-col" dir="ltr" data-active-section={activeSectionId} data-active-group={activeGroup}>
       {/* ─── Top tab bar — mirrors the admin page chrome ──────────────── */}
       <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 px-6">
         <div className="flex items-center gap-1 pt-3">

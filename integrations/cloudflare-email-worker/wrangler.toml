@@ -1,0 +1,12 @@
+name = "flowspace-email-forwarder"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Plain (non-secret) variable: the FlowSpace inbound webhook URL.
+# Edit this to your real domain.
+[vars]
+FLOWSPACE_WEBHOOK = "https://flowspace.tashkeelh.com/api/email/inbound"
+
+# INBOUND_SECRET is a SECRET, not stored here. Set it with:
+#   npx wrangler secret put INBOUND_SECRET
+# (must match EMAIL_INBOUND_SECRET on the VM)

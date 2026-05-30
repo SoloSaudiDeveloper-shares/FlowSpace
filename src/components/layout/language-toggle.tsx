@@ -28,7 +28,6 @@ import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu"
@@ -58,9 +57,11 @@ export function LanguageToggle() {
         sideOffset={6}
         className="min-w-[180px]"
       >
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+        {/* Plain div, NOT DropdownMenuLabel — base-ui's GroupLabel throws if
+            it isn't wrapped in a Menu.Group, and we don't need a group here. */}
+        <div className="px-1.5 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">
           Language
-        </DropdownMenuLabel>
+        </div>
         <DropdownMenuRadioGroup
           value={locale}
           onValueChange={(value) => setLocale(value as Locale)}
