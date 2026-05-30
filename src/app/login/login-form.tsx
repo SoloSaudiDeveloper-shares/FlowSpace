@@ -7,6 +7,7 @@ import { createUser } from "@/lib/actions/user-actions"
 import { useRouter } from "next/navigation"
 import { Loader2, LogIn, UserPlus, Eye, EyeOff, Zap } from "lucide-react"
 import { useT } from "@/lib/hooks/use-i18n"
+import { USFlag, SaudiFlag } from "@/components/shared/flag-icons"
 
 type Mode = "login" | "register"
 
@@ -142,13 +143,13 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
 
   return (
     <div className="relative flex items-center justify-center min-h-[80vh] px-4">
-      {/* Flag picker top-right (top-left on RTL). Two-flag chip — single
-          click flips the locale, keyboard-accessible. */}
-      <div className="absolute top-4 right-4 rtl:right-auto rtl:left-4 flex items-center gap-0.5 rounded-full border border-border/40 bg-card/70 backdrop-blur-md p-0.5 shadow-sm">
+      {/* Language picker top-right (top-left on RTL). Real SVG flags —
+          emoji flags render as "US"/"SA" text on Windows. */}
+      <div className="absolute top-4 right-4 rtl:right-auto rtl:left-4 flex items-center gap-1 rounded-full border border-border/40 bg-card/70 backdrop-blur-md p-1 shadow-sm">
         <button
           type="button"
           onClick={() => setLocale("en")}
-          className={`size-8 rounded-full flex items-center justify-center text-base transition-all ${
+          className={`size-8 rounded-full flex items-center justify-center transition-all ${
             locale === "en"
               ? "ring-2 ring-primary bg-primary/10"
               : "opacity-50 hover:opacity-100"
@@ -156,12 +157,12 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
           aria-label="English"
           title="English"
         >
-          🇺🇸
+          <USFlag size={18} />
         </button>
         <button
           type="button"
           onClick={() => setLocale("ar")}
-          className={`size-8 rounded-full flex items-center justify-center text-base transition-all ${
+          className={`size-8 rounded-full flex items-center justify-center transition-all ${
             locale === "ar"
               ? "ring-2 ring-primary bg-primary/10"
               : "opacity-50 hover:opacity-100"
@@ -169,7 +170,7 @@ export function LoginForm({ signupsEnabled, googleConfigured, initialError }: Lo
           aria-label="العربية"
           title="العربية"
         >
-          🇸🇦
+          <SaudiFlag size={18} />
         </button>
       </div>
       <div className="w-full max-w-sm">

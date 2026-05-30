@@ -80,6 +80,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { LanguageToggle } from "@/components/layout/language-toggle"
 import { openCommandPalette } from "@/components/layout/command-palette"
 import { Search } from "lucide-react"
 import {
@@ -1711,7 +1712,10 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <div className="flex items-center justify-between px-2">
-              <ThemeToggle />
+              <div className="flex items-center gap-0.5">
+                <ThemeToggle />
+                <LanguageToggle />
+              </div>
               {user && (
                 <button
                   onClick={() => logout()}
