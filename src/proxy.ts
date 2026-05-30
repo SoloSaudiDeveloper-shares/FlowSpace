@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-// Public paths that don't require authentication. Note: `/api/telegram` is
-// reached by Telegram's servers POSTing webhook updates — no session cookie
-// possible. The webhook route does its own auth via a per-user secret in the
-// URL path AND a matching `X-Telegram-Bot-Api-Secret-Token` header.
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/telegram", "/forgot-password", "/reset-password", "/verify-email"]
+// Public paths that don't require a session cookie. These are reached by
+// external callers (webhooks, browser extensions) that can't carry a session,
+// so they authenticate themselves:
+//   /api/telegram — per-user secret in the URL + X-Telegram-Bot-Api-Secret-Token
+//   /api/email    — inbound-mail webhook; X-Inbound-Secret header (EMAIL_INBOUND_SECRET)
+//   /api/clip     — web clipper; Authorization: Bearer <API token>
+// Without these here, the proxy would 307 the webhook to /login and the
+// caller (e.g. the Cloudflare email worker) silently follows the redirect —
+// looking "delivered" while never reaching the handler.
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/telegram", "/api/email", "/api/clip", "/forgot-password", "/reset-password", "/verify-email"]
 // Static asset patterns
 const STATIC_PATTERNS = [
   "/_next",
