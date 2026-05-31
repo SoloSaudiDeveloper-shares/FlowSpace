@@ -71,3 +71,19 @@ export async function disconnectCalendarSync(): Promise<{ ok: true }> {
     .run(me.id)
   return { ok: true }
 }
+
+/**
+ * Push this user's dated items to Google right now (instead of waiting for the
+ * 5-minute cron). Returns how many events were created / removed so the UI can
+ * give immediate feedback.
+ */
+export async function runMyCalendarSyncNow(): Promise<
+  { ok: true; pushed: number; removed: number } | { ok: false; error: string }
+> {
+  const me = await requireAuth()
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return { ok: false, error: "Google isn't configured on this server." }
+  }
+  const { syncGoogleCalendarNow } = await import("@/lib/calendar/google-sync")
+  return syncGoogleCalendarNow(me.id)
+}

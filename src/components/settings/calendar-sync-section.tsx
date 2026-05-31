@@ -1,22 +1,46 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Calendar, ExternalLink, AlertCircle, Loader2, Check } from "lucide-react"
+import { Calendar, ExternalLink, AlertCircle, Loader2, Check, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import {
   getCalendarSyncStatus,
   setCalendarSyncEnabled,
   disconnectCalendarSync,
+  runMyCalendarSyncNow,
   type CalendarSyncStatus,
 } from "@/lib/actions/calendar-sync-actions"
+import { SectionHelp } from "@/components/shared/section-help"
 
 export function CalendarSyncSection() {
   const [status, setStatus] = useState<CalendarSyncStatus | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     void getCalendarSyncStatus().then(setStatus).catch(() => undefined)
   }, [])
+
+  async function handleSyncNow() {
+    setSyncing(true)
+    try {
+      const r = await runMyCalendarSyncNow()
+      if (!r.ok) {
+        toast.error(r.error)
+        return
+      }
+      if (r.pushed === 0 && r.removed === 0) {
+        toast.info("Already up to date — nothing new with a date to push.")
+      } else {
+        toast.success(
+          `Synced: ${r.pushed} added${r.removed ? `, ${r.removed} removed` : ""}. Check Google Calendar.`,
+        )
+      }
+      void getCalendarSyncStatus().then(setStatus).catch(() => undefined)
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   if (!status) {
     return (
@@ -60,37 +84,54 @@ export function CalendarSyncSection() {
         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/15 text-emerald-300">
           {status.enabled ? "Syncing" : "Paused"}
         </span>
+        <SectionHelp guideId="calendarSync" className="ml-auto" />
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Pushing to <code className="px-1 py-0.5 text-[10px] bg-muted/50 rounded">{status.calendarId}</code>.
-        Last sync:{" "}
+        Pushing <strong>tasks, to-dos, reminders, and project deadlines</strong>{" "}
+        (anything with a date) to{" "}
+        <code className="px-1 py-0.5 text-[10px] bg-muted/50 rounded">{status.calendarId}</code>{" "}
+        as all-day events, every 5 minutes. Last sync:{" "}
         {status.lastSyncAt
           ? new Date(status.lastSyncAt).toLocaleString()
           : "never"}
       </p>
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Button
           size="sm"
-          variant={status.enabled ? "outline" : "default"}
+          variant="default"
+          className="h-7 text-xs gap-1.5"
+          disabled={syncing}
+          onClick={handleSyncNow}
+        >
+          {syncing ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            <RefreshCw className="size-3" />
+          )}
+          Sync now
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
           className="h-7 text-xs"
           onClick={async () => {
             const r = await setCalendarSyncEnabled(!status.enabled)
             if (r.ok) {
-              toast.success(status.enabled ? "Sync paused" : "Sync resumed")
+              toast.success(status.enabled ? "Auto-sync paused" : "Auto-sync resumed")
               setStatus({ ...status, enabled: !status.enabled })
             } else {
               toast.error(r.error)
             }
           }}
         >
-          {status.enabled ? "Pause sync" : "Resume sync"}
+          {status.enabled ? "Pause auto-sync" : "Resume auto-sync"}
         </Button>
         <Button
           size="sm"
           variant="ghost"
           className="h-7 text-xs text-destructive hover:text-destructive"
           onClick={async () => {
-            if (!confirm("Disconnect Google Calendar? Existing events stay; new tasks won't be pushed.")) return
+            if (!confirm("Disconnect Google Calendar? Existing events stay; new items won't be pushed.")) return
             await disconnectCalendarSync()
             toast.success("Disconnected")
             setStatus({ ...status, connected: false })
@@ -102,8 +143,9 @@ export function CalendarSyncSection() {
       <div className="flex items-start gap-2 px-2.5 py-2 rounded-md border border-amber-500/30 bg-amber-500/5">
         <AlertCircle className="size-3 text-amber-400 shrink-0 mt-0.5" />
         <p className="text-[11px] text-amber-200/85 leading-relaxed">
-          Sync is one-way. Tasks → Calendar. Editing the event on Google
-          Calendar's side won't change the FlowSpace task.
+          One-way: FlowSpace → Google. Give a task a due date (or add a reminder
+          / set a project deadline), then open Google Calendar to see it.
+          Editing the event in Google won&apos;t change FlowSpace.
         </p>
       </div>
     </div>

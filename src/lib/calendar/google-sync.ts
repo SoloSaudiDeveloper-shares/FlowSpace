@@ -1,17 +1,18 @@
 /**
- * Google Calendar one-way sync engine.
+ * Google Calendar one-way sync engine (FlowSpace → Google).
  *
- * Called by the cron every 5 minutes. For each connected user:
- *  - mint a fresh access token from their refresh token (if expired)
- *  - find tasks with a due_date that don't yet have a linked event
- *  - POST each one to /calendar/v3/calendars/{id}/events as an all-day
- *    event
- *  - record the event id in google_calendar_events for future updates
- *  - find linked events whose task was deleted or unscheduled, and
- *    delete them
+ * Runs from the cron every 5 minutes (all enabled users) and on demand via
+ * the "Sync now" button (a single user). For each user it:
+ *  - mints a fresh access token from their refresh token (if expired)
+ *  - gathers every dated item they own — tasks, standalone to-dos,
+ *    reminders, and project due dates — that isn't yet on the calendar
+ *  - POSTs each as an all-day event and records source_id ↔ event_id in
+ *    google_calendar_events (the `task_id` column is used as a generic
+ *    source id; any element/task/todo/reminder id goes there)
+ *  - deletes events whose source was removed or had its date cleared
  *
- * Failures are logged but never throw — one user's broken refresh
- * shouldn't block the others.
+ * Failures are logged but never throw — one user's broken refresh shouldn't
+ * block the others.
  */
 
 import "server-only"
@@ -23,6 +24,14 @@ interface SyncRow {
   accessToken: string | null
   accessExpiresAt: string | null
   calendarId: string
+}
+
+/** A calendar-worthy item from any source, normalised to a single date. */
+interface CalendarItem {
+  id: string
+  title: string
+  description: string | null
+  date: string
 }
 
 async function ensureAccessToken(row: SyncRow): Promise<string | null> {
@@ -61,12 +70,72 @@ async function ensureAccessToken(row: SyncRow): Promise<string | null> {
   return tokens.access_token
 }
 
-async function pushTask(
+/** Every dated item a user owns, across all four sources. */
+function collectCalendarItems(userId: string): CalendarItem[] {
+  const items: CalendarItem[] = []
+
+  // 1. Tasks with a due date (project owned by the user, project not trashed).
+  items.push(
+    ...(sqlite
+      .prepare(
+        `SELECT t.id, t.title, t.description, t.due_date AS date
+           FROM tasks t
+           JOIN elements e ON e.id = t.project_id
+          WHERE e.created_by = ? AND e.is_deleted = 0
+            AND t.due_date IS NOT NULL AND t.due_date != ''`,
+      )
+      .all(userId) as CalendarItem[]),
+  )
+
+  // 2. Standalone to-do items with a due date (list owned by the user).
+  items.push(
+    ...(sqlite
+      .prepare(
+        `SELECT ti.id, ti.title, ti.notes AS description, ti.due_date AS date
+           FROM todo_items ti
+           JOIN elements e ON e.id = ti.list_id
+          WHERE e.created_by = ? AND e.is_deleted = 0
+            AND ti.due_date IS NOT NULL AND ti.due_date != ''`,
+      )
+      .all(userId) as CalendarItem[]),
+  )
+
+  // 3. Reminders (the element itself carries the title/description).
+  items.push(
+    ...(sqlite
+      .prepare(
+        `SELECT r.id, e.title, e.description, r.remind_at AS date
+           FROM reminders r
+           JOIN elements e ON e.id = r.id
+          WHERE e.created_by = ? AND e.is_deleted = 0
+            AND r.is_dismissed = 0
+            AND r.remind_at IS NOT NULL AND r.remind_at != ''`,
+      )
+      .all(userId) as CalendarItem[]),
+  )
+
+  // 4. Project due dates.
+  items.push(
+    ...(sqlite
+      .prepare(
+        `SELECT p.id, e.title, e.description, p.due_date AS date
+           FROM projects p
+           JOIN elements e ON e.id = p.id
+          WHERE e.created_by = ? AND e.is_deleted = 0
+            AND p.due_date IS NOT NULL AND p.due_date != ''`,
+      )
+      .all(userId) as CalendarItem[]),
+  )
+
+  return items
+}
+
+async function pushEvent(
   accessToken: string,
   calendarId: string,
-  task: { id: string; title: string; description: string | null; dueDate: string },
+  item: CalendarItem,
 ): Promise<string | null> {
-  const date = task.dueDate.slice(0, 10)
+  const date = item.date.slice(0, 10)
   const next = new Date(date + "T00:00:00Z")
   next.setUTCDate(next.getUTCDate() + 1)
   const nextDate = next.toISOString().slice(0, 10)
@@ -79,8 +148,8 @@ async function pushTask(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        summary: task.title,
-        description: (task.description ?? "") + "\n\n— from FlowSpace",
+        summary: item.title,
+        description: (item.description ?? "") + "\n\n— from FlowSpace",
         start: { date },
         end: { date: nextDate },
       }),
@@ -107,6 +176,65 @@ async function deleteEvent(
   return res.ok || res.status === 410
 }
 
+/**
+ * Sync one user. Returns how many events were created / removed, or null if
+ * the access token couldn't be minted. Never throws.
+ */
+export async function syncGoogleCalendarForUser(
+  row: SyncRow,
+): Promise<{ pushed: number; removed: number } | null> {
+  const token = await ensureAccessToken(row)
+  if (!token) return null
+
+  const items = collectCalendarItems(row.userId)
+  const validIds = new Set(items.map((i) => i.id))
+
+  // What's already on the calendar for this user.
+  const existing = sqlite
+    .prepare(
+      `SELECT task_id AS sourceId, event_id AS eventId
+         FROM google_calendar_events WHERE user_id = ?`,
+    )
+    .all(row.userId) as { sourceId: string; eventId: string }[]
+  const existingIds = new Set(existing.map((e) => e.sourceId))
+
+  let pushed = 0
+  for (const item of items) {
+    if (existingIds.has(item.id)) continue
+    const eventId = await pushEvent(token, row.calendarId, item)
+    if (eventId) {
+      sqlite
+        .prepare(
+          `INSERT OR REPLACE INTO google_calendar_events (task_id, event_id, user_id)
+           VALUES (?, ?, ?)`,
+        )
+        .run(item.id, eventId, row.userId)
+      pushed++
+    }
+  }
+
+  let removed = 0
+  for (const e of existing) {
+    if (validIds.has(e.sourceId)) continue
+    const ok = await deleteEvent(token, row.calendarId, e.eventId)
+    if (ok) {
+      sqlite
+        .prepare(`DELETE FROM google_calendar_events WHERE task_id = ?`)
+        .run(e.sourceId)
+      removed++
+    }
+  }
+
+  sqlite
+    .prepare(
+      `UPDATE google_calendar_sync SET last_sync_at = datetime('now') WHERE user_id = ?`,
+    )
+    .run(row.userId)
+
+  return { pushed, removed }
+}
+
+/** Cron entry point: sync every enabled user. */
 export async function syncGoogleCalendarForAllUsers(): Promise<void> {
   const rows = sqlite
     .prepare(
@@ -120,55 +248,41 @@ export async function syncGoogleCalendarForAllUsers(): Promise<void> {
     .all() as SyncRow[]
   for (const row of rows) {
     try {
-      const token = await ensureAccessToken(row)
-      if (!token) continue
-      // Tasks with due dates that haven't been pushed yet
-      const newTasks = sqlite
-        .prepare(
-          `SELECT t.id, t.title, t.description, t.due_date AS dueDate
-             FROM tasks t
-        LEFT JOIN google_calendar_events g ON g.task_id = t.id
-        LEFT JOIN elements e ON e.id = t.project_id
-            WHERE e.created_by = ?
-              AND t.due_date IS NOT NULL
-              AND g.event_id IS NULL`,
-        )
-        .all(row.userId) as { id: string; title: string; description: string | null; dueDate: string }[]
-      for (const task of newTasks) {
-        const eventId = await pushTask(token, row.calendarId, task)
-        if (eventId) {
-          sqlite
-            .prepare(
-              `INSERT INTO google_calendar_events (task_id, event_id) VALUES (?, ?)`,
-            )
-            .run(task.id, eventId)
-        }
-      }
-      // Orphans: linked event but task deleted/unscheduled
-      const orphans = sqlite
-        .prepare(
-          `SELECT g.task_id AS taskId, g.event_id AS eventId
-             FROM google_calendar_events g
-        LEFT JOIN tasks t ON t.id = g.task_id
-        LEFT JOIN elements e ON e.id = t.project_id
-            WHERE (t.id IS NULL OR t.due_date IS NULL OR (e.created_by IS NULL OR e.created_by != ?))`,
-        )
-        .all(row.userId) as { taskId: string; eventId: string }[]
-      for (const o of orphans) {
-        const ok = await deleteEvent(token, row.calendarId, o.eventId)
-        if (ok) {
-          sqlite
-            .prepare(`DELETE FROM google_calendar_events WHERE task_id = ?`)
-            .run(o.taskId)
-        }
-      }
-      sqlite
-        .prepare(
-          `UPDATE google_calendar_sync SET last_sync_at = datetime('now') WHERE user_id = ?`,
-        )
-        .run(row.userId)
+      await syncGoogleCalendarForUser(row)
     } catch (err) {
       console.error("[gcal-sync] user", row.userId, err)
+    }
+  }
+}
+
+/**
+ * Manual "Sync now" for a single user. Looks up their connection (must be
+ * connected; runs even if paused since it's an explicit action) and syncs.
+ * Returns counts, or an error reason.
+ */
+export async function syncGoogleCalendarNow(
+  userId: string,
+): Promise<{ ok: true; pushed: number; removed: number } | { ok: false; error: string }> {
+  const row = sqlite
+    .prepare(
+      `SELECT user_id AS userId, refresh_token AS refreshToken,
+              access_token AS accessToken,
+              access_expires_at AS accessExpiresAt,
+              calendar_id AS calendarId
+         FROM google_calendar_sync WHERE user_id = ?`,
+    )
+    .get(userId) as SyncRow | undefined
+  if (!row) return { ok: false, error: "Connect Google Calendar first." }
+  try {
+    const result = await syncGoogleCalendarForUser(row)
+    if (!result) {
+      return { ok: false, error: "Couldn't reach Google — try reconnecting." }
+    }
+    return { ok: true, ...result }
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Sync failed.",
     }
   }
 }

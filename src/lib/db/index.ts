@@ -344,6 +344,27 @@ sqlite.exec(`
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `)
+// Migration: add user_id so sync can own events across ALL sources (tasks,
+// to-dos, reminders, project deadlines) and clean up orphans per-user. The
+// task_id column doubles as a generic "source id". Idempotent.
+{
+  const gcalCols = sqlite
+    .prepare(`PRAGMA table_info(google_calendar_events)`)
+    .all() as { name: string }[]
+  if (!gcalCols.some((c) => c.name === "user_id")) {
+    sqlite.exec(`ALTER TABLE google_calendar_events ADD COLUMN user_id TEXT`)
+    // Backfill existing task-based rows from task → project → owner.
+    sqlite.exec(`
+      UPDATE google_calendar_events
+         SET user_id = (
+           SELECT e.created_by FROM tasks t
+             JOIN elements e ON e.id = t.project_id
+            WHERE t.id = google_calendar_events.task_id
+         )
+       WHERE user_id IS NULL
+    `)
+  }
+}
 
 // ─── Full-text search (FTS5) ───────────────────────────────────────────
 //
