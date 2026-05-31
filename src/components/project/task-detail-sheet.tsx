@@ -143,10 +143,26 @@ type Dependency = {
 }
 
 function formatDuration(seconds: number) {
-  const h = Math.floor(seconds / 3600)
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = seconds % 60
-  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+  const hms = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+  return d > 0 ? `${d}d ${hms}` : hms
+}
+
+/** Human total like "2h 15m" / "1d 3h" for the small label under the timer. */
+function humanDuration(seconds: number) {
+  if (seconds <= 0) return ""
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const parts: string[] = []
+  if (d) parts.push(`${d}d`)
+  if (h) parts.push(`${h}h`)
+  if (m && !d) parts.push(`${m}m`)
+  if (!parts.length) parts.push(`${seconds}s`)
+  return parts.join(" ")
 }
 
 // ── Collapsible section ──
@@ -193,6 +209,14 @@ export function TaskDetailSheet({
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
 
+  // Editable properties mirror the task locally so a change shows immediately
+  // (the `task` prop is stale until the parent re-fetches).
+  const [statusId, setStatusId] = useState("")
+  const [priority, setPriority] = useState<Task["priority"]>("none")
+  const [startDate, setStartDate] = useState("")
+  const [dueDate, setDueDate] = useState("")
+  const [timeEstimate, setTimeEstimate] = useState<number | null>(null)
+
   // Subtasks
   const [subtasks, setSubtasks] = useState<Task[]>([])
   const [isAddingSubtask, setIsAddingSubtask] = useState(false)
@@ -218,11 +242,16 @@ export function TaskDetailSheet({
   const [showDepPicker, setShowDepPicker] = useState(false)
   const [depType, setDepType] = useState<"blocks" | "blocked_by" | "relates_to">("blocks")
 
-  // Time tracking
+  // Time tracking. `committedRef` = seconds already saved to the task;
+  // `runningSinceRef` = epoch-ms the live stopwatch started (null = stopped).
+  // Display = committed + (now - runningSince). We flush (commit + persist) on
+  // stop, on close, on unmount, and on tab unload so seconds aren't lost.
   const [isTracking, setIsTracking] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const trackingRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const trackingStartRef = useRef<number>(0)
+  const committedRef = useRef<number>(0)
+  const runningSinceRef = useRef<number | null>(null)
+  const taskRef = useRef<Task | null>(null)
 
   // Comments
   const [comments, setComments] = useState<Comment[]>([])
@@ -245,6 +274,12 @@ export function TaskDetailSheet({
     if (task && open) {
       setTitle(task.title)
       setDescription(task.description ?? "")
+      setStatusId(task.statusId)
+      setPriority(task.priority)
+      setStartDate(task.startDate?.split("T")[0] ?? "")
+      setDueDate(task.dueDate?.split("T")[0] ?? "")
+      setTimeEstimate(task.timeEstimate ?? null)
+      committedRef.current = task.timeTracked ?? 0
       setElapsed(task.timeTracked ?? 0)
       loadData(task)
     }
@@ -253,9 +288,20 @@ export function TaskDetailSheet({
     }
   }, [task?.id, open])
 
+  // Keep a ref to the current task so unmount/unload handlers can save without
+  // a stale closure.
   useEffect(() => {
+    taskRef.current = task
+  }, [task])
+
+  // Save in-progress time when navigating away (unmount) or closing the tab.
+  useEffect(() => {
+    const onUnload = () => flushTracking()
+    window.addEventListener("beforeunload", onUnload)
     return () => {
+      window.removeEventListener("beforeunload", onUnload)
       if (trackingRef.current) clearInterval(trackingRef.current)
+      flushTracking()
     }
   }, [])
 
@@ -281,33 +327,47 @@ export function TaskDetailSheet({
   }
 
   function startTracking() {
-    if (isTracking) return
+    if (runningSinceRef.current != null) return
     setIsTracking(true)
-    trackingStartRef.current = Date.now()
+    runningSinceRef.current = Date.now()
     trackingRef.current = setInterval(() => {
-      const delta = Math.floor((Date.now() - trackingStartRef.current) / 1000)
-      setElapsed((task?.timeTracked ?? 0) + delta)
+      const since = runningSinceRef.current
+      if (since == null) return
+      setElapsed(committedRef.current + Math.floor((Date.now() - since) / 1000))
     }, 1000)
   }
 
+  /** Commit elapsed-since-start into the running total and persist it.
+   *  Idempotent: advances the start marker so repeat calls don't double-count. */
+  function flushTracking() {
+    if (runningSinceRef.current == null) return
+    const now = Date.now()
+    const delta = Math.floor((now - runningSinceRef.current) / 1000)
+    runningSinceRef.current = now
+    if (delta > 0) {
+      committedRef.current += delta
+      setElapsed(committedRef.current)
+      const t = taskRef.current
+      if (t) updateTask(t.id, t.projectId, { timeTracked: committedRef.current })
+    }
+  }
+
   function stopTracking() {
-    if (!isTracking) return
-    setIsTracking(false)
+    if (runningSinceRef.current == null) return
     if (trackingRef.current) {
       clearInterval(trackingRef.current)
       trackingRef.current = null
     }
-    if (task) {
-      const delta = Math.floor((Date.now() - trackingStartRef.current) / 1000)
-      const newTotal = (task.timeTracked ?? 0) + delta
-      updateTask(task.id, task.projectId, { timeTracked: newTotal })
-    }
+    flushTracking()
+    runningSinceRef.current = null
+    setIsTracking(false)
   }
 
   if (!task) return null
 
-  const currentStatus = statuses.find((s) => s.id === task.statusId)
-  const currentPriority = PRIORITIES.find((p) => p.value === task.priority)
+  const currentStatus =
+    statuses.find((s) => s.id === statusId) ?? statuses.find((s) => s.id === task.statusId)
+  const currentPriority = PRIORITIES.find((p) => p.value === priority)
 
   function handleTitleBlur() {
     if (task && title !== task.title) {
@@ -653,7 +713,7 @@ export function TaskDetailSheet({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                       {statuses.map((s) => (
-                        <DropdownMenuItem key={s.id} onClick={() => updateTask(task.id, task.projectId, { statusId: s.id })}>
+                        <DropdownMenuItem key={s.id} onClick={() => { setStatusId(s.id); updateTask(task.id, task.projectId, { statusId: s.id }) }}>
                           <span className="size-2.5 rounded-full mr-2" style={{ backgroundColor: s.color }} />
                           {s.name}
                         </DropdownMenuItem>
@@ -676,7 +736,7 @@ export function TaskDetailSheet({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                       {PRIORITIES.map((p) => (
-                        <DropdownMenuItem key={p.value} onClick={() => updateTask(task.id, task.projectId, { priority: p.value })}>
+                        <DropdownMenuItem key={p.value} onClick={() => { setPriority(p.value); updateTask(task.id, task.projectId, { priority: p.value }) }}>
                           <Flag className="size-3 mr-2" style={{ color: p.color }} />
                           {p.label}
                         </DropdownMenuItem>
@@ -694,16 +754,16 @@ export function TaskDetailSheet({
                   <div className="flex items-center gap-2">
                     <input
                       type="date"
-                      value={task.startDate?.split("T")[0] ?? ""}
-                      onChange={(e) => updateTask(task.id, task.projectId, { startDate: e.target.value || null })}
+                      value={startDate}
+                      onChange={(e) => { setStartDate(e.target.value); updateTask(task.id, task.projectId, { startDate: e.target.value || null }) }}
                       className="bg-transparent text-sm border rounded px-1.5 py-0.5 w-[120px]"
                       aria-label="Start date"
                     />
                     <ArrowRight className="size-3 text-muted-foreground" />
                     <input
                       type="date"
-                      value={task.dueDate?.split("T")[0] ?? ""}
-                      onChange={(e) => updateTask(task.id, task.projectId, { dueDate: e.target.value || null })}
+                      value={dueDate}
+                      onChange={(e) => { setDueDate(e.target.value); updateTask(task.id, task.projectId, { dueDate: e.target.value || null }) }}
                       className="bg-transparent text-sm border rounded px-1.5 py-0.5 w-[120px]"
                       aria-label="Due date"
                     />
@@ -814,8 +874,15 @@ export function TaskDetailSheet({
                           <Play className="size-3 text-primary" />
                         </span>
                       )}
-                      <span className={`text-lg font-mono ${isTracking ? "text-red-400" : ""}`}>
-                        {formatDuration(elapsed)}
+                      <span className="flex flex-col leading-tight">
+                        <span className={`text-lg font-mono ${isTracking ? "text-red-400" : ""}`}>
+                          {formatDuration(elapsed)}
+                        </span>
+                        {elapsed >= 60 && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {humanDuration(elapsed)} tracked
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -828,29 +895,30 @@ export function TaskDetailSheet({
                       type="number"
                       min={0}
                       placeholder="min"
-                      value={task.timeEstimate ?? ""}
+                      value={timeEstimate ?? ""}
                       onChange={(e) => {
                         const val = e.target.value ? parseInt(e.target.value) : null
+                        setTimeEstimate(val)
                         updateTask(task.id, task.projectId, { timeEstimate: val })
                       }}
                       className="bg-transparent text-sm border rounded px-2 py-0.5 w-16"
                       aria-label="Time estimate in minutes"
                     />
                     <span className="text-xs text-muted-foreground">
-                      {task.timeEstimate ? (task.timeEstimate >= 60 ? `${Math.floor(task.timeEstimate / 60)}h ${task.timeEstimate % 60}m` : `${task.timeEstimate}m`) : ""}
+                      {timeEstimate ? (timeEstimate >= 60 ? `${Math.floor(timeEstimate / 60)}h ${timeEstimate % 60}m` : `${timeEstimate}m`) : ""}
                     </span>
                   </div>
                 </div>
-                {task.timeEstimate && task.timeEstimate > 0 && (
+                {timeEstimate && timeEstimate > 0 && (
                   <div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                       <span>Progress</span>
-                      <span>{Math.min(100, Math.round((elapsed / (task.timeEstimate * 60)) * 100))}%</span>
+                      <span>{Math.min(100, Math.round((elapsed / (timeEstimate * 60)) * 100))}%</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
                         className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${Math.min(100, (elapsed / (task.timeEstimate * 60)) * 100)}%` }}
+                        style={{ width: `${Math.min(100, (elapsed / (timeEstimate * 60)) * 100)}%` }}
                       />
                     </div>
                   </div>
