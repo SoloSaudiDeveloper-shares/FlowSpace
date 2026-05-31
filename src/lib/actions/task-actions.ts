@@ -155,6 +155,17 @@ export async function updateTask(
     updateData.completedAt = data.isCompleted ? now : null
   }
 
+  // Completing a task stops its running timer (and banks the elapsed time).
+  if (data.isCompleted === true) {
+    const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+    const startedAt = cur[0]?.timeTrackingStartedAt
+    if (startedAt) {
+      const elapsed = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000))
+      updateData.timeTracked = (cur[0]?.timeTracked ?? 0) + elapsed
+      updateData.timeTrackingStartedAt = null
+    }
+  }
+
   await db.update(tasks).set(updateData).where(eq(tasks.id, id))
   await db
     .update(elements)
@@ -171,6 +182,34 @@ export async function deleteTask(id: string, projectId: string) {
     .set({ updatedAt: new Date().toISOString() })
     .where(eq(elements.id, projectId))
 
+  revalidatePath(`/projects/${projectId}`)
+}
+
+/**
+ * Start the persistent (server-side) timer for a task. It keeps accruing —
+ * even while you're logged out or the tab is closed — until stopped, the task
+ * is completed, or it's deleted. No-op if already running.
+ */
+export async function startTaskTimer(id: string, projectId: string) {
+  const now = new Date().toISOString()
+  const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+  if (!cur[0] || cur[0].timeTrackingStartedAt) return
+  await db.update(tasks).set({ timeTrackingStartedAt: now, updatedAt: now }).where(eq(tasks.id, id))
+  await db.update(elements).set({ updatedAt: now }).where(eq(elements.id, projectId))
+  revalidatePath(`/projects/${projectId}`)
+}
+
+/** Stop the timer and bank the elapsed seconds into timeTracked. No-op if not running. */
+export async function stopTaskTimer(id: string, projectId: string) {
+  const now = new Date().toISOString()
+  const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+  if (!cur[0] || !cur[0].timeTrackingStartedAt) return
+  const elapsed = Math.max(0, Math.floor((Date.now() - new Date(cur[0].timeTrackingStartedAt).getTime()) / 1000))
+  await db
+    .update(tasks)
+    .set({ timeTracked: (cur[0].timeTracked ?? 0) + elapsed, timeTrackingStartedAt: null, updatedAt: now })
+    .where(eq(tasks.id, id))
+  await db.update(elements).set({ updatedAt: now }).where(eq(elements.id, projectId))
   revalidatePath(`/projects/${projectId}`)
 }
 

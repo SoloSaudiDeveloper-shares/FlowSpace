@@ -111,6 +111,9 @@ export const tasks = sqliteTable("tasks", {
   parentTaskId: text("parent_task_id"),
   timeEstimate: integer("time_estimate"),
   timeTracked: integer("time_tracked").notNull().default(0),
+  /** When the live timer was started (ISO). Non-null = running server-side;
+   *  accrues continuously until stopped, completed, or deleted. */
+  timeTrackingStartedAt: text("time_tracking_started_at"),
   isCompleted: integer("is_completed", { mode: "boolean" }).notNull().default(false),
   completedAt: text("completed_at"),
   createdBy: text("created_by"),

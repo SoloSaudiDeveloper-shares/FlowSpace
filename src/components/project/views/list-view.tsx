@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -9,6 +9,8 @@ import {
   Calendar,
   MessageCircle,
   Timer,
+  Play,
+  Pause,
   Trash2,
   ExternalLink,
   CheckCircle2,
@@ -16,7 +18,13 @@ import {
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SpeechButton } from "@/components/shared/speech-button"
-import { createTask, updateTask, deleteTask } from "@/lib/actions/task-actions"
+import {
+  createTask,
+  updateTask,
+  deleteTask,
+  startTaskTimer,
+  stopTaskTimer,
+} from "@/lib/actions/task-actions"
 import { TaskDetailSheet } from "../task-detail-sheet"
 import {
   ContextMenu,
@@ -46,6 +54,23 @@ const PRIORITY_BAR: Record<string, string> = {
 }
 
 const INDENT_PX = 20
+
+/** Live tracked seconds for a task = banked time + (now - startedAt) if running. */
+function trackedSeconds(task: Task, now: number): number {
+  const base = task.timeTracked ?? 0
+  if (!task.timeTrackingStartedAt) return base
+  return base + Math.max(0, Math.floor((now - new Date(task.timeTrackingStartedAt).getTime()) / 1000))
+}
+
+function fmtTracked(sec: number): string {
+  if (sec <= 0) return ""
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`
+  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`
+  if (m > 0) return `${m}m`
+  return `${sec}s`
+}
 
 // ─── Task tree helpers ──────────────────────────────────────────────────────
 
@@ -107,6 +132,17 @@ export function ListView({ projectId, statuses, tasks, hiddenFields }: ListViewP
 
   const showDue = !hiddenFields?.has("dueDate")
   const showPriority = !hiddenFields?.has("priority")
+  const showTime = !hiddenFields?.has("timeTracking")
+
+  // Re-render every second while any task's timer is running, so the Time
+  // column ticks live.
+  const anyRunning = tasks.some((t) => t.timeTrackingStartedAt)
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  useEffect(() => {
+    if (!anyRunning) return
+    const i = setInterval(() => setNowTick(Date.now()), 1000)
+    return () => clearInterval(i)
+  }, [anyRunning])
 
   // Track which parent tasks are expanded (all by default)
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -148,11 +184,14 @@ export function ListView({ projectId, statuses, tasks, hiddenFields }: ListViewP
   function handleRowContextMenu(e: React.MouseEvent, task: Task) {
     e.preventDefault()
     e.stopPropagation()
+    const running = !!task.timeTrackingStartedAt
     const items: ContextMenuEntry[] = [
       { header: true, title: task.title },
       { label: "Open", icon: ExternalLink, onClick: () => openTask(task) },
       { label: "Add comment", icon: MessageCircle, onClick: () => openTask(task, "comments") },
-      { label: "Track time", icon: Timer, onClick: () => openTask(task, "details", true) },
+      running
+        ? { label: "Stop timer", icon: Pause, onClick: () => stopTaskTimer(task.id, task.projectId) }
+        : { label: "Start timer", icon: Play, onClick: () => startTaskTimer(task.id, task.projectId) },
       { separator: true },
       {
         label: task.isCompleted ? "Mark incomplete" : "Mark complete",
@@ -175,6 +214,7 @@ export function ListView({ projectId, statuses, tasks, hiddenFields }: ListViewP
       {/* Column headers */}
       <div className="flex items-center gap-2 px-4 py-2 border-b text-xs font-medium text-muted-foreground sticky top-0 bg-background z-10">
         <div className="flex-1 pl-10">Name</div>
+        {showTime && <div className="w-24 text-center">Time</div>}
         {showDue && <div className="w-28 text-center">Due Date</div>}
         {showPriority && <div className="w-20 text-center">Priority</div>}
       </div>
@@ -202,6 +242,8 @@ export function ListView({ projectId, statuses, tasks, hiddenFields }: ListViewP
             onTaskContextMenu={handleRowContextMenu}
             showDue={showDue}
             showPriority={showPriority}
+            showTime={showTime}
+            nowTick={nowTick}
           />
         )
       })}
@@ -235,6 +277,8 @@ function StatusGroup({
   onTaskContextMenu,
   showDue,
   showPriority,
+  showTime,
+  nowTick,
 }: {
   status: TaskStatus
   tasks: Task[]
@@ -248,6 +292,8 @@ function StatusGroup({
   onTaskContextMenu: (e: React.MouseEvent, task: Task) => void
   showDue: boolean
   showPriority: boolean
+  showTime: boolean
+  nowTick: number
 }) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
@@ -288,6 +334,8 @@ function StatusGroup({
               onTaskContextMenu={onTaskContextMenu}
               showDue={showDue}
               showPriority={showPriority}
+              showTime={showTime}
+              nowTick={nowTick}
             />
           ))}
 
@@ -337,6 +385,8 @@ function TaskRow({
   onTaskContextMenu,
   showDue,
   showPriority,
+  showTime,
+  nowTick,
 }: {
   task: Task
   depth: number
@@ -347,12 +397,16 @@ function TaskRow({
   onTaskContextMenu: (e: React.MouseEvent, task: Task) => void
   showDue: boolean
   showPriority: boolean
+  showTime: boolean
+  nowTick: number
 }) {
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.none
   const barColor = PRIORITY_BAR[task.priority] ?? PRIORITY_BAR.none
   const dueDate = task.dueDate ? new Date(task.dueDate) : null
   const isOverdue = dueDate && dueDate < new Date() && !task.isCompleted
   const isSubtask = depth > 0
+  const timerRunning = !!task.timeTrackingStartedAt
+  const tracked = trackedSeconds(task, nowTick)
 
   return (
     <div
@@ -420,6 +474,24 @@ function TaskRow({
       }`}>
         {task.title}
       </span>
+
+      {/* Time tracked (ticks live while running) */}
+      {showTime && (
+        <div className="w-24 flex justify-center">
+          {tracked > 0 || timerRunning ? (
+            <span className={`text-xs flex items-center gap-1 font-mono ${timerRunning ? "text-red-400" : "text-muted-foreground"}`}>
+              {timerRunning ? (
+                <span className="size-1.5 rounded-full bg-red-400 animate-pulse" aria-label="running" />
+              ) : (
+                <Timer className="size-3" />
+              )}
+              {fmtTracked(tracked) || "0s"}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground/30">&mdash;</span>
+          )}
+        </div>
+      )}
 
       {/* Due date */}
       {showDue && (

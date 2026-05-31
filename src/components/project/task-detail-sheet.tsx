@@ -59,6 +59,8 @@ import {
   updateTask,
   deleteTask,
   duplicateTask,
+  startTaskTimer,
+  stopTaskTimer,
   getSubtasks,
   createSubtask,
   getAllLabels,
@@ -248,16 +250,16 @@ export function TaskDetailSheet({
   const [showDepPicker, setShowDepPicker] = useState(false)
   const [depType, setDepType] = useState<"blocks" | "blocked_by" | "relates_to">("blocks")
 
-  // Time tracking. `committedRef` = seconds already saved to the task;
-  // `runningSinceRef` = epoch-ms the live stopwatch started (null = stopped).
-  // Display = committed + (now - runningSince). We flush (commit + persist) on
-  // stop, on close, on unmount, and on tab unload so seconds aren't lost.
+  // Time tracking is PERSISTENT (server-side): the task stores
+  // `timeTrackingStartedAt`, so the timer keeps accruing even when this sheet
+  // is closed, the tab is gone, or you're logged out. `committedRef` = seconds
+  // already banked; `runningSinceRef` = epoch-ms it's been running since (from
+  // the server). Display = committed + (now - runningSince).
   const [isTracking, setIsTracking] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const trackingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const committedRef = useRef<number>(0)
   const runningSinceRef = useRef<number | null>(null)
-  const taskRef = useRef<Task | null>(null)
 
   // Comments
   const [comments, setComments] = useState<Comment[]>([])
@@ -286,30 +288,34 @@ export function TaskDetailSheet({
       setDueDate(task.dueDate?.split("T")[0] ?? "")
       setTimeEstimate(task.timeEstimate ?? null)
       committedRef.current = task.timeTracked ?? 0
-      setElapsed(task.timeTracked ?? 0)
       setRightTab(initialTab ?? "details")
+      // Derive running state from the server (the timer may have been started
+      // earlier and kept accruing while we were away).
+      if (task.timeTrackingStartedAt) {
+        runningSinceRef.current = new Date(task.timeTrackingStartedAt).getTime()
+        setIsTracking(true)
+        startTicker()
+      } else {
+        runningSinceRef.current = null
+        setIsTracking(false)
+        setElapsed(committedRef.current)
+      }
       loadData(task)
-      if (autoStartTimer) startTracking()
+      if (autoStartTimer && !task.timeTrackingStartedAt) void startTracking()
     }
-    if (!open) {
-      stopTracking()
+    // Closing the sheet must NOT stop the timer — it runs server-side. Just
+    // stop the local ticking interval.
+    if (!open && trackingRef.current) {
+      clearInterval(trackingRef.current)
+      trackingRef.current = null
     }
-  }, [task?.id, open])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, task?.timeTrackingStartedAt, open])
 
-  // Keep a ref to the current task so unmount/unload handlers can save without
-  // a stale closure.
+  // Clear the ticking interval on unmount (does not stop the server timer).
   useEffect(() => {
-    taskRef.current = task
-  }, [task])
-
-  // Save in-progress time when navigating away (unmount) or closing the tab.
-  useEffect(() => {
-    const onUnload = () => flushTracking()
-    window.addEventListener("beforeunload", onUnload)
     return () => {
-      window.removeEventListener("beforeunload", onUnload)
       if (trackingRef.current) clearInterval(trackingRef.current)
-      flushTracking()
     }
   }, [])
 
@@ -334,41 +340,39 @@ export function TaskDetailSheet({
     setAttachments(atts)
   }
 
-  function startTracking() {
-    if (runningSinceRef.current != null) return
-    setIsTracking(true)
-    runningSinceRef.current = Date.now()
-    trackingRef.current = setInterval(() => {
+  /** Start the 1-second display ticker (does not touch the server). */
+  function startTicker() {
+    if (trackingRef.current) clearInterval(trackingRef.current)
+    const tick = () => {
       const since = runningSinceRef.current
-      if (since == null) return
-      setElapsed(committedRef.current + Math.floor((Date.now() - since) / 1000))
-    }, 1000)
-  }
-
-  /** Commit elapsed-since-start into the running total and persist it.
-   *  Idempotent: advances the start marker so repeat calls don't double-count. */
-  function flushTracking() {
-    if (runningSinceRef.current == null) return
-    const now = Date.now()
-    const delta = Math.floor((now - runningSinceRef.current) / 1000)
-    runningSinceRef.current = now
-    if (delta > 0) {
-      committedRef.current += delta
-      setElapsed(committedRef.current)
-      const t = taskRef.current
-      if (t) updateTask(t.id, t.projectId, { timeTracked: committedRef.current })
+      setElapsed(committedRef.current + (since != null ? Math.floor((Date.now() - since) / 1000) : 0))
     }
+    tick()
+    trackingRef.current = setInterval(tick, 1000)
   }
 
-  function stopTracking() {
-    if (runningSinceRef.current == null) return
+  /** Start the persistent server timer (keeps running after close/logout). */
+  async function startTracking() {
+    if (runningSinceRef.current != null || !task) return
+    runningSinceRef.current = Date.now()
+    setIsTracking(true)
+    startTicker()
+    await startTaskTimer(task.id, task.projectId)
+  }
+
+  /** Stop the server timer and bank the elapsed time. */
+  async function stopTracking() {
+    if (runningSinceRef.current == null || !task) return
     if (trackingRef.current) {
       clearInterval(trackingRef.current)
       trackingRef.current = null
     }
-    flushTracking()
+    const delta = Math.floor((Date.now() - runningSinceRef.current) / 1000)
+    committedRef.current += Math.max(0, delta)
     runningSinceRef.current = null
+    setElapsed(committedRef.current)
     setIsTracking(false)
+    await stopTaskTimer(task.id, task.projectId)
   }
 
   if (!task) return null
