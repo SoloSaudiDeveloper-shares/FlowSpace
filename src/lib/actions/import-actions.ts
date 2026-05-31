@@ -160,6 +160,10 @@ export async function importFromAIAs(
           title: t.title.slice(0, 200),
           priority: t.priority,
           dueDate: t.dueDate,
+          // Completed tasks must carry the flag too, or they land in the Done
+          // column un-crossed with a grey dot.
+          isCompleted: t.isCompleted,
+          completedAt: t.isCompleted ? now : null,
           sortOrder: sort++,
           createdAt: now,
           updatedAt: now,

@@ -512,7 +512,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           />
         )}
         {activeView === "list" && (
-          <ListView projectId={projectId} statuses={statuses} tasks={tasks} hiddenFields={hiddenFields} />
+          <ListView projectId={projectId} statuses={statuses} tasks={tasks} hiddenFields={hiddenFields} taskMeta={taskMeta} />
         )}
         {activeView === "board" && (
           <div className="p-6">
