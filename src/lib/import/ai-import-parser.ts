@@ -196,21 +196,37 @@ function normalizeType(s: string): ImportElementType {
   return "project"
 }
 
-/** Parse a `- [ ] (priority) @YYYY-MM-DD title` line. */
+/**
+ * Parse a task line. The canonical form is
+ *   `- [ ] (priority) @YYYY-MM-DD title`
+ * but we're deliberately forgiving: weaker models routinely drop the `[ ]`
+ * checkbox, so inside a Tasks section a plain bullet or numbered item
+ * (`- title`, `* title`, `1. title`) is accepted as an open task too —
+ * otherwise those lines would be silently lost.
+ */
 function parseTaskLine(line: string): ParsedTask | null {
-  const m = line.match(/^[-*]\s*\[([ xX✓])\]\s*(.+)$/)
-  if (!m) return null
-  const isCompleted = m[1] !== " "
-  let rest = m[2].trim()
+  let isCompleted = false
+  let rest: string
 
+  // Preferred form: a checkbox bullet — - [ ] / - [x] / * [X] / • [✓]
+  const cb = line.match(/^[-*•]\s*\[([ xX✓])\]\s*(.+)$/)
+  if (cb) {
+    isCompleted = cb[1] !== " "
+    rest = cb[2].trim()
+  } else {
+    // Fallback: a plain bullet or numbered item with no checkbox.
+    const bullet = line.match(/^(?:[-*•]|\d+[.)])\s+(.+)$/)
+    if (!bullet) return null
+    rest = bullet[1].trim()
+  }
+
+  // Priority — only strip the parens when the word is an actual priority, so
+  // titles like "Call client (Acme)" keep their parenthetical.
   let priority: ImportPriority = "none"
   const pm = rest.match(PRIORITY_RE)
-  if (pm) {
-    const p = pm[1].toLowerCase()
-    if (["urgent", "high", "medium", "low"].includes(p)) {
-      priority = p as ImportPriority
-    }
-    rest = rest.replace(PRIORITY_RE, "").replace(/\s{2,}/g, " ").trim()
+  if (pm && ["urgent", "high", "medium", "low"].includes(pm[1].toLowerCase())) {
+    priority = pm[1].toLowerCase() as ImportPriority
+    rest = rest.replace(pm[0], "").replace(/\s{2,}/g, " ").trim()
   }
 
   let dueDate: string | null = null
@@ -239,37 +255,87 @@ function parseDateLoose(s: string): string | null {
 // What gets copied to the clipboard when the user clicks "Copy AI prompt".
 // Designed so the model produces *only* the markdown, no preamble.
 
-export const AI_PROMPT_TEMPLATE = `You're helping me organize work in FlowSpace, a project-management app.
+export const AI_PROMPT_TEMPLATE = `You are a strict TEXT-TO-FORMAT CONVERTER for an app called FlowSpace.
 
-Take everything we just discussed and output it in FlowSpace's import format below. Output ONLY the Markdown, no preamble, no explanation, no code fences.
+TASK: turn my notes into FlowSpace "import format" — a precise plain-text layout shown below. Copy the shape EXACTLY, character for character, especially the brackets. Output ONLY the converted text. Do NOT add a greeting, do NOT explain, and do NOT wrap it in code fences or quotes.
 
-## Format
-
-\`\`\`
-# Project: <title>
-Status: planning | active | paused | completed
-Due: YYYY-MM-DD
-Tags: comma, separated, lowercase
+──────────── TEMPLATE (copy this exact shape) ────────────
+# Project: PUT THE TITLE HERE
+Status: active
+Due: 2026-12-31
+Tags: tag-one, tag-two
 
 ## Tasks
-- [ ] (high) @2026-06-20 Task with a priority and a due date
-- [ ] (medium) Task with just a priority
-- [ ] @2026-07-01 Task with just a due date
-- [x] Completed task
-- [ ] Plain task
+- [ ] A normal task to do
+- [ ] (high) An important task
+- [ ] @2026-07-15 A task that has a deadline
+- [ ] (urgent) @2026-07-20 An important task with a deadline
+- [x] A task that is already finished
 
 ## Notes
-Any free-form notes about the project. Multiple paragraphs are fine.
-- Bullets are fine here too.
-\`\`\`
+Any extra detail, written as plain sentences.
 
-## Rules
+──────────── RULES (follow every single one) ────────────
+1) THE FIRST LINE is the title line. It must be, in this exact order:
+   one "#"  +  one space  +  the Type  +  a colon ":"  +  one space  +  the title.
+   Correct example:  # Project: Website Relaunch
+   The Type must be EXACTLY one of these six words:
+   Project   Page   Todo   Canvas   Reminder   Process
+   If you are not sure which to use, use Project.
 
-- The first line MUST be \`# <Type>: <title>\`. Type can be one of: \`Project\`, \`Page\`, \`Todo\`, \`Canvas\`, \`Reminder\`, \`Process\`.
-- For \`# Page:\` skip the Tasks section — everything below the header becomes the page body.
-- Priorities allowed: \`urgent\`, \`high\`, \`medium\`, \`low\`. Omit for none.
-- Dates use ISO \`YYYY-MM-DD\` only.
-- Don't wrap the output in code fences (\`\`\`).
-- Don't add any commentary before or after.
+2) SECTION HEADINGS start with TWO hashes. There are only two:
+   "## Tasks"   (the list of things to do)
+   "## Notes"   (extra description text)
+   Write them exactly like that, capital T and capital N.
 
-Now produce the markdown for the work we discussed.`
+3) EVERY task line MUST begin with these six characters:  - [ ]
+   (a dash, a space, an open square bracket, a SPACE, a close square bracket, a space)
+   - [ ] like this   = a task that is NOT done (empty box)
+   - [x] like this   = a task that IS done (a lowercase x inside the box)
+   DO NOT write a task as "- task" or "* task" or "1. task". It MUST have the [ ] or [x] box.
+
+4) PRIORITY is optional. To add it, put one word in ROUND brackets right after the box.
+   The ONLY allowed words are: urgent, high, medium, low.
+   Example:  - [ ] (high) Title
+   If a task has no priority, leave it out — never write "(none)".
+
+5) DUE DATE is optional. To add it, write "@" then the date as YYYY-MM-DD
+   (4-digit year, dash, 2-digit month, dash, 2-digit day). No other date style.
+   Example:  - [ ] @2026-08-01 Title
+   You may use BOTH a priority and a date on one task, in any order:
+   - [ ] (high) @2026-08-01 Title
+
+6) THE TOP LINES (Status, Due, Tags) are optional and only for "# Project:". Put each on its own line directly under line 1:
+   Status:  one of  planning  active  paused  completed
+   Due:     YYYY-MM-DD
+   Tags:    comma, separated, lowercase
+   Leave out any line you do not need.
+
+7) Lines under "## Notes" are plain sentences. Do NOT put "- [ ]" boxes there.
+
+8) Output ONE element ONLY — there must be exactly ONE line that starts with "#" at the very top. Never output two "#" headers.
+
+──────────── A FULL CORRECT EXAMPLE ────────────
+# Project: Website Relaunch
+Status: active
+Due: 2026-09-01
+Tags: web, marketing
+
+## Tasks
+- [ ] (urgent) @2026-07-01 Lock the brief with stakeholders
+- [ ] (high) Design the homepage
+- [ ] @2026-07-15 Build the components
+- [ ] Write the launch copy
+- [x] Kickoff meeting
+
+## Notes
+Relaunch before Q4. Keep the old URLs redirecting.
+
+──────────── CHECK BEFORE YOU ANSWER ────────────
+- Line 1 starts with "# " and one of the six Types.
+- Every task line starts with "- [ ] " or "- [x] ".
+- Priorities are only urgent/high/medium/low, inside (round brackets).
+- Dates look exactly like @2026-07-15.
+- There are no code fences and no extra words — only the format above.
+
+Now convert my notes into that format. If we already discussed the work above, use that. My notes:`
