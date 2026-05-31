@@ -34,6 +34,9 @@ import {
   Palette,
   Repeat,
   ScanEye,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  HelpCircle,
 } from "lucide-react"
 import {
   DndContext,
@@ -880,6 +883,12 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   }
   const isCollapsed = (k: string) => collapsedGroups.has(k)
 
+  function persistCollapsed(next: Set<string>) {
+    try {
+      window.localStorage.setItem("flowspace.collapsedGroups", JSON.stringify([...next]))
+    } catch {}
+  }
+
   async function handleCreate(type: ElementType, parentId?: string) {
     const result = await createElement(type, undefined, parentId)
     const href = getElementHref({ ...result, title: "Untitled" } as Element)
@@ -1099,6 +1108,18 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
   // Make sure newly-added section keys not yet in stored prefs still appear
   for (const k of DEFAULT_ORDER) {
     if (!sectionOrder.includes(k)) sectionOrder.push(k)
+  }
+
+  // Collapse-all toggle: if every section is already folded, expand them all;
+  // otherwise fold them all. Persisted like the individual section toggles.
+  const allSectionsCollapsed =
+    sectionOrder.length > 0 && sectionOrder.every((k) => collapsedGroups.has(k))
+  function toggleCollapseAll() {
+    const next = allSectionsCollapsed
+      ? new Set<string>()
+      : new Set<string>(sectionOrder)
+    setCollapsedGroups(next)
+    persistCollapsed(next)
   }
 
   function handleSectionDragEnd(e: DragEndEvent) {
@@ -1580,11 +1601,28 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <WorkspaceHeader
-              isOwner={user?.role === "owner"}
-              isActive={pathname === "/"}
-              onNavigateHome={() => router.push("/")}
-            />
+            <div className="flex items-center gap-1">
+              <div className="min-w-0 flex-1">
+                <WorkspaceHeader
+                  isOwner={user?.role === "owner"}
+                  isActive={pathname === "/"}
+                  onNavigateHome={() => router.push("/")}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={toggleCollapseAll}
+                title={allSectionsCollapsed ? "Expand all sections" : "Collapse all sections"}
+                aria-label={allSectionsCollapsed ? "Expand all sections" : "Collapse all sections"}
+                className="shrink-0 grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground group-data-[collapsible=icon]:hidden"
+              >
+                {allSectionsCollapsed ? (
+                  <ChevronsUpDown className="size-4" />
+                ) : (
+                  <ChevronsDownUp className="size-4" />
+                )}
+              </button>
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -1715,6 +1753,14 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
               <div className="flex items-center gap-0.5">
                 <ThemeToggle />
                 <LanguageToggle />
+                <button
+                  onClick={() => router.push("/settings#guides")}
+                  className="p-1.5 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-foreground transition-colors"
+                  title="Help & guides"
+                  aria-label="Help & guides"
+                >
+                  <HelpCircle className="size-4" />
+                </button>
               </div>
               {user && (
                 <button

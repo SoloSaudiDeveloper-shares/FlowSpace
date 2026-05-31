@@ -382,6 +382,28 @@ export function SettingsContent() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
+  // Deep-link support: open the right top-tab and scroll when arriving with a
+  // #hash (e.g. /settings#guides from the sidebar Help icon, or
+  // #calendar-sync from the Google Calendar callback).
+  useEffect(() => {
+    function applyHash() {
+      const id = window.location.hash.replace(/^#/, "")
+      if (!id) return
+      const nav = SETTINGS_NAV.find((s) => s.id === id)
+      if (!nav) return
+      setActiveGroup(nav.group)
+      setActiveSectionId(id)
+      // Let the new tab's sections mount before scrolling to the target.
+      setTimeout(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: "auto", block: "start" })
+      }, 90)
+    }
+    applyHash()
+    window.addEventListener("hashchange", applyHash)
+    return () => window.removeEventListener("hashchange", applyHash)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const activeNavItem =
     SETTINGS_NAV.find((s) => s.id === activeSectionId) ?? SETTINGS_NAV[0]
 
