@@ -355,7 +355,9 @@ async function summarizeWithAI(
           },
           { role: "user", content: excerpt },
         ],
-        max_tokens: 400,
+        // Generous so "thinking" models (Gemini 2.5 etc.) don't burn the
+        // whole budget on hidden reasoning and truncate the visible summary.
+        max_tokens: 1500,
         temperature: 0.3,
       }),
       signal: AbortSignal.timeout(30_000),

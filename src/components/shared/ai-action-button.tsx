@@ -19,6 +19,7 @@ import {
   DEFAULT_SYSTEM_PROMPTS,
   STRENGTH_PROMPTS,
   STRENGTH_MAX_TOKENS,
+  DEFAULT_MAX_TOKENS,
   buildMessages,
 } from "@/lib/ai/ai-actions"
 
@@ -104,7 +105,7 @@ export function AIActionButton({
     }
     return {
       systemPrompt: preferences.aiSystemPrompts?.[action] || DEFAULT_SYSTEM_PROMPTS[action],
-      maxTokens: 512,
+      maxTokens: DEFAULT_MAX_TOKENS,
     }
   }
 
@@ -143,7 +144,7 @@ export function AIActionButton({
     if (!preview) return
     setRegenerating(true)
     try {
-      const maxTokens = preview.action === "summarize" ? STRENGTH_MAX_TOKENS[strength] : 512
+      const maxTokens = preview.action === "summarize" ? STRENGTH_MAX_TOKENS[strength] : DEFAULT_MAX_TOKENS
       const out = await runGenerate(preview.action, systemPrompt, maxTokens)
       if (out) setPreview({ ...preview, result: out })
     } catch (err) {

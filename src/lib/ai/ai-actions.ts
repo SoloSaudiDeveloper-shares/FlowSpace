@@ -45,11 +45,19 @@ export const STRENGTH_PROMPTS: Record<SummaryStrength, string> = {
     "You are a summarizer. Write a thorough summary in one or two paragraphs, preserving the key points, names, numbers, and dates. No preamble.",
 }
 
+// NOTE: budgets are deliberately generous. "Thinking" models (e.g. Gemini
+// 2.5 Flash) via the OpenAI-compat endpoint count their hidden reasoning
+// tokens against max_tokens, so a tight cap gets eaten by thinking and the
+// visible answer is truncated mid-sentence. These leave ample headroom; a
+// non-thinking model simply stops at the natural end of its answer.
 export const STRENGTH_MAX_TOKENS: Record<SummaryStrength, number> = {
-  one_line: 120,
-  short: 320,
-  detailed: 640,
+  one_line: 1024,
+  short: 2048,
+  detailed: 4096,
 }
+
+/** Token budget for the non-summarize actions (expand, improve, continue…). */
+export const DEFAULT_MAX_TOKENS = 2048
 
 export const STRENGTH_LABELS: Record<SummaryStrength, string> = {
   one_line: "One line",
