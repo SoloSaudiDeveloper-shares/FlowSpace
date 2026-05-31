@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -165,6 +165,9 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta }:
   const [sheetTab, setSheetTab] = useState<"details" | "comments">("details")
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const { menu, open: openMenu, close: closeMenu } = useContextMenu()
+  // Hidden native date input used by the right-click "Custom date…" action.
+  const dateInputRef = useRef<HTMLInputElement>(null)
+  const pendingDateTask = useRef<Task | null>(null)
 
   const cols: Cols = {
     time: !hiddenFields?.has("timeTracking"),
@@ -252,6 +255,19 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta }:
       { label: "Today", icon: Calendar, onClick: () => set({ dueDate: isoDate(0) }) },
       { label: "Tomorrow", icon: Calendar, onClick: () => set({ dueDate: isoDate(1) }) },
       { label: "Next week", icon: Calendar, onClick: () => set({ dueDate: isoDate(7) }) },
+      {
+        label: "Custom date…",
+        icon: CalendarClock,
+        onClick: () => {
+          pendingDateTask.current = task
+          const inp = dateInputRef.current
+          if (inp) {
+            inp.value = task.dueDate?.split("T")[0] ?? ""
+            if (inp.showPicker) inp.showPicker()
+            else inp.click()
+          }
+        },
+      },
       { label: "Clear due date", icon: Calendar, onClick: () => set({ dueDate: null }) },
       { separator: true },
       {
@@ -321,6 +337,20 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta }:
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={closeMenu} />
       )}
+
+      {/* Hidden native date picker for the "Custom date…" quick action. */}
+      <input
+        ref={dateInputRef}
+        type="date"
+        className="fixed bottom-2 left-2 size-px opacity-0 pointer-events-none"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(e) => {
+          const t = pendingDateTask.current
+          if (t) updateTask(t.id, t.projectId, { dueDate: e.target.value || null })
+          pendingDateTask.current = null
+        }}
+      />
     </div>
   )
 }

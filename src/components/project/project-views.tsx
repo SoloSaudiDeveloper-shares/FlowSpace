@@ -43,6 +43,9 @@ export type TaskCardMeta = {
   subtaskCounts: Record<string, { total: number; done: number }>
   labelsByTask: Record<string, TaskLabel[]>
   checklistByTask: Record<string, { total: number; done: number }>
+  attachmentCounts: Record<string, number>
+  dependencyCounts: Record<string, number>
+  commentCounts: Record<string, number>
 }
 
 type ViewType = "overview" | "list" | "board" | "calendar" | "gantt" | "table"

@@ -14,12 +14,17 @@ import {
   Clock,
   GitBranch,
   ListChecks,
+  Paperclip,
+  Link2,
+  MessageCircle,
 } from "lucide-react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { deleteTask, updateTask, duplicateTask } from "@/lib/actions/task-actions"
 import type { tasks, taskLabels } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
+import { TaskMetaPopover, type MetaKind } from "./task-meta-popover"
 
 type Task = typeof tasks.$inferSelect
 type TaskLabel = typeof taskLabels.$inferSelect
@@ -48,6 +53,9 @@ interface TaskCardProps {
   subtaskDoneCount?: number
   checklistTotal?: number
   checklistDone?: number
+  attachmentCount?: number
+  dependencyCount?: number
+  commentCount?: number
 }
 
 export function TaskCard({
@@ -58,7 +66,15 @@ export function TaskCard({
   subtaskDoneCount = 0,
   checklistTotal = 0,
   checklistDone = 0,
+  attachmentCount = 0,
+  dependencyCount = 0,
+  commentCount = 0,
 }: TaskCardProps) {
+  const [popover, setPopover] = useState<{ kind: MetaKind; x: number; y: number } | null>(null)
+  function openPopover(kind: MetaKind, e: React.MouseEvent) {
+    e.stopPropagation()
+    setPopover({ kind, x: e.clientX, y: e.clientY })
+  }
   const {
     attributes,
     listeners,
@@ -213,9 +229,52 @@ export function TaskCard({
                 {timeStr}
               </span>
             )}
+
+            {/* Clickable meta badges — open a popover without opening the task. */}
+            {attachmentCount > 0 && (
+              <button
+                onClick={(e) => openPopover("attachments", e)}
+                className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+                title="Attachments"
+              >
+                <Paperclip className="size-3" />
+                {attachmentCount}
+              </button>
+            )}
+            {dependencyCount > 0 && (
+              <button
+                onClick={(e) => openPopover("dependencies", e)}
+                className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+                title="Dependencies"
+              >
+                <Link2 className="size-3" />
+                {dependencyCount}
+              </button>
+            )}
+            {commentCount > 0 && (
+              <button
+                onClick={(e) => openPopover("comments", e)}
+                className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+                title="Comments"
+              >
+                <MessageCircle className="size-3" />
+                {commentCount}
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {popover && (
+        <TaskMetaPopover
+          kind={popover.kind}
+          taskId={task.id}
+          projectId={task.projectId}
+          x={popover.x}
+          y={popover.y}
+          onClose={() => setPopover(null)}
+        />
+      )}
 
       {ctxMenu && (
         <ContextMenu

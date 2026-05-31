@@ -10,6 +10,7 @@ import {
   taskChecklistItems,
   taskDependencies,
   taskAttachments,
+  taskComments,
   elements,
   projects,
 } from "@/lib/db/schema"
@@ -432,6 +433,9 @@ export async function getTaskCardMetadata(projectId: string) {
       subtaskCounts: {} as Record<string, { total: number; done: number }>,
       labelsByTask: {} as Record<string, typeof taskLabels.$inferSelect[]>,
       checklistByTask: {} as Record<string, { total: number; done: number }>,
+      attachmentCounts: {} as Record<string, number>,
+      dependencyCounts: {} as Record<string, number>,
+      commentCounts: {} as Record<string, number>,
     }
   }
   // Get all subtask counts grouped by parent
@@ -439,6 +443,7 @@ export async function getTaskCardMetadata(projectId: string) {
     .select()
     .from(tasks)
     .where(eq(tasks.projectId, projectId))
+  const taskIdSet = new Set(allTasks.map((t) => t.id))
 
   const subtaskCounts: Record<string, { total: number; done: number }> = {}
   for (const t of allTasks) {
@@ -467,7 +472,7 @@ export async function getTaskCardMetadata(projectId: string) {
   const allChecklists = await db.select().from(taskChecklists)
   const clIds = allChecklists.map((c) => c.id)
 
-  let itemsByChecklist: Record<string, { total: number; done: number }> = {}
+  const itemsByChecklist: Record<string, { total: number; done: number }> = {}
   if (clIds.length > 0) {
     const allItems = await db.select().from(taskChecklistItems)
     for (const item of allItems) {
@@ -491,7 +496,21 @@ export async function getTaskCardMetadata(projectId: string) {
     }
   }
 
-  return { subtaskCounts, labelsByTask, checklistByTask }
+  // Attachment / dependency / comment counts (scoped to this project's tasks).
+  const attachmentCounts: Record<string, number> = {}
+  for (const r of await db.select({ taskId: taskAttachments.taskId }).from(taskAttachments)) {
+    if (taskIdSet.has(r.taskId)) attachmentCounts[r.taskId] = (attachmentCounts[r.taskId] ?? 0) + 1
+  }
+  const dependencyCounts: Record<string, number> = {}
+  for (const r of await db.select({ taskId: taskDependencies.taskId }).from(taskDependencies)) {
+    if (taskIdSet.has(r.taskId)) dependencyCounts[r.taskId] = (dependencyCounts[r.taskId] ?? 0) + 1
+  }
+  const commentCounts: Record<string, number> = {}
+  for (const r of await db.select({ taskId: taskComments.taskId }).from(taskComments)) {
+    if (taskIdSet.has(r.taskId)) commentCounts[r.taskId] = (commentCounts[r.taskId] ?? 0) + 1
+  }
+
+  return { subtaskCounts, labelsByTask, checklistByTask, attachmentCounts, dependencyCounts, commentCounts }
 }
 
 // ─── Task Dependencies ────────────────────────────────────────────────

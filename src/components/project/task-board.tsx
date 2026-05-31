@@ -155,6 +155,9 @@ function StatusColumn({
               subtaskDoneCount={taskMeta?.subtaskCounts[task.id]?.done}
               checklistTotal={taskMeta?.checklistByTask[task.id]?.total}
               checklistDone={taskMeta?.checklistByTask[task.id]?.done}
+              attachmentCount={taskMeta?.attachmentCounts[task.id]}
+              dependencyCount={taskMeta?.dependencyCounts[task.id]}
+              commentCount={taskMeta?.commentCounts[task.id]}
             />
           ))}
         </SortableContext>
