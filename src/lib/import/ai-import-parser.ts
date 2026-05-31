@@ -44,11 +44,25 @@ export type ImportElementType =
 
 export type ImportPriority = "urgent" | "high" | "medium" | "low" | "none"
 
-export interface ParsedTask {
+/** A task line's own fields (also the shape of a subtask). */
+export interface ParsedTaskLine {
   title: string
   isCompleted: boolean
   priority: ImportPriority
   dueDate: string | null // ISO YYYY-MM-DD or null
+  estimateMinutes: number | null
+}
+
+export interface ParsedChecklist {
+  name: string
+  items: { title: string; isCompleted: boolean }[]
+}
+
+export interface ParsedTask extends ParsedTaskLine {
+  /** Nested tasks (one level), from indented checkbox lines. */
+  subtasks: ParsedTaskLine[]
+  /** Checklists, from indented `Checklist: …` blocks. */
+  checklists: ParsedChecklist[]
 }
 
 export interface ParsedImport {
@@ -65,6 +79,25 @@ export interface ParsedImport {
 const HEADER_RE = /^#\s+(project|page|todo|todos|todo_list|canvas|reminder|process)\s*[:\-—]\s*(.+?)\s*$/i
 const PRIORITY_RE = /\(([a-z]+)\)/i
 const DUE_RE = /@(\d{4}-\d{2}-\d{2})/
+// Inline estimate token: ~30m, ~2h, ~1h30m
+const EST_RE = /~(\d+\s*h\s*\d+\s*m|\d+\s*h|\d+\s*m)\b/i
+const CHECKLIST_RE = /^checklist\s*:\s*(.+)$/i
+const ESTIMATE_LINE_RE = /^estimate\s*:\s*(.+)$/i
+
+function parseEstimate(s: string): number | null {
+  let mins = 0
+  const h = s.match(/(\d+)\s*h/i)
+  if (h) mins += parseInt(h[1], 10) * 60
+  const m = s.match(/(\d+)\s*m/i)
+  if (m) mins += parseInt(m[1], 10)
+  return mins > 0 ? mins : null
+}
+
+/** Leading-whitespace width (tabs count as 2). */
+function indentOf(line: string): number {
+  const ws = line.slice(0, line.length - line.trimStart().length)
+  return ws.replace(/\t/g, "  ").length
+}
 
 /** Parse a Markdown document into an importable shape. */
 export function parseAIImport(markdown: string): ParsedImport | null {
@@ -132,9 +165,15 @@ export function parseAIImport(markdown: string): ParsedImport | null {
   }
 
   // ── 3. Walk sections (## Tasks / ## Steps / ## Notes) ────────────────
+  //
+  // Inside ## Tasks we track indentation: a non-indented checkbox line is a
+  // top-level task; an indented one is a subtask of the task above it (or, if
+  // it follows an indented `Checklist: …` line, an item of that checklist).
   const tasks: ParsedTask[] = []
   let notes = ""
   let currentSection: "tasks" | "notes" | null = null
+  let currentTask: ParsedTask | null = null
+  let currentChecklist: ParsedChecklist | null = null
 
   while (i < lines.length) {
     const line = lines[i]
@@ -146,23 +185,45 @@ export function parseAIImport(markdown: string): ParsedImport | null {
       } else if (/^(notes?|description|details?|body)$/.test(heading)) {
         currentSection = "notes"
       } else {
-        // Unknown section — treat as notes so the content isn't lost.
         currentSection = "notes"
         notes += `## ${heading}\n`
         warnings.push(`Unknown section "## ${heading}" — kept as notes.`)
       }
+      currentTask = null
+      currentChecklist = null
       i++
       continue
     }
 
     if (currentSection === "tasks") {
-      const t = parseTaskLine(trimmed)
-      if (t) tasks.push(t)
-      // Anything else (blank, freeform) is ignored inside Tasks.
+      if (trimmed !== "") {
+        const indented = indentOf(line) >= 2
+        const clMatch = trimmed.match(CHECKLIST_RE)
+        const estMatch = trimmed.match(ESTIMATE_LINE_RE)
+        if (indented && clMatch && currentTask) {
+          currentChecklist = { name: clMatch[1].trim(), items: [] }
+          currentTask.checklists.push(currentChecklist)
+        } else if (indented && estMatch && currentTask) {
+          currentTask.estimateMinutes = parseEstimate(estMatch[1])
+        } else {
+          const t = parseTaskLine(trimmed)
+          if (t) {
+            if (indented && currentTask) {
+              if (currentChecklist) {
+                currentChecklist.items.push({ title: t.title, isCompleted: t.isCompleted })
+              } else {
+                currentTask.subtasks.push(t)
+              }
+            } else {
+              currentTask = { ...t, subtasks: [], checklists: [] }
+              currentChecklist = null
+              tasks.push(currentTask)
+            }
+          }
+          // else: unrecognized line inside Tasks — ignored.
+        }
+      }
     } else {
-      // We're either in a Notes section, or there's loose content above
-      // the first section — accumulate it as notes either way so nothing
-      // the user typed gets lost.
       notes += line + "\n"
     }
     i++
@@ -204,7 +265,7 @@ function normalizeType(s: string): ImportElementType {
  * (`- title`, `* title`, `1. title`) is accepted as an open task too —
  * otherwise those lines would be silently lost.
  */
-function parseTaskLine(line: string): ParsedTask | null {
+function parseTaskLine(line: string): ParsedTaskLine | null {
   let isCompleted = false
   let rest: string
 
@@ -236,8 +297,16 @@ function parseTaskLine(line: string): ParsedTask | null {
     rest = rest.replace(DUE_RE, "").replace(/\s{2,}/g, " ").trim()
   }
 
+  // Inline estimate token: ~30m / ~2h / ~1h30m
+  let estimateMinutes: number | null = null
+  const em = rest.match(EST_RE)
+  if (em) {
+    estimateMinutes = parseEstimate(em[1])
+    rest = rest.replace(em[0], "").replace(/\s{2,}/g, " ").trim()
+  }
+
   if (!rest) return null
-  return { title: rest, isCompleted, priority, dueDate }
+  return { title: rest, isCompleted, priority, dueDate, estimateMinutes }
 }
 
 /** Accept a few date shapes — "2026-07-15", "July 15 2026", etc. — and
@@ -267,9 +336,14 @@ Tags: tag-one, tag-two
 
 ## Tasks
 - [ ] A normal task to do
-- [ ] (high) An important task
+- [ ] (high) ~2h An important task with a 2-hour estimate
 - [ ] @2026-07-15 A task that has a deadline
-- [ ] (urgent) @2026-07-20 An important task with a deadline
+- [ ] A task that has subtasks and a checklist
+  - [ ] A subtask (indented 2 spaces under its task)
+  - [x] A finished subtask
+  Checklist: Pre-flight
+  - [ ] A checklist item
+  - [x] A finished checklist item
 - [x] A task that is already finished
 
 ## Notes
@@ -305,15 +379,30 @@ Any extra detail, written as plain sentences.
    You may use BOTH a priority and a date on one task, in any order:
    - [ ] (high) @2026-08-01 Title
 
-6) THE TOP LINES (Status, Due, Tags) are optional and only for "# Project:". Put each on its own line directly under line 1:
+6) ESTIMATE is optional. Add a "~" token with a duration: ~30m, ~2h, or ~1h30m.
+   Example:  - [ ] ~45m Title
+
+7) SUBTASKS are optional. Indent a task line by TWO spaces under its parent task.
+   - [ ] Parent task
+     - [ ] A subtask
+     - [x] A finished subtask
+
+8) CHECKLISTS are optional. Under a task, add an indented line "Checklist: <name>",
+   then indented "- [ ]" lines as its items. Put any subtasks BEFORE the Checklist line.
+   - [ ] A task
+     Checklist: QA steps
+     - [ ] Run tests
+     - [x] Smoke test
+
+9) THE TOP LINES (Status, Due, Tags) are optional and only for "# Project:". Put each on its own line directly under line 1:
    Status:  one of  planning  active  paused  completed
    Due:     YYYY-MM-DD
    Tags:    comma, separated, lowercase
    Leave out any line you do not need.
 
-7) Lines under "## Notes" are plain sentences. Do NOT put "- [ ]" boxes there.
+10) Lines under "## Notes" are plain sentences. Do NOT put "- [ ]" boxes there.
 
-8) Output ONE element ONLY — there must be exactly ONE line that starts with "#" at the very top. Never output two "#" headers.
+11) Output ONE element ONLY — there must be exactly ONE line that starts with "#" at the very top. Never output two "#" headers.
 
 ──────────── A FULL CORRECT EXAMPLE ────────────
 # Project: Website Relaunch
@@ -323,9 +412,13 @@ Tags: web, marketing
 
 ## Tasks
 - [ ] (urgent) @2026-07-01 Lock the brief with stakeholders
-- [ ] (high) Design the homepage
+- [ ] (high) ~6h Design the homepage
+  - [ ] Hero section
+  - [ ] Footer
+  Checklist: Design review
+  - [ ] Mobile layout checked
+  - [x] Brand colours applied
 - [ ] @2026-07-15 Build the components
-- [ ] Write the launch copy
 - [x] Kickoff meeting
 
 ## Notes
@@ -335,7 +428,8 @@ Relaunch before Q4. Keep the old URLs redirecting.
 - Line 1 starts with "# " and one of the six Types.
 - Every task line starts with "- [ ] " or "- [x] ".
 - Priorities are only urgent/high/medium/low, inside (round brackets).
-- Dates look exactly like @2026-07-15.
+- Dates look exactly like @2026-07-15; estimates like ~30m / ~2h / ~1h30m.
+- Subtasks and checklist items are indented 2 spaces under their task.
 - There are no code fences and no extra words — only the format above.
 
 Now convert my notes into that format. If we already discussed the work above, use that. My notes:`

@@ -20,6 +20,8 @@ import {
   canvases,
   todoLists,
   todoItems,
+  taskChecklists,
+  taskChecklistItems,
   reminders,
   processes,
   taskStatuses,
@@ -153,13 +155,15 @@ export async function importFromAIAs(
       // Insert each parsed task — completed ones go in Done, others in To Do.
       let sort = 0
       for (const t of parsed.tasks) {
+        const taskId = createId()
         await db.insert(tasks).values({
-          id: createId(),
+          id: taskId,
           projectId: id,
           statusId: t.isCompleted ? statusIds.doneId : statusIds.todoId,
           title: t.title.slice(0, 200),
           priority: t.priority,
           dueDate: t.dueDate,
+          timeEstimate: t.estimateMinutes,
           // Completed tasks must carry the flag too, or they land in the Done
           // column un-crossed with a grey dot.
           isCompleted: t.isCompleted,
@@ -168,6 +172,50 @@ export async function importFromAIAs(
           createdAt: now,
           updatedAt: now,
         })
+
+        // Subtasks (one level deep), parented to this task.
+        let subSort = 0
+        for (const st of t.subtasks) {
+          await db.insert(tasks).values({
+            id: createId(),
+            projectId: id,
+            statusId: st.isCompleted ? statusIds.doneId : statusIds.todoId,
+            parentTaskId: taskId,
+            title: st.title.slice(0, 200),
+            priority: st.priority,
+            dueDate: st.dueDate,
+            timeEstimate: st.estimateMinutes,
+            isCompleted: st.isCompleted,
+            completedAt: st.isCompleted ? now : null,
+            sortOrder: subSort++,
+            createdAt: now,
+            updatedAt: now,
+          })
+        }
+
+        // Checklists + their items.
+        let clSort = 0
+        for (const cl of t.checklists) {
+          const clId = createId()
+          await db.insert(taskChecklists).values({
+            id: clId,
+            taskId,
+            title: cl.name.slice(0, 200),
+            sortOrder: clSort++,
+            createdAt: now,
+          })
+          let itSort = 0
+          for (const it of cl.items) {
+            await db.insert(taskChecklistItems).values({
+              id: createId(),
+              checklistId: clId,
+              title: it.title.slice(0, 200),
+              isCompleted: it.isCompleted,
+              completedAt: it.isCompleted ? now : null,
+              sortOrder: itSort++,
+            })
+          }
+        }
       }
 
       // Recompute progress from completion ratio.

@@ -78,9 +78,13 @@ Tags: web, marketing, q3
 
 ## Tasks
 - [ ] (urgent) @2026-07-01 Lock the brief with stakeholders
-- [ ] (high) Design the homepage
+- [ ] (high) ~6h Design the homepage
+  - [ ] Hero section
+  - [x] Footer
+  Checklist: Design review
+  - [ ] Mobile layout checked
+  - [x] Brand colours applied
 - [ ] (medium) @2026-07-15 Build the components
-- [ ] Write the launch copy
 - [x] Kickoff meeting
 
 ## Notes
@@ -187,6 +191,9 @@ export const GUIDES: Record<GuideId, GuideMeta> = {
             <Cheat code="Tags: a, b, c" desc="Optional, comma-separated." />
             <Cheat code="## Tasks" desc="Starts the task list (## Steps in a Process)." />
             <Cheat code="- [ ] / - [x]" desc="An open / completed task." />
+            <Cheat code="  - [ ] (indent)" desc="Indent 2 spaces → a subtask of the task above." />
+            <Cheat code="  Checklist: Name" desc="Indented → a checklist; indented - [ ] lines below are its items." />
+            <Cheat code="~30m / ~2h" desc="Optional time estimate on a task (~1h30m too)." />
             <Cheat code="(high)" desc="Priority: urgent · high · medium · low." />
             <Cheat code="@YYYY-MM-DD" desc="Due date on a single task." />
             <Cheat code="## Notes" desc="Free text → the element's description." />
