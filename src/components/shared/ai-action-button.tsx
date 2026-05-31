@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   Sparkles,
   Loader2,
@@ -12,103 +12,39 @@ import {
 } from "lucide-react"
 import { useAI } from "@/lib/hooks/use-ai"
 import { usePreferences } from "@/lib/hooks/use-preferences"
-import type { LLMMessage } from "@/lib/ai/types"
+import { AIResultPreview, type AIPreviewState } from "@/components/shared/ai-result-preview"
+import {
+  type AIAction,
+  type SummaryStrength,
+  DEFAULT_SYSTEM_PROMPTS,
+  STRENGTH_PROMPTS,
+  STRENGTH_MAX_TOKENS,
+  buildMessages,
+} from "@/lib/ai/ai-actions"
 
-// ─── Action definitions ─────────────────────────────────────────────────
+export type { AIAction } from "@/lib/ai/ai-actions"
 
-export type AIAction =
-  | "summarize"
-  | "expand"
-  | "fix_grammar"
-  | "improve"
-  | "generate_todos"
-  | "continue"
-
-interface AIActionDef {
+interface MenuItem {
   id: AIAction
   label: string
   icon: typeof Sparkles
-  prompt: (text: string) => LLMMessage[]
 }
 
-const DEFAULT_SYSTEM_PROMPTS: Record<AIAction, string> = {
-  summarize: "You are a concise summarizer. Provide a brief summary in 1-3 sentences.",
-  expand: "You are a writing assistant. Expand the given text with more detail while keeping the same tone.",
-  fix_grammar: "You are a proofreader. Fix grammar and spelling errors. Return only the corrected text, no explanations.",
-  improve: "You are a writing assistant. Improve the clarity and flow of the text. Return only the improved text.",
-  continue: "You are a writing assistant. Continue the text naturally, matching the style and tone. Write 2-3 more sentences.",
-  generate_todos: "You are a task planner. Given a goal or description, generate a concise numbered list of actionable todo items (3-7 items). Return only the numbered list.",
-}
-
-function buildActions(customPrompts: Record<string, string>): AIActionDef[] {
-  function getPrompt(id: AIAction): string {
-    return customPrompts[id] || DEFAULT_SYSTEM_PROMPTS[id]
-  }
-
-  return [
-    {
-      id: "summarize",
-      label: "Summarize",
-      icon: FileText,
-      prompt: (text) => [
-        { role: "system", content: getPrompt("summarize") },
-        { role: "user", content: `Summarize this:\n\n${text}` },
-      ],
-    },
-    {
-      id: "expand",
-      label: "Expand",
-      icon: Expand,
-      prompt: (text) => [
-        { role: "system", content: getPrompt("expand") },
-        { role: "user", content: `Expand this text:\n\n${text}` },
-      ],
-    },
-    {
-      id: "fix_grammar",
-      label: "Fix Grammar",
-      icon: CheckCheck,
-      prompt: (text) => [
-        { role: "system", content: getPrompt("fix_grammar") },
-        { role: "user", content: text },
-      ],
-    },
-    {
-      id: "improve",
-      label: "Improve Writing",
-      icon: Wand2,
-      prompt: (text) => [
-        { role: "system", content: getPrompt("improve") },
-        { role: "user", content: text },
-      ],
-    },
-    {
-      id: "continue",
-      label: "Continue Writing",
-      icon: Expand,
-      prompt: (text) => [
-        { role: "system", content: getPrompt("continue") },
-        { role: "user", content: `Continue this:\n\n${text}` },
-      ],
-    },
-    {
-      id: "generate_todos",
-      label: "Generate Todos",
-      icon: ListTodo,
-      prompt: (text) => [
-        { role: "system", content: getPrompt("generate_todos") },
-        { role: "user", content: `Generate todo items for:\n\n${text}` },
-      ],
-    },
-  ]
-}
+const MENU: MenuItem[] = [
+  { id: "summarize", label: "Summarize", icon: FileText },
+  { id: "expand", label: "Expand", icon: Expand },
+  { id: "fix_grammar", label: "Fix Grammar", icon: CheckCheck },
+  { id: "improve", label: "Improve Writing", icon: Wand2 },
+  { id: "continue", label: "Continue Writing", icon: Expand },
+  { id: "generate_todos", label: "Generate Todos", icon: ListTodo },
+]
 
 // ─── Component ──────────────────────────────────────────────────────────
 
 interface AIActionButtonProps {
   /** Current text to act on */
   text: string
-  /** Called with the AI-generated result */
+  /** Called with the AI-generated result once the user applies it */
   onResult: (result: string, action: AIAction) => void
   /** Filter which actions to show */
   actions?: AIAction[]
@@ -130,6 +66,8 @@ export function AIActionButton({
   const [loading, setLoading] = useState(false)
   const [activeAction, setActiveAction] = useState<AIAction | null>(null)
   const [open, setOpen] = useState(false)
+  const [preview, setPreview] = useState<AIPreviewState | null>(null)
+  const [regenerating, setRegenerating] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
 
@@ -148,45 +86,50 @@ export function AIActionButton({
     return () => document.removeEventListener("mousedown", handleClick)
   }, [open])
 
-  const ACTIONS = useMemo(
-    () => buildActions(preferences.aiSystemPrompts ?? {}),
-    [preferences.aiSystemPrompts],
-  )
-
   if (!preferences.aiEnabled || !enabled) return null
 
-  const visibleActions = actions
-    ? ACTIONS.filter((a) => actions.includes(a.id))
-    : ACTIONS
+  const visibleActions = actions ? MENU.filter((a) => actions.includes(a.id)) : MENU
 
-  const sizeClasses = {
-    sm: "size-7",
-    md: "size-8",
-    lg: "size-10",
+  const sizeClasses = { sm: "size-7", md: "size-8", lg: "size-10" }
+  const iconSizes = { sm: "size-3", md: "size-3.5", lg: "size-4" }
+
+  /** Resolve the effective system prompt + token budget for the first run. */
+  function initialPromptFor(action: AIAction): { systemPrompt: string; maxTokens: number } {
+    if (action === "summarize") {
+      const strength = preferences.aiSummaryStrength ?? "short"
+      const saved = preferences.aiSystemPrompts?.summarize
+      const systemPrompt =
+        saved && saved !== DEFAULT_SYSTEM_PROMPTS.summarize ? saved : STRENGTH_PROMPTS[strength]
+      return { systemPrompt, maxTokens: STRENGTH_MAX_TOKENS[strength] }
+    }
+    return {
+      systemPrompt: preferences.aiSystemPrompts?.[action] || DEFAULT_SYSTEM_PROMPTS[action],
+      maxTokens: 512,
+    }
   }
 
-  const iconSizes = {
-    sm: "size-3",
-    md: "size-3.5",
-    lg: "size-4",
+  async function runGenerate(action: AIAction, systemPrompt: string, maxTokens: number): Promise<string> {
+    const result = await generateText({
+      messages: buildMessages(action, text, systemPrompt),
+      maxTokens,
+      temperature: 0.7,
+    })
+    return result.text.trim()
   }
 
-  async function handleAction(action: AIActionDef) {
+  async function handleAction(action: AIAction) {
     if (!text.trim()) return
-
     setOpen(false)
     setLoading(true)
-    setActiveAction(action.id)
-
+    setActiveAction(action)
     try {
-      const result = await generateText({
-        messages: action.prompt(text),
-        maxTokens: 512,
-        temperature: 0.7,
-      })
-
-      if (result.text.trim()) {
-        onResult(result.text.trim(), action.id)
+      const { systemPrompt, maxTokens } = initialPromptFor(action)
+      const out = await runGenerate(action, systemPrompt, maxTokens)
+      if (!out) return
+      if (preferences.aiPreviewBeforeApply) {
+        setPreview({ action, original: text, result: out })
+      } else {
+        onResult(out, action)
       }
     } catch (err) {
       console.error("[AI Action] Error:", err)
@@ -194,6 +137,26 @@ export function AIActionButton({
       setLoading(false)
       setActiveAction(null)
     }
+  }
+
+  async function handleRegenerate(systemPrompt: string, strength: SummaryStrength) {
+    if (!preview) return
+    setRegenerating(true)
+    try {
+      const maxTokens = preview.action === "summarize" ? STRENGTH_MAX_TOKENS[strength] : 512
+      const out = await runGenerate(preview.action, systemPrompt, maxTokens)
+      if (out) setPreview({ ...preview, result: out })
+    } catch (err) {
+      console.error("[AI Action] Regenerate error:", err)
+    } finally {
+      setRegenerating(false)
+    }
+  }
+
+  function handleApply(finalText: string) {
+    if (!preview) return
+    onResult(finalText, preview.action)
+    setPreview(null)
   }
 
   return (
@@ -244,7 +207,7 @@ export function AIActionButton({
                 key={action.id}
                 type="button"
                 disabled={loading}
-                onClick={() => handleAction(action)}
+                onClick={() => handleAction(action.id)}
                 className="flex items-center gap-2 w-full px-2 py-1.5 text-left rounded-md transition-colors hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isActive ? (
@@ -257,6 +220,16 @@ export function AIActionButton({
             )
           })}
         </div>
+      )}
+
+      {preview && (
+        <AIResultPreview
+          state={preview}
+          busy={regenerating}
+          onRegenerate={handleRegenerate}
+          onApply={handleApply}
+          onClose={() => setPreview(null)}
+        />
       )}
     </div>
   )

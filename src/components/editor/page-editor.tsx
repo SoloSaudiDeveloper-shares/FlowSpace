@@ -8,6 +8,7 @@ import { BlockNoteView } from "@blocknote/shadcn"
 import { useTheme } from "@/components/theme-provider"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { savePageContent } from "@/lib/actions/page-actions"
+import { toast } from "sonner"
 import { TTSButton } from "@/components/shared/tts-button"
 import { AIActionButton } from "@/components/shared/ai-action-button"
 import { SpeechButton } from "@/components/shared/speech-button"
@@ -65,19 +66,33 @@ export function PageEditor({ pageId, initialContent }: PageEditorProps) {
     }, 500)
   }, [editor, pageId])
 
-  /** Insert AI result at the end of the document */
+  /** Apply an AI result. Append for continue/expand; otherwise replace the
+   *  whole document. Either way we snapshot first and offer a one-click Undo
+   *  (so a summary that's too aggressive is never destructive). */
   function handleAIResult(result: string, action: string) {
+    // Deep-clone the current document so Undo restores plain block objects,
+    // not stale live references.
+    const snapshot = JSON.parse(JSON.stringify(editor.document))
     if (action === "continue" || action === "expand") {
-      // Append as a new paragraph at end
       const newBlock = { type: "paragraph" as const, content: result }
       editor.insertBlocks([newBlock], editor.document[editor.document.length - 1], "after")
     } else {
-      // Replace entire document with the result
       const newBlock = { type: "paragraph" as const, content: result }
       editor.replaceBlocks(editor.document, [newBlock])
     }
-    // Trigger save
     handleChange()
+    toast.success("Applied to your page", {
+      description: action === "continue" || action === "expand" ? "Added below." : "Page content replaced.",
+      action: {
+        label: "Undo",
+        onClick: () => {
+          editor.replaceBlocks(editor.document, snapshot)
+          handleChange()
+          toast.success("Reverted")
+        },
+      },
+      duration: 10000,
+    })
   }
 
   /** Insert speech transcript at cursor or end */

@@ -96,6 +96,11 @@ export interface Preferences {
   /** Model name for the OpenAI-compat endpoint. */
   aiOpenAIModel: string
   aiSystemPrompts: Record<string, string>
+  /** Show a preview popup before an AI action overwrites or inserts content.
+   *  When false, results apply immediately (with an Undo toast on the page). */
+  aiPreviewBeforeApply: boolean
+  /** Default strength for the Summarize action. */
+  aiSummaryStrength: "one_line" | "short" | "detailed"
   // Sidebar customisation
   sidebarVisible: Record<SidebarSectionKey, boolean>
   sidebarOrder: SidebarSectionKey[]
@@ -178,6 +183,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
     continue: "You are a writing assistant. Continue the text naturally, matching the style and tone. Write 2-3 more sentences.",
     generate_todos: "You are a task planner. Given a goal or description, generate a concise numbered list of actionable todo items (3-7 items). Return only the numbered list.",
   },
+  aiPreviewBeforeApply: true,
+  aiSummaryStrength: "short",
   sidebarVisible: {
     favorites: true,
     projects: true,
