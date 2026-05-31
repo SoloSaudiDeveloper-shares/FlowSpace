@@ -101,6 +101,16 @@ export interface Preferences {
   aiPreviewBeforeApply: boolean
   /** Default strength for the Summarize action. */
   aiSummaryStrength: "one_line" | "short" | "detailed"
+  /** Max output tokens per AI writing action. Generous by default so
+   *  "thinking" models (which spend hidden reasoning tokens against this cap)
+   *  don't truncate the visible answer. */
+  aiTokenBudgets: {
+    one_line: number
+    short: number
+    detailed: number
+    /** Expand / improve / continue / generate-todos. */
+    other: number
+  }
   // Sidebar customisation
   sidebarVisible: Record<SidebarSectionKey, boolean>
   sidebarOrder: SidebarSectionKey[]
@@ -185,6 +195,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   },
   aiPreviewBeforeApply: true,
   aiSummaryStrength: "short",
+  aiTokenBudgets: { one_line: 1024, short: 2048, detailed: 4096, other: 2048 },
   sidebarVisible: {
     favorites: true,
     projects: true,

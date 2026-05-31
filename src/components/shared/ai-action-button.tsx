@@ -94,6 +94,13 @@ export function AIActionButton({
   const sizeClasses = { sm: "size-7", md: "size-8", lg: "size-10" }
   const iconSizes = { sm: "size-3", md: "size-3.5", lg: "size-4" }
 
+  /** User-configurable token budgets (Settings → AI), falling back to defaults. */
+  function budgetFor(kind: SummaryStrength | "other"): number {
+    const b = preferences.aiTokenBudgets
+    if (kind === "other") return b?.other ?? DEFAULT_MAX_TOKENS
+    return b?.[kind] ?? STRENGTH_MAX_TOKENS[kind]
+  }
+
   /** Resolve the effective system prompt + token budget for the first run. */
   function initialPromptFor(action: AIAction): { systemPrompt: string; maxTokens: number } {
     if (action === "summarize") {
@@ -101,11 +108,11 @@ export function AIActionButton({
       const saved = preferences.aiSystemPrompts?.summarize
       const systemPrompt =
         saved && saved !== DEFAULT_SYSTEM_PROMPTS.summarize ? saved : STRENGTH_PROMPTS[strength]
-      return { systemPrompt, maxTokens: STRENGTH_MAX_TOKENS[strength] }
+      return { systemPrompt, maxTokens: budgetFor(strength) }
     }
     return {
       systemPrompt: preferences.aiSystemPrompts?.[action] || DEFAULT_SYSTEM_PROMPTS[action],
-      maxTokens: DEFAULT_MAX_TOKENS,
+      maxTokens: budgetFor("other"),
     }
   }
 

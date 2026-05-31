@@ -78,6 +78,7 @@ import { AccountSection } from "@/components/settings/account-section"
 import { TelegramSection } from "@/components/settings/telegram-section"
 import { LocaleSwitcher } from "@/components/settings/locale-switcher"
 import { GuidesHub } from "@/components/settings/guides-hub"
+import { SectionHelp } from "@/components/shared/section-help"
 import { EmailInSection } from "@/components/settings/email-in-section"
 import { CalendarSyncSection } from "@/components/settings/calendar-sync-section"
 import { VoiceUsageCard } from "@/components/settings/voice-usage-card"
@@ -1895,6 +1896,48 @@ export function SettingsContent() {
                 </div>
                 <ChevronRight className="size-4 text-muted-foreground shrink-0" />
               </button>
+
+              {/* Response length — editable max-token budgets per action */}
+              <div className="px-4 py-3 rounded-lg border bg-card">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Settings2 className="size-3.5 text-muted-foreground" />
+                    Response length
+                  </h3>
+                  <SectionHelp guideId="aiResponseLength" className="ml-auto" />
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Max tokens per AI action — how long answers can get (~1 token ≈ ¾ of a word).
+                  Higher leaves room for &ldquo;thinking&rdquo; models so summaries aren&apos;t cut off.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    ["one_line", "Summarize · One line"],
+                    ["short", "Summarize · Short"],
+                    ["detailed", "Summarize · Detailed"],
+                    ["other", "Other actions"],
+                  ] as const).map(([key, label]) => {
+                    const budgets = preferences.aiTokenBudgets ?? DEFAULT_PREFERENCES.aiTokenBudgets
+                    return (
+                      <label key={key} className="text-xs">
+                        <span className="block text-muted-foreground mb-1">{label}</span>
+                        <input
+                          type="number"
+                          min={64}
+                          max={32000}
+                          step={64}
+                          value={budgets[key]}
+                          onChange={(e) => {
+                            const n = Math.max(64, Math.min(32000, Math.round(Number(e.target.value) || 0)))
+                            updatePreference("aiTokenBudgets", { ...budgets, [key]: n })
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
 
               {/* TTS — Browser Speech Synthesis */}
               <div className="px-4 py-3 rounded-lg border bg-card">

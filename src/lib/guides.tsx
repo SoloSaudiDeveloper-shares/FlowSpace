@@ -22,6 +22,7 @@ import {
   Settings2,
   Calendar,
   Activity,
+  Gauge,
 } from "lucide-react"
 import type { GuideStep } from "@/components/shared/guide-dialog"
 import { AI_PROMPT_TEMPLATE } from "@/lib/import/ai-import-parser"
@@ -33,6 +34,7 @@ export type GuideId =
   | "customFields"
   | "calendarSync"
   | "serverEvents"
+  | "aiResponseLength"
 
 export interface GuideMeta {
   id: GuideId
@@ -399,6 +401,62 @@ Due: 2026-07-15
     ],
   },
 
+  aiResponseLength: {
+    id: "aiResponseLength",
+    label: "AI response length",
+    blurb: "Control how long AI answers can get (max tokens).",
+    icon: Gauge,
+    steps: [
+      {
+        title: "What is “max tokens”?",
+        body: (
+          <p>
+            A token is a chunk of text — roughly{" "}
+            <strong>¾ of a word</strong> (so ~1,000 tokens ≈ 750 words). The
+            number is the <strong>maximum length</strong> an AI answer is
+            allowed to reach. Raise it for longer answers, lower it to keep
+            things short and fast.
+          </p>
+        ),
+      },
+      {
+        title: "Why the defaults are generous",
+        body: (
+          <p>
+            Some models (e.g. <strong>Gemini 2.5 Flash</strong>) spend hidden
+            &ldquo;thinking&rdquo; tokens that count against this same cap. If
+            the budget is too small, thinking eats it and the visible answer
+            gets cut off mid-sentence. The defaults leave plenty of room. A
+            simpler local model just stops at the natural end, so a high
+            ceiling does no harm.
+          </p>
+        ),
+      },
+      {
+        title: "The four fields",
+        body: (
+          <ul className="space-y-1.5">
+            <Row title="Summarize · One line">a single-sentence summary (default 1024).</Row>
+            <Row title="Summarize · Short">3–5 bullet points (default 2048).</Row>
+            <Row title="Summarize · Detailed">one or two full paragraphs (default 4096).</Row>
+            <Row title="Other actions">expand, improve, continue, generate to-dos (default 2048).</Row>
+          </ul>
+        ),
+      },
+      {
+        title: "Tuning tips",
+        body: (
+          <p>
+            If a summary still comes out truncated, <strong>raise</strong> that
+            field. If answers are longer or slower than you want,{" "}
+            <strong>lower</strong> it. Changes apply to the next AI action —
+            no reload needed.
+          </p>
+        ),
+      },
+    ],
+  },
+
   serverEvents: {
     id: "serverEvents",
     label: "Server events",
@@ -440,6 +498,7 @@ export const GUIDE_LIST: GuideMeta[] = [
   GUIDES.telegramBot,
   GUIDES.calendarSync,
   GUIDES.customFields,
+  GUIDES.aiResponseLength,
   GUIDES.apiTokens,
   GUIDES.serverEvents,
 ]
