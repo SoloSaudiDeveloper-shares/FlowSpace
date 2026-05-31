@@ -148,7 +148,7 @@ export function ApiTokensSection() {
             </option>
           ))}
         </select>
-        <Button size="sm" className="h-8 text-xs gap-1.5" disabled={!name.trim() || issuing}>
+        <Button type="submit" size="sm" className="h-8 text-xs gap-1.5" disabled={!name.trim() || issuing}>
           {issuing ? (
             <Loader2 className="size-3 animate-spin" />
           ) : (

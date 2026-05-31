@@ -3,7 +3,7 @@
 /**
  * Tiny file-ingest dropzone.
  *
- * Drag (or click) a PDF / CSV / TSV / TXT / MD → server parses it and
+ * Drag (or click) a PDF / Word / CSV / TSV / TXT / MD → server parses it and
  * creates a Page in the user's workspace; the client redirects there.
  * Optional "summarise via AI" checkbox prepends a model-generated
  * 3-5-bullet summary at the top.
@@ -18,7 +18,7 @@ import { FileText, Loader2, Upload, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { ingestFileAsPage } from "@/lib/actions/file-ingest-actions"
 
-const ACCEPT = ".pdf,.csv,.tsv,.txt,.md,application/pdf,text/csv,text/plain,text/markdown"
+const ACCEPT = ".pdf,.docx,.csv,.tsv,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv,text/plain,text/markdown"
 
 export function FileIngestDropzone() {
   const router = useRouter()
@@ -112,7 +112,7 @@ export function FileIngestDropzone() {
             {busy ? `Importing ${filename}…` : "Drop a file → make a Page"}
           </p>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            PDF · CSV · TSV · TXT · MD · max 10 MB
+            PDF · Word · CSV · TSV · TXT · MD · max 10 MB
           </p>
         </div>
       </button>

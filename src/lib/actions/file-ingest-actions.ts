@@ -4,7 +4,8 @@
  * Drop a file → land it as a Page.
  *
  * Supported types:
- *   - PDF (.pdf)            extracted to plain text via pdf-parse
+ *   - PDF (.pdf)            extracted to plain text via unpdf (Node-safe pdf.js)
+ *   - Word (.docx)          extracted to plain text via mammoth
  *   - CSV / TSV (.csv/.tsv) parsed via papaparse, rendered as a
  *                           markdown table inside the page
  *   - Plain text (.txt/.md) ingested as-is
@@ -29,11 +30,16 @@ const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 const MAX_CSV_ROWS = 50_000
 const MAX_CSV_COLS = 50
 
-export type IngestKind = "pdf" | "csv" | "tsv" | "text" | "unknown"
+export type IngestKind = "pdf" | "docx" | "csv" | "tsv" | "text" | "unknown"
 
 function detectKind(filename: string, mime?: string): IngestKind {
   const lower = filename.toLowerCase()
   if (lower.endsWith(".pdf") || mime === "application/pdf") return "pdf"
+  if (
+    lower.endsWith(".docx") ||
+    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  )
+    return "docx"
   if (lower.endsWith(".csv") || mime === "text/csv") return "csv"
   if (lower.endsWith(".tsv") || mime === "text/tab-separated-values") return "tsv"
   if (
@@ -55,21 +61,32 @@ interface IngestResult {
 }
 
 async function extractPdf(buf: Buffer): Promise<IngestResult> {
-  // pdf-parse v2 ships a class-based API. Wrap in a try so any throw
-  // from PDF.js (corrupt file, encrypted, weird charset) lands as a
-  // friendly "couldn't parse" instead of a 500.
-  const { PDFParse } = await import("pdf-parse")
-  // PDF.js prefers a Uint8Array view; passing a Buffer can trigger a
-  // detached-buffer warning on some Node versions.
-  const data = new Uint8Array(buf)
-  const parser = new PDFParse({ data })
-  const out = await parser.getText()
-  const text = (out.text ?? "").trim()
+  // unpdf ships a serverless/Node build of pdf.js that doesn't touch
+  // browser globals like DOMMatrix (the old pdf-parse path threw
+  // "DOMMatrix is not defined" in Node). Text-only, no canvas needed.
+  const { extractText, getDocumentProxy } = await import("unpdf")
+  const pdf = await getDocumentProxy(new Uint8Array(buf))
+  const { totalPages, text } = await extractText(pdf, { mergePages: true })
+  const merged = (Array.isArray(text) ? text.join("\n\n") : text).trim()
+  const words = merged.split(/\s+/).filter(Boolean).length
+  return {
+    text: merged,
+    kind: "pdf",
+    summary: `${totalPages} page${totalPages === 1 ? "" : "s"} · ${words.toLocaleString()} words`,
+  }
+}
+
+async function extractDocx(buf: Buffer): Promise<IngestResult> {
+  // mammoth converts .docx → plain text in pure JS (no native deps).
+  const mod = await import("mammoth")
+  const mammoth = (mod as { default?: typeof import("mammoth") }).default ?? mod
+  const result = await mammoth.extractRawText({ buffer: buf })
+  const text = (result.value ?? "").trim()
   const words = text.split(/\s+/).filter(Boolean).length
   return {
     text,
-    kind: "pdf",
-    summary: `${out.total} page${out.total === 1 ? "" : "s"} · ${words.toLocaleString()} words`,
+    kind: "docx",
+    summary: `${words.toLocaleString()} word${words === 1 ? "" : "s"}`,
   }
 }
 
@@ -146,12 +163,13 @@ export async function ingestFileAsPage(
   }
   const kind = detectKind(input.filename, input.mime)
   if (kind === "unknown") {
-    return { ok: false, error: "Unsupported file type. Try PDF, CSV, TSV, TXT, or MD." }
+    return { ok: false, error: "Unsupported file type. Try PDF, Word (.docx), CSV, TSV, TXT, or MD." }
   }
 
   let extracted: IngestResult
   try {
     if (kind === "pdf") extracted = await extractPdf(buf)
+    else if (kind === "docx") extracted = await extractDocx(buf)
     else if (kind === "csv" || kind === "tsv") extracted = await extractDelimited(buf, kind)
     else extracted = extractText(buf)
   } catch (err) {
