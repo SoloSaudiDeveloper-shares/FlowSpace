@@ -14,12 +14,15 @@ interface PageContextMenuProps {
 
 export function PageContextMenu({ children, className }: PageContextMenuProps) {
   const { menu, open, close } = useContextMenu()
-  const { enabled: aiEnabled, disposeAll } = useAI()
+  const { disposeAll, modelStates } = useAI()
   const { status: speechStatus, unloadModel } = useSpeechRecognition()
   const { preferences } = usePreferences()
 
   const speechLoaded = speechStatus === "ready" || speechStatus === "listening"
-  const hasModels = aiEnabled || speechLoaded
+  // Only meaningful when models are actually loaded IN THE BROWSER. With an
+  // API-key provider (OpenAI / Gemini / etc.) nothing is loaded locally, so
+  // there's nothing to unload — don't show the option.
+  const aiModelsLoaded = modelStates.size > 0
 
   function handleContextMenu(e: React.MouseEvent) {
     // Let native context menu through on text inputs for copy/paste
@@ -33,9 +36,6 @@ export function PageContextMenu({ children, className }: PageContextMenuProps) {
       return
     }
 
-    // Don't show if no models are relevant
-    if (!preferences.aiEnabled && !preferences.speechEnabled) return
-
     const items: ContextMenuEntry[] = []
 
     if (preferences.speechEnabled && speechLoaded) {
@@ -46,7 +46,8 @@ export function PageContextMenu({ children, className }: PageContextMenuProps) {
       })
     }
 
-    if (preferences.aiEnabled && aiEnabled) {
+    // Only when something is actually loaded locally (not for API providers).
+    if (preferences.aiEnabled && aiModelsLoaded) {
       items.push({
         label: "Unload AI Models",
         icon: Cpu,

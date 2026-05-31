@@ -1,11 +1,28 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, ChevronRight, Plus, Flag, Calendar } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Flag,
+  Calendar,
+  MessageCircle,
+  Timer,
+  Trash2,
+  ExternalLink,
+  CheckCircle2,
+  Circle,
+} from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SpeechButton } from "@/components/shared/speech-button"
-import { createTask, updateTask } from "@/lib/actions/task-actions"
+import { createTask, updateTask, deleteTask } from "@/lib/actions/task-actions"
 import { TaskDetailSheet } from "../task-detail-sheet"
+import {
+  ContextMenu,
+  useContextMenu,
+  type ContextMenuEntry,
+} from "@/components/shared/context-menu"
 import type { tasks, taskStatuses } from "@/lib/db/schema"
 
 type Task = typeof tasks.$inferSelect
@@ -17,6 +34,15 @@ const PRIORITY_COLORS: Record<string, string> = {
   medium: "text-yellow-400",
   low: "text-blue-400",
   none: "text-muted-foreground/30",
+}
+
+/** Hex for the colored left accent bar on each row. */
+const PRIORITY_BAR: Record<string, string> = {
+  urgent: "#ef4444",
+  high: "#f97316",
+  medium: "#eab308",
+  low: "#3b82f6",
+  none: "transparent",
 }
 
 const INDENT_PX = 20
@@ -67,12 +93,20 @@ interface ListViewProps {
   projectId: string
   statuses: TaskStatus[]
   tasks: Task[]
+  /** Field keys hidden via the toolbar's "Fields" menu. */
+  hiddenFields?: Set<string>
 }
 
-export function ListView({ projectId, statuses, tasks }: ListViewProps) {
+export function ListView({ projectId, statuses, tasks, hiddenFields }: ListViewProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetTab, setSheetTab] = useState<"details" | "comments">("details")
+  const [sheetAutoStart, setSheetAutoStart] = useState(false)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const { menu, open: openMenu, close: closeMenu } = useContextMenu()
+
+  const showDue = !hiddenFields?.has("dueDate")
+  const showPriority = !hiddenFields?.has("priority")
 
   // Track which parent tasks are expanded (all by default)
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -94,8 +128,9 @@ export function ListView({ projectId, statuses, tasks }: ListViewProps) {
     })
   }
 
+  // Preserve the order coming from the toolbar (it already filtered + sorted).
   const tasksByStatus = statuses.reduce((acc, s) => {
-    acc[s.id] = tasks.filter((t) => t.statusId === s.id).sort((a, b) => a.sortOrder - b.sortOrder)
+    acc[s.id] = tasks.filter((t) => t.statusId === s.id)
     return acc
   }, {} as Record<string, Task[]>)
 
@@ -103,9 +138,36 @@ export function ListView({ projectId, statuses, tasks }: ListViewProps) {
     setCollapsed((prev) => ({ ...prev, [statusId]: !prev[statusId] }))
   }
 
-  function openTask(task: Task) {
+  function openTask(task: Task, tab: "details" | "comments" = "details", autoStart = false) {
     setSelectedTask(task)
+    setSheetTab(tab)
+    setSheetAutoStart(autoStart)
     setSheetOpen(true)
+  }
+
+  function handleRowContextMenu(e: React.MouseEvent, task: Task) {
+    e.preventDefault()
+    e.stopPropagation()
+    const items: ContextMenuEntry[] = [
+      { header: true, title: task.title },
+      { label: "Open", icon: ExternalLink, onClick: () => openTask(task) },
+      { label: "Add comment", icon: MessageCircle, onClick: () => openTask(task, "comments") },
+      { label: "Track time", icon: Timer, onClick: () => openTask(task, "details", true) },
+      { separator: true },
+      {
+        label: task.isCompleted ? "Mark incomplete" : "Mark complete",
+        icon: task.isCompleted ? Circle : CheckCircle2,
+        onClick: () => updateTask(task.id, task.projectId, { isCompleted: !task.isCompleted }),
+      },
+      { separator: true },
+      {
+        label: "Delete task",
+        icon: Trash2,
+        variant: "destructive",
+        onClick: () => deleteTask(task.id, task.projectId),
+      },
+    ]
+    openMenu(e, items)
   }
 
   return (
@@ -113,8 +175,8 @@ export function ListView({ projectId, statuses, tasks }: ListViewProps) {
       {/* Column headers */}
       <div className="flex items-center gap-2 px-4 py-2 border-b text-xs font-medium text-muted-foreground sticky top-0 bg-background z-10">
         <div className="flex-1 pl-10">Name</div>
-        <div className="w-28 text-center">Due Date</div>
-        <div className="w-20 text-center">Priority</div>
+        {showDue && <div className="w-28 text-center">Due Date</div>}
+        {showPriority && <div className="w-20 text-center">Priority</div>}
       </div>
 
       {statuses.map((status) => {
@@ -137,6 +199,9 @@ export function ListView({ projectId, statuses, tasks }: ListViewProps) {
             isCollapsed={isCollapsed}
             onToggle={() => toggleCollapse(status.id)}
             onTaskClick={openTask}
+            onTaskContextMenu={handleRowContextMenu}
+            showDue={showDue}
+            showPriority={showPriority}
           />
         )
       })}
@@ -146,7 +211,13 @@ export function ListView({ projectId, statuses, tasks }: ListViewProps) {
         statuses={statuses}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
+        initialTab={sheetTab}
+        autoStartTimer={sheetAutoStart}
       />
+
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={closeMenu} />
+      )}
     </div>
   )
 }
@@ -161,6 +232,9 @@ function StatusGroup({
   isCollapsed,
   onToggle,
   onTaskClick,
+  onTaskContextMenu,
+  showDue,
+  showPriority,
 }: {
   status: TaskStatus
   tasks: Task[]
@@ -171,6 +245,9 @@ function StatusGroup({
   isCollapsed: boolean
   onToggle: () => void
   onTaskClick: (task: Task) => void
+  onTaskContextMenu: (e: React.MouseEvent, task: Task) => void
+  showDue: boolean
+  showPriority: boolean
 }) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
@@ -208,6 +285,9 @@ function StatusGroup({
               isExpanded={expanded.has(task.id)}
               onToggleExpand={onToggleExpand}
               onTaskClick={onTaskClick}
+              onTaskContextMenu={onTaskContextMenu}
+              showDue={showDue}
+              showPriority={showPriority}
             />
           ))}
 
@@ -254,6 +334,9 @@ function TaskRow({
   isExpanded,
   onToggleExpand,
   onTaskClick,
+  onTaskContextMenu,
+  showDue,
+  showPriority,
 }: {
   task: Task
   depth: number
@@ -261,8 +344,12 @@ function TaskRow({
   isExpanded: boolean
   onToggleExpand: (id: string) => void
   onTaskClick: (task: Task) => void
+  onTaskContextMenu: (e: React.MouseEvent, task: Task) => void
+  showDue: boolean
+  showPriority: boolean
 }) {
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.none
+  const barColor = PRIORITY_BAR[task.priority] ?? PRIORITY_BAR.none
   const dueDate = task.dueDate ? new Date(task.dueDate) : null
   const isOverdue = dueDate && dueDate < new Date() && !task.isCompleted
   const isSubtask = depth > 0
@@ -272,7 +359,15 @@ function TaskRow({
       className="relative flex items-center gap-2 px-4 py-1.5 border-b hover:bg-accent/30 cursor-pointer group"
       style={{ paddingLeft: 16 + depth * INDENT_PX }}
       onClick={() => onTaskClick(task)}
+      onContextMenu={(e) => onTaskContextMenu(e, task)}
     >
+      {/* Priority accent bar (coloured by priority; transparent for none) */}
+      <span
+        className="absolute left-0 top-0 bottom-0 w-1"
+        style={{ backgroundColor: barColor }}
+        aria-hidden
+      />
+
       {/* Indent guide line */}
       {isSubtask && (
         <div
@@ -327,21 +422,25 @@ function TaskRow({
       </span>
 
       {/* Due date */}
-      <div className="w-28 flex justify-center">
-        {dueDate ? (
-          <span className={`text-xs flex items-center gap-1 ${isOverdue ? "text-red-400" : "text-muted-foreground"}`}>
-            <Calendar className="size-3" />
-            {dueDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground/30">&mdash;</span>
-        )}
-      </div>
+      {showDue && (
+        <div className="w-28 flex justify-center">
+          {dueDate ? (
+            <span className={`text-xs flex items-center gap-1 ${isOverdue ? "text-red-400" : "text-muted-foreground"}`}>
+              <Calendar className="size-3" />
+              {dueDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground/30">&mdash;</span>
+          )}
+        </div>
+      )}
 
       {/* Priority */}
-      <div className="w-20 flex justify-center">
-        <Flag className={`size-3.5 ${priorityColor}`} />
-      </div>
+      {showPriority && (
+        <div className="w-20 flex justify-center">
+          <Flag className={`size-3.5 ${priorityColor}`} />
+        </div>
+      )}
     </div>
   )
 }

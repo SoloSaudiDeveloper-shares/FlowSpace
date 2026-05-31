@@ -116,6 +116,10 @@ interface TaskDetailSheetProps {
   statuses: TaskStatus[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Which right-panel tab to show when opened (e.g. jump straight to Comments). */
+  initialTab?: "details" | "comments"
+  /** Start the time tracker automatically on open (e.g. from a "Track time" action). */
+  autoStartTimer?: boolean
 }
 
 type ChecklistWithItems = {
@@ -205,6 +209,8 @@ export function TaskDetailSheet({
   statuses,
   open,
   onOpenChange,
+  initialTab,
+  autoStartTimer,
 }: TaskDetailSheetProps) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -281,7 +287,9 @@ export function TaskDetailSheet({
       setTimeEstimate(task.timeEstimate ?? null)
       committedRef.current = task.timeTracked ?? 0
       setElapsed(task.timeTracked ?? 0)
+      setRightTab(initialTab ?? "details")
       loadData(task)
+      if (autoStartTimer) startTracking()
     }
     if (!open) {
       stopTracking()

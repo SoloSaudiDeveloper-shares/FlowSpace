@@ -67,7 +67,7 @@ const TASK_FIELDS = [
   { key: "description", label: "Description" },
 ] as const
 
-type SortField = "title" | "priority" | "dueDate" | "createdAt" | "updatedAt"
+type SortField = "manual" | "title" | "priority" | "dueDate" | "createdAt" | "updatedAt"
 type FilterPriority = "all" | "urgent" | "high" | "medium" | "low" | "none"
 
 interface ProjectViewsProps {
@@ -99,8 +99,8 @@ const PRIORITY_COLORS: Record<string, string> = {
 export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, projectDescription, parentId, taskMeta }: ProjectViewsProps) {
   const [activeView, setActiveView] = useState<ViewType>("overview")
   const [hiddenFields, setHiddenFields] = useState<Set<string>>(new Set())
-  const [sortField, setSortField] = useState<SortField>("createdAt")
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+  const [sortField, setSortField] = useState<SortField>("manual")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const [filterPriority, setFilterPriority] = useState<FilterPriority>("all")
   const [filterCompleted, setFilterCompleted] = useState<"all" | "active" | "completed">("all")
   const [filterDueDate, setFilterDueDate] = useState<"all" | "overdue" | "today" | "this_week" | "no_date">("all")
@@ -160,6 +160,9 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
   tasks = [...tasks].sort((a, b) => {
     let cmp = 0
     switch (sortField) {
+      case "manual":
+        cmp = a.sortOrder - b.sortOrder
+        break
       case "title":
         cmp = a.title.localeCompare(b.title)
         break
@@ -264,6 +267,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuLabel className="text-xs">Sort by</DropdownMenuLabel>
               {([
+                ["manual", "Default order"],
                 ["title", "Title"],
                 ["priority", "Priority"],
                 ["dueDate", "Due Date"],
@@ -508,7 +512,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           />
         )}
         {activeView === "list" && (
-          <ListView projectId={projectId} statuses={statuses} tasks={tasks} />
+          <ListView projectId={projectId} statuses={statuses} tasks={tasks} hiddenFields={hiddenFields} />
         )}
         {activeView === "board" && (
           <div className="p-6">
