@@ -204,6 +204,29 @@ export const GUIDES: Record<GuideId, GuideMeta> = {
         ),
         code: AI_PROMPT_TEMPLATE,
       },
+      {
+        title: "Tips & limits",
+        body: (
+          <ul className="space-y-2">
+            <Row title="One element per import">
+              each import builds a single element — exactly one{" "}
+              <code>#</code> header line. If your notes cover several projects,
+              do them one at a time, or paste each block separately.
+            </Row>
+            <Row title="Want a plain page, not a task list?">
+              start with <code># Page: Title</code> instead of{" "}
+              <code># Project:</code> — everything below the header becomes the
+              page body (skip <code>## Tasks</code>).
+            </Row>
+            <Row title="Forgot the boxes? It still works">
+              if a model drops the <code>- [ ]</code> boxes, plain bullets
+              under <code>## Tasks</code> (<code>- task</code>,{" "}
+              <code>* task</code>, <code>1. task</code>) are still imported as
+              open tasks — but the <code>- [ ]</code> form is the reliable one.
+            </Row>
+          </ul>
+        ),
+      },
     ],
   },
 
