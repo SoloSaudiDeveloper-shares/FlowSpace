@@ -27,6 +27,7 @@ export function EmailInSection() {
   const [pending, setPending] = useState<PendingInboundEmail[]>([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [addrCopied, setAddrCopied] = useState(false)
 
   useEffect(() => {
     void refresh()
@@ -65,59 +66,98 @@ export function EmailInSection() {
       ? `${window.location.origin}/api/email/inbound`
       : "/api/email/inbound"
 
+  // Best-effort guess of the email domain from the web host: email routing
+  // lives on the registrable (zone) domain, so drop a leading subdomain
+  // (flowspace.tashkeelh.com → tashkeelh.com).
+  const emailDomain = (() => {
+    if (typeof window === "undefined") return "your-domain.com"
+    const host = window.location.host.split(":")[0]
+    const labels = host.split(".")
+    return labels.length > 2 ? labels.slice(1).join(".") : host
+  })()
+  const myAddress = `${user?.username ?? "your-username"}@${emailDomain}`
+
   return (
     <div className="px-4 py-3 rounded-lg border bg-card space-y-3">
       <div className="flex items-center gap-2">
         <Mail className="size-4 text-muted-foreground" />
         <h3 className="text-sm font-medium">Email IN</h3>
       </div>
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        Forward emails from anywhere into FlowSpace. Each accepted email
-        becomes a pending item in your bell — approve to keep it, or
-        dismiss. A plain email becomes a simple to-do in your Inbox; if the
-        email is written in the format below, approving builds the full
-        structure (a project with tasks, a page, etc.).
-      </p>
-
-      <div className="rounded-md border border-border/60 p-3 space-y-2">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">
-          Setup
+      {/* What a normal user actually needs: their own address. */}
+      <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1.5">
+        <p className="text-[10px] uppercase tracking-wider text-primary/70 font-medium">
+          Your inbox address
         </p>
-        <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal pl-4 leading-relaxed">
-          <li>
-            Point an inbound-mail provider (Resend, Postmark, SendGrid
-            Parse, Cloudflare Email Routing) at the webhook below.
-          </li>
-          <li>
-            Set the secret as <code className="px-1 py-0.5 mx-0.5 text-[10px] bg-muted/50 rounded">EMAIL_INBOUND_SECRET</code>
-            on the server, then have the provider send it as
-            <code className="px-1 py-0.5 mx-0.5 text-[10px] bg-muted/50 rounded">X-Inbound-Secret</code>.
-          </li>
-          <li>
-            Send mail to <code className="px-1 py-0.5 mx-0.5 text-[10px] bg-muted/50 rounded">
-              {user?.username ?? "your-username"}@your-domain.com
-            </code>{" "}
-            (the local part matches your username).
-          </li>
-        </ol>
-        <div className="flex items-center gap-1.5 pt-1">
-          <code className="flex-1 font-mono text-[11px] px-2 py-1 rounded bg-muted/60 truncate">
-            {webhookUrl}
+        <div className="flex items-center gap-1.5">
+          <code className="flex-1 font-mono text-sm px-2 py-1.5 rounded bg-background/60 truncate">
+            {myAddress}
           </code>
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 px-2"
+            className="h-8 px-2 shrink-0"
             onClick={() => {
-              navigator.clipboard.writeText(webhookUrl).catch(() => undefined)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 1500)
+              navigator.clipboard.writeText(myAddress).catch(() => undefined)
+              setAddrCopied(true)
+              setTimeout(() => setAddrCopied(false), 1500)
             }}
           >
-            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            {addrCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Email anything to this address and it shows up in your bell to
+          approve. A plain email becomes a simple to-do in your Inbox; an
+          email written in the format below builds a full project (with
+          tasks), a page, and so on.
+        </p>
       </div>
+
+      {/* The technical bits are a one-time server/admin job — tucked away so
+          a normal user isn't confronted with provider/secret jargon. */}
+      <details className="rounded-md border border-border/60">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground select-none hover:bg-accent/30 rounded-md">
+          Server setup (one-time, admin only)
+          <span className="ml-auto text-[10px] opacity-60">show</span>
+        </summary>
+        <div className="px-3 pb-3 space-y-2">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Already done for this workspace. Only relevant if you're the
+            person hosting FlowSpace and wiring up inbound mail.
+          </p>
+          <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal pl-4 leading-relaxed">
+            <li>
+              Point an inbound-mail provider (Cloudflare Email Routing is
+              free and recommended) at the webhook below.
+            </li>
+            <li>
+              Set <code className="px-1 py-0.5 mx-0.5 text-[10px] bg-muted/50 rounded">EMAIL_INBOUND_SECRET</code>
+              on the server and have the provider send it as
+              <code className="px-1 py-0.5 mx-0.5 text-[10px] bg-muted/50 rounded">X-Inbound-Secret</code>.
+            </li>
+            <li>
+              Use a catch-all so every <code className="px-1 py-0.5 mx-0.5 text-[10px] bg-muted/50 rounded">username@{emailDomain}</code> reaches its user.
+            </li>
+          </ol>
+          <div className="flex items-center gap-1.5 pt-1">
+            <code className="flex-1 font-mono text-[11px] px-2 py-1 rounded bg-muted/60 truncate">
+              {webhookUrl}
+            </code>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2"
+              onClick={() => {
+                navigator.clipboard.writeText(webhookUrl).catch(() => undefined)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1500)
+              }}
+            >
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            </Button>
+          </div>
+        </div>
+      </details>
 
       <MarkdownFormatGuide />
 
