@@ -19,7 +19,6 @@ import {
   Loader2,
   Globe,
   FolderKanban,
-  HelpCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,51 +40,7 @@ import {
   addFieldScope,
   removeFieldOption,
 } from "@/lib/actions/custom-field-actions"
-import { GuideDialog, type GuideStep } from "@/components/shared/guide-dialog"
-
-const CUSTOM_FIELD_GUIDE: GuideStep[] = [
-  {
-    title: "What are custom fields?",
-    body: (
-      <p>
-        Extra columns you bolt onto your elements or tasks — anything that
-        isn&apos;t already built in. Estimated hours, client name, repo URL,
-        confidence rating, a checkbox for &ldquo;ready for review&rdquo;. Once
-        you define a field it shows up on the task detail sheet (or element
-        panel) for whichever element types you scoped it to.
-      </p>
-    ),
-  },
-  {
-    title: "The field types",
-    body: (
-      <ul className="space-y-1.5">
-        <li><strong className="text-foreground/80">Text / Long text</strong> — free-form strings.</li>
-        <li><strong className="text-foreground/80">Number</strong> — integers or decimals, e.g. an estimate.</li>
-        <li><strong className="text-foreground/80">Date</strong> — review date, kickoff, etc.</li>
-        <li><strong className="text-foreground/80">Checkbox</strong> — a yes/no flag.</li>
-        <li><strong className="text-foreground/80">Select / Multi-select</strong> — fixed options (add them after creating).</li>
-        <li><strong className="text-foreground/80">URL / Email</strong> — typed input with validation.</li>
-        <li><strong className="text-foreground/80">Rating</strong> — 1–5 stars.</li>
-      </ul>
-    ),
-  },
-  {
-    title: "Scope — where a field shows up",
-    body: (
-      <p>
-        When you create a field you choose its scope:{" "}
-        <strong className="text-foreground/80">All elements</strong>,{" "}
-        <strong className="text-foreground/80">a specific element type</strong>{" "}
-        (only Projects, only Tasks…), or{" "}
-        <strong className="text-foreground/80">a single project</strong>. The
-        field then appears on the detail panel of everything that matches —
-        nowhere else. Start with the example below to see one wired up
-        end-to-end.
-      </p>
-    ),
-  },
-]
+import { SectionHelp } from "@/components/shared/section-help"
 
 const FIELD_TYPES = [
   { value: "text", label: "Text", icon: Type },
@@ -133,7 +88,6 @@ export function CustomFieldsSettings() {
   const [fields, setFields] = useState<FieldWithOptions[]>([])
   const [loading, setLoading] = useState(true)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [showGuide, setShowGuide] = useState(false)
   const [expandedField, setExpandedField] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -276,16 +230,8 @@ export function CustomFieldsSettings() {
           <Settings2 className="size-4" />
           Custom Fields
         </h2>
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-muted-foreground"
-            onClick={() => setShowGuide(true)}
-          >
-            <HelpCircle className="size-3.5 mr-1.5" />
-            How do I use this?
-          </Button>
+        <div className="flex items-center gap-2.5">
+          <SectionHelp guideId="customFields" />
           <Button
             variant="outline"
             size="sm"
@@ -300,13 +246,6 @@ export function CustomFieldsSettings() {
       <p className="text-sm text-muted-foreground mb-4">
         Define custom metadata fields for your elements and tasks.
       </p>
-
-      <GuideDialog
-        open={showGuide}
-        onOpenChange={setShowGuide}
-        subject="Custom fields"
-        steps={CUSTOM_FIELD_GUIDE}
-      />
 
       {/* Field list */}
       {fields.length === 0 ? (

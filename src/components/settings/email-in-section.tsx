@@ -20,7 +20,7 @@ import {
   dismissInboundEmail,
   type PendingInboundEmail,
 } from "@/lib/actions/inbound-email-actions"
-import { MarkdownFormatGuide } from "@/components/shared/markdown-format-guide"
+import { SectionHelp } from "@/components/shared/section-help"
 
 export function EmailInSection() {
   const { user } = useAuth()
@@ -76,6 +76,7 @@ export function EmailInSection() {
       <div className="flex items-center gap-2">
         <Mail className="size-4 text-muted-foreground" />
         <h3 className="text-sm font-medium">Email IN</h3>
+        <SectionHelp guideId="markdownFormat" label="Markdown format guide" className="ml-auto" />
       </div>
       {/* What a normal user actually needs: their own address. */}
       <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1.5">
@@ -106,8 +107,6 @@ export function EmailInSection() {
           tasks), a page, and so on.
         </p>
       </div>
-
-      <MarkdownFormatGuide />
 
       <div>
         <div className="flex items-center justify-between mb-1.5">
