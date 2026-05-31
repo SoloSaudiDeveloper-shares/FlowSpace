@@ -3,7 +3,7 @@
 /**
  * Tiny file-ingest dropzone.
  *
- * Drag (or click) a PDF / Word / CSV / TSV / TXT / MD → server parses it and
+ * Drag (or click) a PDF / Word / Excel / CSV / TSV / TXT / MD → server parses it and
  * creates a Page in the user's workspace; the client redirects there.
  * Optional "summarise via AI" checkbox prepends a model-generated
  * 3-5-bullet summary at the top.
@@ -18,7 +18,7 @@ import { FileText, Loader2, Upload, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { ingestFileAsPage } from "@/lib/actions/file-ingest-actions"
 
-const ACCEPT = ".pdf,.docx,.csv,.tsv,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv,text/plain,text/markdown"
+const ACCEPT = ".pdf,.docx,.xlsx,.csv,.tsv,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain,text/markdown"
 
 export function FileIngestDropzone() {
   const router = useRouter()
@@ -56,7 +56,13 @@ export function FileIngestDropzone() {
         toast.error(r.error)
         return
       }
-      toast.success(`Imported ${file.name}`)
+      // One toast, never two stacked on top of each other: if the summary was
+      // skipped we fold that into the (still-successful) import notice.
+      if (r.warning) {
+        toast.warning(r.warning, { description: `Imported ${file.name}` })
+      } else {
+        toast.success(`Imported ${file.name}`)
+      }
       router.push(`/pages/${r.pageId}`)
     } finally {
       setBusy(false)
@@ -112,7 +118,7 @@ export function FileIngestDropzone() {
             {busy ? `Importing ${filename}…` : "Drop a file → make a Page"}
           </p>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            PDF · Word · CSV · TSV · TXT · MD · max 10 MB
+            PDF · Word · Excel · CSV · TSV · TXT · MD · max 10 MB
           </p>
         </div>
       </button>

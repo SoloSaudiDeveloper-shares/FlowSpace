@@ -26,7 +26,6 @@ export function EmailInSection() {
   const { user } = useAuth()
   const [pending, setPending] = useState<PendingInboundEmail[]>([])
   const [loading, setLoading] = useState(true)
-  const [copied, setCopied] = useState(false)
   const [addrCopied, setAddrCopied] = useState(false)
 
   useEffect(() => {
@@ -60,11 +59,6 @@ export function EmailInSection() {
       toast.error(r.error)
     }
   }
-
-  const webhookUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/api/email/inbound`
-      : "/api/email/inbound"
 
   // Best-effort guess of the email domain from the web host: email routing
   // lives on the registrable (zone) domain, so drop a leading subdomain
@@ -112,52 +106,6 @@ export function EmailInSection() {
           tasks), a page, and so on.
         </p>
       </div>
-
-      {/* The technical bits are a one-time server/admin job — tucked away so
-          a normal user isn't confronted with provider/secret jargon. */}
-      <details className="rounded-md border border-border/60">
-        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground select-none hover:bg-accent/30 rounded-md">
-          Server setup (one-time, admin only)
-          <span className="ml-auto text-[10px] opacity-60">show</span>
-        </summary>
-        <div className="px-3 pb-3 space-y-2">
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Already done for this workspace. Only relevant if you're the
-            person hosting FlowSpace and wiring up inbound mail.
-          </p>
-          <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal pl-4 leading-relaxed">
-            <li>
-              Point an inbound-mail provider (Cloudflare Email Routing is
-              free and recommended) at the webhook below.
-            </li>
-            <li>
-              Set <code className="px-1 py-0.5 mx-0.5 text-[10px] bg-muted/50 rounded">EMAIL_INBOUND_SECRET</code>
-              on the server and have the provider send it as
-              <code className="px-1 py-0.5 mx-0.5 text-[10px] bg-muted/50 rounded">X-Inbound-Secret</code>.
-            </li>
-            <li>
-              Use a catch-all so every <code className="px-1 py-0.5 mx-0.5 text-[10px] bg-muted/50 rounded">username@{emailDomain}</code> reaches its user.
-            </li>
-          </ol>
-          <div className="flex items-center gap-1.5 pt-1">
-            <code className="flex-1 font-mono text-[11px] px-2 py-1 rounded bg-muted/60 truncate">
-              {webhookUrl}
-            </code>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2"
-              onClick={() => {
-                navigator.clipboard.writeText(webhookUrl).catch(() => undefined)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 1500)
-              }}
-            >
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            </Button>
-          </div>
-        </div>
-      </details>
 
       <MarkdownFormatGuide />
 

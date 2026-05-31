@@ -6,6 +6,7 @@
  * Supported types:
  *   - PDF (.pdf)            extracted to plain text via unpdf (Node-safe pdf.js)
  *   - Word (.docx)          extracted to plain text via mammoth
+ *   - Excel (.xlsx)         parsed via exceljs, each sheet → a markdown table
  *   - CSV / TSV (.csv/.tsv) parsed via papaparse, rendered as a
  *                           markdown table inside the page
  *   - Plain text (.txt/.md) ingested as-is
@@ -30,7 +31,7 @@ const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 const MAX_CSV_ROWS = 50_000
 const MAX_CSV_COLS = 50
 
-export type IngestKind = "pdf" | "docx" | "csv" | "tsv" | "text" | "unknown"
+export type IngestKind = "pdf" | "docx" | "xlsx" | "csv" | "tsv" | "text" | "unknown"
 
 function detectKind(filename: string, mime?: string): IngestKind {
   const lower = filename.toLowerCase()
@@ -40,6 +41,11 @@ function detectKind(filename: string, mime?: string): IngestKind {
     mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   )
     return "docx"
+  if (
+    lower.endsWith(".xlsx") ||
+    mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  )
+    return "xlsx"
   if (lower.endsWith(".csv") || mime === "text/csv") return "csv"
   if (lower.endsWith(".tsv") || mime === "text/tab-separated-values") return "tsv"
   if (
@@ -127,6 +133,81 @@ async function extractDelimited(
   }
 }
 
+/** Coerce any exceljs cell value (rich text, hyperlink, formula, date…) to a flat string. */
+function cellToString(value: unknown): string {
+  if (value == null) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  if (typeof value === "object") {
+    const v = value as Record<string, unknown>
+    // Rich text: array of styled runs.
+    if (Array.isArray(v.richText)) {
+      return (v.richText as { text?: string }[]).map((t) => t.text ?? "").join("")
+    }
+    // Hyperlink cell: { text, hyperlink }.
+    if (typeof v.hyperlink === "string") {
+      return typeof v.text === "string" ? v.text : v.hyperlink
+    }
+    // Formula cell: { formula, result } — show the computed result.
+    if ("result" in v) return cellToString(v.result)
+    // Plain/shared text shape.
+    if (typeof v.text === "string") return v.text
+  }
+  return String(value)
+}
+
+async function extractXlsx(buf: Buffer): Promise<IngestResult> {
+  // exceljs (already a dep) reads .xlsx in pure JS. We render each sheet as
+  // its own markdown table under a "### <sheet name>" heading.
+  const mod = await import("exceljs")
+  const ExcelJS = (mod as { default?: typeof import("exceljs") }).default ?? mod
+  const wb = new ExcelJS.Workbook()
+  // exceljs's bundled types pin an older non-generic Buffer; the runtime
+  // accepts a Node Buffer fine, so cast to the declared parameter type.
+  await wb.xlsx.load(buf as unknown as Parameters<typeof wb.xlsx.load>[0])
+  const esc = (s: string) => String(s ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ")
+  let out = ""
+  let totalRows = 0
+  let sheetCount = 0
+  wb.eachSheet((ws) => {
+    sheetCount++
+    const rows: string[][] = []
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      if (rows.length >= MAX_CSV_ROWS) return
+      // row.values is 1-indexed (index 0 is null); drop it.
+      const raw = Array.isArray(row.values) ? row.values.slice(1) : []
+      const values: string[] = []
+      for (let i = 0; i < Math.min(raw.length, MAX_CSV_COLS); i++) {
+        values.push(cellToString(raw[i]))
+      }
+      rows.push(values)
+    })
+    if (rows.length === 0) return
+    totalRows += rows.length
+    // Normalise ragged rows to the widest row so the table stays valid.
+    const colCount = rows.reduce((m, r) => Math.max(m, r.length), 0)
+    const norm = rows.map((r) => {
+      const c = r.slice()
+      while (c.length < colCount) c.push("")
+      return c
+    })
+    out += `### ${esc(ws.name)}\n\n`
+    const [header, ...body] = norm
+    out += `| ${header.map(esc).join(" | ")} |\n`
+    out += `| ${header.map(() => "---").join(" | ")} |\n`
+    for (const r of body) {
+      out += `| ${r.map(esc).join(" | ")} |\n`
+    }
+    out += "\n"
+  })
+  return {
+    text: out.trim(),
+    kind: "xlsx",
+    summary: `${sheetCount} sheet${sheetCount === 1 ? "" : "s"} · ${totalRows.toLocaleString()} row${totalRows === 1 ? "" : "s"}`,
+  }
+}
+
 function extractText(buf: Buffer): IngestResult {
   const text = buf.toString("utf8")
   const lines = text.split("\n").length
@@ -149,7 +230,10 @@ interface IngestInput {
 
 export async function ingestFileAsPage(
   input: IngestInput,
-): Promise<{ ok: true; pageId: string; kind: IngestKind } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; pageId: string; kind: IngestKind; warning?: string }
+  | { ok: false; error: string }
+> {
   const me = await requireAuth()
   // Decode + size check
   let buf: Buffer
@@ -163,13 +247,14 @@ export async function ingestFileAsPage(
   }
   const kind = detectKind(input.filename, input.mime)
   if (kind === "unknown") {
-    return { ok: false, error: "Unsupported file type. Try PDF, Word (.docx), CSV, TSV, TXT, or MD." }
+    return { ok: false, error: "Unsupported file type. Try PDF, Word (.docx), Excel (.xlsx), CSV, TSV, TXT, or MD." }
   }
 
   let extracted: IngestResult
   try {
     if (kind === "pdf") extracted = await extractPdf(buf)
     else if (kind === "docx") extracted = await extractDocx(buf)
+    else if (kind === "xlsx") extracted = await extractXlsx(buf)
     else if (kind === "csv" || kind === "tsv") extracted = await extractDelimited(buf, kind)
     else extracted = extractText(buf)
   } catch (err) {
@@ -181,10 +266,19 @@ export async function ingestFileAsPage(
 
   // Optional summary via the user's AI provider
   let header = `**Source:** \`${input.filename}\` · ${extracted.summary}\n\n`
-  if (input.summarize && extracted.text.length > 200) {
-    const summary = await summarizeWithAI(me.id, extracted.text)
-    if (summary) {
-      header += `**Summary**\n\n${summary}\n\n---\n\n`
+  let warning: string | undefined
+  if (input.summarize) {
+    if (extracted.text.length <= 200) {
+      warning = "Too short to summarise — imported without an AI summary."
+    } else {
+      const r = await summarizeWithAI(me.id, extracted.text)
+      if (r.ok) {
+        header += `**Summary**\n\n${r.summary}\n\n---\n\n`
+      } else if (r.reason === "no_provider") {
+        warning = "AI summary skipped — no AI provider is set up yet (Settings → AI)."
+      } else {
+        warning = "AI summary failed — imported without it. Check your AI provider in Settings."
+      }
     }
   }
 
@@ -218,24 +312,28 @@ export async function ingestFileAsPage(
     return { ok: false, error: err instanceof Error ? err.message : "Save failed." }
   }
   revalidatePath("/pages")
-  return { ok: true, pageId, kind }
+  return { ok: true, pageId, kind, warning }
 }
+
+type SummaryResult =
+  | { ok: true; summary: string }
+  | { ok: false; reason: "no_provider" | "request_failed" }
 
 async function summarizeWithAI(
   userId: string,
   text: string,
-): Promise<string | null> {
+): Promise<SummaryResult> {
   const row = sqlite
     .prepare(`SELECT prefs_json FROM user_preferences WHERE user_id = ?`)
     .get(userId) as { prefs_json: string } | undefined
-  if (!row?.prefs_json) return null
+  if (!row?.prefs_json) return { ok: false, reason: "no_provider" }
   let prefs: { aiOpenAIBaseUrl?: string; aiOpenAIApiKey?: string; aiOpenAIModel?: string }
   try {
     prefs = JSON.parse(row.prefs_json)
   } catch {
-    return null
+    return { ok: false, reason: "no_provider" }
   }
-  if (!prefs.aiOpenAIBaseUrl || !prefs.aiOpenAIApiKey) return null
+  if (!prefs.aiOpenAIBaseUrl || !prefs.aiOpenAIApiKey) return { ok: false, reason: "no_provider" }
   const baseUrl = prefs.aiOpenAIBaseUrl.replace(/\/+$/, "")
   const model = prefs.aiOpenAIModel?.trim() || "gpt-4o-mini"
   // Cap context to ~8k chars so we stay inside small-model windows.
@@ -262,12 +360,13 @@ async function summarizeWithAI(
       }),
       signal: AbortSignal.timeout(30_000),
     })
-    if (!res.ok) return null
+    if (!res.ok) return { ok: false, reason: "request_failed" }
     const data = (await res.json()) as {
       choices?: { message?: { content?: string } }[]
     }
-    return data.choices?.[0]?.message?.content?.trim() ?? null
+    const summary = data.choices?.[0]?.message?.content?.trim()
+    return summary ? { ok: true, summary } : { ok: false, reason: "request_failed" }
   } catch {
-    return null
+    return { ok: false, reason: "request_failed" }
   }
 }
