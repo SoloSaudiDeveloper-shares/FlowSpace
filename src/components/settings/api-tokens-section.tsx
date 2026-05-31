@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from "react"
-import { KeyRound, Plus, Trash2, Copy, Check, Loader2, AlertTriangle } from "lucide-react"
+import { KeyRound, Plus, Trash2, Copy, Check, Loader2, AlertTriangle, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import {
@@ -18,6 +18,7 @@ import {
   revokeApiToken,
   type ApiTokenRow,
 } from "@/lib/actions/api-token-actions"
+import { GuideDialog, type GuideStep } from "@/components/shared/guide-dialog"
 
 const EXPIRY_PRESETS = [
   { label: "30 days", days: 30 },
@@ -34,6 +35,62 @@ export function ApiTokensSection() {
   const [issuing, setIssuing] = useState(false)
   const [justIssued, setJustIssued] = useState<{ id: string; token: string; name: string } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://your-domain"
+
+  const tokenGuideSteps: GuideStep[] = [
+    {
+      title: "What is an API token?",
+      body: (
+        <p>
+          A token is a long-lived key that lets a script, cron job, or tool act
+          as <strong>you</strong> — without your password. Anyone who has it can
+          do anything you can, so treat it like a password and never paste it
+          into a public place.
+        </p>
+      ),
+    },
+    {
+      title: "Issue one",
+      body: (
+        <p>
+          In the form below, give the token a name that says what it&apos;s for
+          (e.g. <code className="px-1 py-0.5 bg-muted/60 rounded">cron-importer</code>),
+          pick an expiry, and hit <strong>Issue</strong>. You&apos;ll see the
+          full <code className="px-1 py-0.5 bg-muted/60 rounded">flws_…</code> value{" "}
+          <strong>once</strong> — copy it straight into your password manager or
+          your script&apos;s secrets right away.
+        </p>
+      ),
+    },
+    {
+      title: "Use it in a request",
+      body: (
+        <p>
+          Send the token as an{" "}
+          <code className="px-1 py-0.5 bg-muted/60 rounded">Authorization: Bearer</code>{" "}
+          header on any API route that supports it. Here&apos;s the web-clipper
+          endpoint, which drops a pending item into your bell:
+        </p>
+      ),
+      code: `curl -X POST ${origin}/api/clip \\
+  -H "Authorization: Bearer flws_your_token_here" \\
+  -H "Content-Type: application/json" \\
+  -d '{"title":"Saved from my script","url":"https://example.com"}'`,
+    },
+    {
+      title: "Keep it safe — revoke anytime",
+      body: (
+        <p>
+          If a token leaks, or you&apos;re done with a script, click the trash
+          icon next to it in the list below. It stops working{" "}
+          <strong>immediately</strong> — no other tokens are affected. Set a
+          short expiry on tokens you only need briefly.
+        </p>
+      ),
+    },
+  ]
 
   useEffect(() => {
     void refresh()
@@ -82,12 +139,27 @@ export function ApiTokensSection() {
       <div className="flex items-center gap-2">
         <KeyRound className="size-4 text-muted-foreground" />
         <h3 className="text-sm font-medium">API tokens</h3>
+        <button
+          type="button"
+          onClick={() => setShowHelp(true)}
+          className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+        >
+          <HelpCircle className="size-3.5" />
+          How do I use this?
+        </button>
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
         Long-lived bearer tokens for scripts and integrations. Send as
         <code className="px-1 py-0.5 mx-1 text-[10px] bg-muted/50 rounded">Authorization: Bearer flws_…</code>
         on API routes that support it.
       </p>
+
+      <GuideDialog
+        open={showHelp}
+        onOpenChange={setShowHelp}
+        subject="API tokens"
+        steps={tokenGuideSteps}
+      />
 
       {justIssued && (
         <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">

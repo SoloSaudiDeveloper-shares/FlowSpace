@@ -18,7 +18,6 @@ import {
   LinkIcon as LinkIconLucide,
   Send,
   X,
-  Sparkles,
   AlertCircle,
   ExternalLink,
   MessageSquare,
@@ -26,7 +25,6 @@ import {
   ArrowDown,
   ArrowUp,
   BookOpen,
-  Zap,
 } from "lucide-react"
 const LinkIcon = LinkIconLucide
 import { Button } from "@/components/ui/button"
@@ -47,6 +45,7 @@ import {
   type TelegramHistoryEntry,
 } from "@/lib/actions/telegram-actions"
 import { BotReplyTemplatesPanel } from "@/components/settings/bot-reply-templates"
+import { GuideDialog, type GuideStep } from "@/components/shared/guide-dialog"
 
 export function TelegramSection({
   featureEnabled,
@@ -67,6 +66,102 @@ export function TelegramSection({
   const [historyLoading, setHistoryLoading] = useState(false)
   // Voice settings
   const [savingVoice, setSavingVoice] = useState(false)
+  // "How to use the bot" guide popup.
+  const [showGuide, setShowGuide] = useState(false)
+
+  // The bot's how-to, presented as a stepped popup instead of a wall of
+  // panels. Reuses the same CheatRow / GuideRow helpers as the inline list.
+  const botGuideSteps: GuideStep[] = [
+    {
+      title: "Smart capture — inline syntax",
+      body: (
+        <div className="space-y-2.5">
+          <p>
+            Text the bot anything and it becomes a todo. Sprinkle these tokens
+            anywhere in the message — the bot pulls them out and tells you what
+            it captured.
+          </p>
+          <div className="grid grid-cols-1 gap-y-1.5">
+            <CheatRow code="!high" desc="Set priority (urgent/high/medium/low)" />
+            <CheatRow code="@2026-06-15" desc="Set ISO due date" />
+            <CheatRow code="@tomorrow" desc="Or @today / @tomorrow / @next-week" />
+            <CheatRow code="#release" desc="Add a tag (alphanumeric + dashes)" />
+          </div>
+          <p className="text-muted-foreground/70">
+            <strong className="text-foreground/80">Example:</strong>{" "}
+            <code className="text-primary">ship v1 @2026-06-15 !high #release</code>{" "}
+            → title <em>&ldquo;ship v1&rdquo;</em>, due 2026-06-15, priority
+            high, tag <code>#release</code>.
+          </p>
+        </div>
+      ),
+    },
+    {
+      title: "Commands",
+      body: (
+        <div className="grid grid-cols-1 gap-y-1.5">
+          <CheatRow code="<text>" desc="Capture as todo (smart syntax)" />
+          <CheatRow code="/tasks" desc="Open tasks across projects" />
+          <CheatRow code="/deadlines 7" desc="Due in the next N days" />
+          <CheatRow code="/projects" desc="Projects + completion %" />
+          <CheatRow code="/lists" desc="Your todo lists" />
+          <CheatRow code="/add buy milk" desc="Quick add to default" />
+          <CheatRow code='/todo "Work" review PRs' desc="Add to a specific list" />
+          <CheatRow code="/task NorthStar Ship v1" desc="New task in a project" />
+          <CheatRow code="/done a1b2c3d4" desc="Mark a task/todo done" />
+          <CheatRow code="/help" desc="Full command list" />
+        </div>
+      ),
+    },
+    {
+      title: "Paste-from-AI inbox",
+      body: (
+        <p>
+          Brainstorm with Claude or ChatGPT, ask them to output in FlowSpace
+          format, then paste the markdown to your bot. FlowSpace recognises the
+          structure and <strong>queues it for your approval</strong> instead of
+          acting immediately — review it on the home page (pending-imports
+          banner) and click Approve. Grab the ready-made prompt from the home
+          page → &ldquo;Import from AI&rdquo; → &ldquo;Copy AI prompt&rdquo;.
+        </p>
+      ),
+      code: `# Project: NorthStar
+Status: active
+Due: 2026-07-15
+
+## Tasks
+- [ ] (high) Extract toolkit components
+- [ ] @2026-06-15 Stage toolkits in Hub`,
+    },
+    {
+      title: "What you can do",
+      body: (
+        <ul className="space-y-2">
+          <GuideRow title="Capture ideas on the go">
+            Text the bot anything — it becomes a todo in your chosen list. Add{" "}
+            <code>!high</code>, <code>@tomorrow</code>, or <code>#tag</code> to
+            enrich without typing fields.
+          </GuideRow>
+          <GuideRow title="Query your work from anywhere">
+            <code>/tasks</code>, <code>/deadlines</code>, <code>/projects</code>,{" "}
+            <code>/lists</code> — quick read-only summaries pulled live.
+          </GuideRow>
+          <GuideRow title="Mark things done">
+            <code>/done &lt;id-prefix&gt;</code> — the 8-character ID shown after
+            each task. Fuzzy match — first 4 chars are enough.
+          </GuideRow>
+          <GuideRow title="Push a whole project structure">
+            Paste FlowSpace AI-import markdown. It queues for human review (no
+            auto-mutate) — you approve on the home page.
+          </GuideRow>
+          <GuideRow title="Choose where captures land">
+            Set the target list in the panel above. Captures route there until
+            you switch.
+          </GuideRow>
+        </ul>
+      ),
+    },
+  ]
 
   async function refresh() {
     try {
@@ -400,123 +495,22 @@ export function TelegramSection({
           )}
         </div>
 
-        {/* Smart-capture syntax */}
-        <div className="px-4 py-3 rounded-lg border bg-card">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-            <Sparkles className="size-3 text-primary" />
-            Smart capture — inline syntax
-          </p>
-          <p className="text-[11px] text-muted-foreground/80 mb-3 leading-relaxed">
-            Sprinkle these anywhere in a freeform message. The bot pulls them
-            out and tells you what it captured.
-          </p>
-          <div className="grid grid-cols-1 gap-y-1.5 text-xs">
-            <CheatRow code="!high" desc="Set priority (urgent/high/medium/low)" />
-            <CheatRow code="@2026-06-15" desc="Set ISO due date" />
-            <CheatRow code="@tomorrow" desc="Or @today / @tomorrow / @next-week" />
-            <CheatRow code="#release" desc="Add a tag (alphanumeric + dashes)" />
-          </div>
-          <p className="text-[11px] text-muted-foreground/60 mt-2.5 leading-relaxed">
-            <strong className="text-foreground/80">Example:</strong>{" "}
-            <code className="text-primary">ship v1 @2026-06-15 !high #release</code>
-            {" "}→ title <em>&ldquo;ship v1&rdquo;</em>, due 2026-06-15, priority high, tag <code>#release</code>
-          </p>
-        </div>
-
-        {/* Commands cheatsheet */}
-        <div className="px-4 py-3 rounded-lg border bg-card">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-            <Sparkles className="size-3 text-primary" />
-            Commands
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-y-1.5 gap-x-4 text-xs">
-            <CheatRow code="<text>" desc="Capture as todo (smart syntax above)" />
-            <CheatRow code="/tasks" desc="Open tasks across projects" />
-            <CheatRow code="/deadlines 7" desc="Due in the next N days" />
-            <CheatRow code="/projects" desc="Projects + completion %" />
-            <CheatRow code="/lists" desc="Your todo lists" />
-            <CheatRow code="/add buy milk" desc="Quick add to default" />
-            <CheatRow code='/todo "Work" review PRs' desc="Add to a specific list" />
-            <CheatRow code="/task NorthStar Ship v1" desc="New task in a project" />
-            <CheatRow code="/done a1b2c3d4" desc="Mark a task/todo done" />
-            <CheatRow code="/help" desc="Full command list" />
-          </div>
-        </div>
-
-        {/* AI-import via bot — explainer */}
-        <div className="px-4 py-3 rounded-lg border border-primary/40 bg-gradient-to-r from-primary/5 to-transparent">
-          <p className="text-xs font-medium uppercase tracking-wider text-primary mb-2 flex items-center gap-1.5">
-            <Zap className="size-3" />
-            Paste-from-AI inbox
-          </p>
-          <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-            Brainstorm with Claude or ChatGPT, ask them to output in FlowSpace
-            format, then paste the markdown to your bot. FlowSpace recognises
-            the structure and queues it for your approval instead of acting
-            immediately — you review on the home page (pending-imports banner)
-            and click <strong className="text-foreground">Approve</strong> to
-            materialise the project/page/etc.
-          </p>
-          <div className="text-[11px] font-mono bg-muted/60 rounded-md p-2.5 leading-relaxed text-muted-foreground border border-border/40">
-            <span className="text-primary"># Project:</span> NorthStar
-            <br />
-            <span className="text-primary">Status:</span> active
-            <br />
-            <span className="text-primary">Due:</span> 2026-07-15
-            <br />
-            <br />
-            <span className="text-primary">## Tasks</span>
-            <br />
-            - [ ] (high) Extract toolkit components
-            <br />
-            - [ ] @2026-06-15 Stage toolkits in Hub
-          </div>
-          <p className="text-[11px] text-muted-foreground/70 mt-2">
-            Get the ready-made AI prompt from the home page →
-            &ldquo;Import from AI&rdquo; → &ldquo;Copy AI prompt&rdquo;.
-          </p>
-        </div>
-
-        {/* What's possible — comprehensive guide */}
-        <div className="px-4 py-3 rounded-lg border bg-card">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-            <BookOpen className="size-3 text-primary" />
-            What you can do
-          </p>
-          <ul className="text-xs space-y-1.5 leading-relaxed">
-            <GuideRow title="Capture ideas on the go">
-              Text the bot anything — it becomes a todo item in your chosen
-              list. Add <code>!high</code>, <code>@tomorrow</code>, or
-              <code>#tag</code> to enrich without typing fields.
-            </GuideRow>
-            <GuideRow title="Query your work from anywhere">
-              <code>/tasks</code>, <code>/deadlines</code>,{" "}
-              <code>/projects</code>, <code>/lists</code> — quick read-only
-              summaries pulled live from your workspace.
-            </GuideRow>
-            <GuideRow title="Mark things done">
-              <code>/done &lt;id-prefix&gt;</code> — the 8-character ID shown
-              after each task/todo in any reply. Fuzzy match — first 4 chars
-              are enough.
-            </GuideRow>
-            <GuideRow title="Push a whole project structure">
-              Paste FlowSpace AI-import markdown to the bot. It queues for
-              human review (no auto-mutate) — you approve on the home page.
-            </GuideRow>
-            <GuideRow title="Choose where captures land">
-              Set the target list above. Captures route there until you
-              switch. Default is most-recently-updated.
-            </GuideRow>
-            <GuideRow title="Test the connection">
-              The &ldquo;Test&rdquo; button up top sends a hello-world. Useful
-              after reconnecting or moving between dev/prod.
-            </GuideRow>
-            <GuideRow title="See history">
-              The block below logs the last 50 messages — handy for
-              debugging or auditing.
-            </GuideRow>
-          </ul>
-        </div>
+        {/* How to use the bot — opens a stepped guide popup */}
+        <button
+          type="button"
+          onClick={() => setShowGuide(true)}
+          className="flex w-full items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm font-medium hover:bg-accent/30 transition-colors"
+        >
+          <BookOpen className="size-4 text-primary" />
+          How to use the bot — syntax, commands &amp; AI import
+          <span className="ml-auto text-xs text-muted-foreground">open guide</span>
+        </button>
+        <GuideDialog
+          open={showGuide}
+          onOpenChange={setShowGuide}
+          subject="Telegram bot"
+          steps={botGuideSteps}
+        />
 
         {/* Reply templates — customize what the bot says back */}
         <div className="px-4 py-3 rounded-lg border bg-card">

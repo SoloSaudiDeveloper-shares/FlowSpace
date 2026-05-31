@@ -28,6 +28,7 @@ import {
   UserPlus,
   Lock,
   Bot,
+  HelpCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -35,6 +36,35 @@ import { toast } from "sonner"
 import { createBackup, deleteBackup, restoreBackup } from "@/lib/actions/backup-actions"
 import { updateUser, deleteUser } from "@/lib/actions/user-actions"
 import { getTelegramFeatureEnabled, setTelegramFeatureEnabled } from "@/lib/actions/telegram-actions"
+import { GuideDialog, type GuideStep } from "@/components/shared/guide-dialog"
+
+const EVENTS_GUIDE: GuideStep[] = [
+  {
+    title: "What are server events?",
+    body: (
+      <p>
+        The audit log of everything important the server did. Each entry
+        records <strong>when</strong> something happened,{" "}
+        <strong>what</strong> happened, and <strong>who</strong> triggered it.
+        Use it to debug issues, spot suspicious activity, or confirm a deploy
+        succeeded.
+      </p>
+    ),
+  },
+  {
+    title: "Event types you'll see",
+    body: (
+      <ul className="space-y-1.5">
+        <li><strong className="text-foreground/80">server_start / server_stop</strong> — container booted or shut down. After every deploy you should see a fresh start.</li>
+        <li><strong className="text-foreground/80">backup_completed / backup_failed</strong> — scheduled backups firing. Red = investigate.</li>
+        <li><strong className="text-foreground/80">user_login / user_logout</strong> — session activity, useful for security review.</li>
+        <li><strong className="text-foreground/80">user_created</strong> — new account signed up. Cross-check the Users tab.</li>
+        <li><strong className="text-foreground/80">permission_changed</strong> — admin or role flips. High-impact action.</li>
+        <li><strong className="text-foreground/80">error / warning</strong> — server-side problems logged for investigation.</li>
+      </ul>
+    ),
+  },
+]
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
@@ -776,36 +806,33 @@ function BackupsTab({
 // ─── Events Tab ─────────────────────────────────────────────────────────
 
 function EventsTab({ events }: { events: any[] }) {
+  const [showGuide, setShowGuide] = useState(false)
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold">Recent Events</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Last {events.length} server events
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">Recent Events</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Last {events.length} server events
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-muted-foreground shrink-0"
+          onClick={() => setShowGuide(true)}
+        >
+          <HelpCircle className="size-3.5 mr-1.5" />
+          What are these?
+        </Button>
       </div>
 
-      {/* Explainer panel — events are opaque without context */}
-      <div className="px-4 py-3 rounded-lg border border-primary/30 bg-primary/5">
-        <p className="text-xs font-medium uppercase tracking-wider text-primary mb-2 flex items-center gap-1.5">
-          <Info className="size-3" />
-          What are server events?
-        </p>
-        <p className="text-xs text-muted-foreground leading-relaxed mb-2">
-          The audit log of everything important the server did. Each entry
-          records WHEN something happened, WHAT happened, and WHO triggered
-          it. Use this to debug issues, spot suspicious activity, or
-          confirm a deploy succeeded.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground mt-2">
-          <div><strong className="text-foreground/80">server_start / server_stop</strong> — container booted or shut down. After every deploy you should see a fresh start.</div>
-          <div><strong className="text-foreground/80">backup_completed / backup_failed</strong> — scheduled backups firing on schedule. Red = investigate.</div>
-          <div><strong className="text-foreground/80">user_login / user_logout</strong> — session activity. Useful for security review.</div>
-          <div><strong className="text-foreground/80">user_created</strong> — new account signed up. Cross-check the Users tab.</div>
-          <div><strong className="text-foreground/80">permission_changed</strong> — admin or role flips. High-impact action.</div>
-          <div><strong className="text-foreground/80">error / warning</strong> — server-side errors logged for investigation.</div>
-        </div>
-      </div>
+      <GuideDialog
+        open={showGuide}
+        onOpenChange={setShowGuide}
+        subject="Server events"
+        steps={EVENTS_GUIDE}
+      />
 
       {events.length === 0 ? (
         <div className="bg-card border rounded-lg px-4 py-8 text-center text-muted-foreground text-sm">
