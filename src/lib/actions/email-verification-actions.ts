@@ -8,6 +8,7 @@ import crypto from "node:crypto"
 import { headers } from "next/headers"
 import { sendEmail, isEmailConfigured } from "@/lib/email/send"
 import { requireAuth } from "@/lib/auth/scope"
+import { escapeHtml } from "@/lib/utils"
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
@@ -63,7 +64,7 @@ export async function requestEmailVerification(userId?: string): Promise<{ ok: t
       <div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto;color:#1a1a1a;">
         <h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">Confirm your email</h2>
         <p style="line-height:1.5;color:#555;">
-          Welcome to FlowSpace, <strong>${user.displayName}</strong>. Tap below to confirm
+          Welcome to FlowSpace, <strong>${escapeHtml(user.displayName)}</strong>. Tap below to confirm
           this email address so you can recover your account if you ever lose your password.
         </p>
         <p style="margin:24px 0;">

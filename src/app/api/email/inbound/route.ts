@@ -62,9 +62,15 @@ function localPart(email: string): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  // Optional shared-secret check
+  // Shared-secret check. In production the secret is REQUIRED (fail closed) so
+  // an unconfigured deployment can't have spoofed mail injected into anyone's
+  // approval queue. In development it's optional for convenience.
   const expected = process.env.EMAIL_INBOUND_SECRET?.trim()
-  if (expected) {
+  if (!expected) {
+    if (process.env.NODE_ENV === "production") {
+      return new NextResponse("Inbound email not configured", { status: 503 })
+    }
+  } else {
     const got = req.headers.get("x-inbound-secret")?.trim()
     if (got !== expected) {
       return new NextResponse("Unauthorized", { status: 401 })

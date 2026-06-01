@@ -8,6 +8,7 @@ import crypto from "node:crypto"
 import bcrypt from "bcrypt"
 import { headers } from "next/headers"
 import { sendEmail, isEmailConfigured } from "@/lib/email/send"
+import { escapeHtml } from "@/lib/utils"
 
 const TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hour
 const BCRYPT_COST = 12
@@ -71,7 +72,7 @@ export async function requestPasswordReset(
         <h2 style="font-size:18px;font-weight:600;margin-bottom:16px;">Reset your FlowSpace password</h2>
         <p style="line-height:1.5;color:#555;">
           A password reset was requested for the FlowSpace account
-          <strong>${user.username}</strong>. If that was you, click below to set a new password:
+          <strong>${escapeHtml(user.username)}</strong>. If that was you, click below to set a new password:
         </p>
         <p style="margin:24px 0;">
           <a href="${link}" style="display:inline-block;background:#6366f1;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:500;">Reset password</a>
