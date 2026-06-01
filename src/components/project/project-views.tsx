@@ -15,7 +15,12 @@ import {
   Plus,
   ChevronDown,
   Search,
+  Bookmark,
+  Save,
+  Trash2,
+  Check,
 } from "lucide-react"
+import { usePreferences, type SavedView } from "@/lib/hooks/use-preferences"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,6 +116,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
   const [showFilterBar, setShowFilterBar] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
+  const [viewsOpen, setViewsOpen] = useState(false)
 
   // Multi-select (bulk actions) — only meaningful in the List view.
   const [selectMode, setSelectMode] = useState(false)
@@ -250,6 +256,61 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
     setHiddenFields(new Set())
   }
 
+  // ── Saved views ─────────────────────────────────────────────────────────
+  // A named preset of view + sort + filters + visible columns, per project,
+  // stored in the user's preferences blob.
+  const { preferences, updatePreference } = usePreferences()
+  const allSavedViews = preferences.savedViews ?? []
+  const savedViews = allSavedViews.filter((v) => v.projectId === projectId)
+
+  function applyView(v: SavedView) {
+    exitSelect()
+    setActiveView(v.view)
+    setSortField(v.sortField)
+    setSortDir(v.sortDir)
+    setFilterPriority(v.filterPriority)
+    setFilterCompleted(v.filterCompleted)
+    setFilterDueDate(v.filterDueDate)
+    setHiddenFields(new Set(v.hiddenFields))
+  }
+
+  function saveCurrentView() {
+    const name = window.prompt("Name this view (e.g. \"My week\", \"Overdue\"):", "")
+    if (!name || !name.trim()) return
+    const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `v_${Date.now()}`
+    const next: SavedView = {
+      id,
+      projectId,
+      name: name.trim(),
+      view: activeView,
+      sortField,
+      sortDir,
+      filterPriority,
+      filterCompleted,
+      filterDueDate,
+      hiddenFields: [...hiddenFields],
+    }
+    updatePreference("savedViews", [...allSavedViews, next])
+  }
+
+  function deleteView(id: string) {
+    updatePreference("savedViews", allSavedViews.filter((v) => v.id !== id))
+  }
+
+  // Does the current toolbar state match a saved view? (for the active check)
+  function matchesView(v: SavedView) {
+    return (
+      v.view === activeView &&
+      v.sortField === sortField &&
+      v.sortDir === sortDir &&
+      v.filterPriority === filterPriority &&
+      v.filterCompleted === filterCompleted &&
+      v.filterDueDate === filterDueDate &&
+      v.hiddenFields.length === hiddenFields.size &&
+      v.hiddenFields.every((f) => hiddenFields.has(f))
+    )
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Views Bar */}
@@ -336,6 +397,53 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               </Badge>
             )}
           </button>
+
+          {/* Saved views */}
+          <DropdownMenu open={viewsOpen} onOpenChange={setViewsOpen}>
+            <DropdownMenuTrigger
+              className={`flex items-center gap-1.5 h-7 px-2 text-xs rounded-md hover:bg-accent transition-colors ${
+                savedViews.some(matchesView) ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
+              <Bookmark className="size-3" />
+              Views
+              {savedViews.length > 0 && (
+                <Badge variant="secondary" className="h-4 px-1 text-[10px] min-w-[16px] justify-center">
+                  {savedViews.length}
+                </Badge>
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {/* Plain div, NOT DropdownMenuLabel — base-ui's GroupLabel throws
+                  if it isn't wrapped in a Menu.Group. */}
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Saved views</div>
+              {savedViews.length === 0 && (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground/70">No saved views yet.</div>
+              )}
+              {savedViews.map((v) => (
+                <div key={v.id} className="flex items-center group/vrow">
+                  <button
+                    onClick={() => { applyView(v); setViewsOpen(false) }}
+                    className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-accent text-left min-w-0"
+                  >
+                    {matchesView(v) ? <Check className="size-3.5 shrink-0 text-primary" /> : <Bookmark className="size-3.5 shrink-0 text-muted-foreground" />}
+                    <span className="truncate">{v.name}</span>
+                  </button>
+                  <button
+                    onClick={() => deleteView(v.id)}
+                    className="p-1.5 text-muted-foreground/50 hover:text-destructive opacity-0 group-hover/vrow:opacity-100 transition-opacity"
+                    title="Delete view"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={saveCurrentView}>
+                <Save className="size-3.5 mr-2" /> Save current as…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Sort */}
           <DropdownMenu>

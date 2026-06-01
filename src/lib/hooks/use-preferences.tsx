@@ -32,6 +32,22 @@ export type SidebarSectionKey =
 export type ClockDateFormat = "short" | "long" | "iso" | "weekday"
 export type ClockMode = "digital" | "analog"
 
+/** A named, per-project preset of the toolbar's view + sort + filters +
+ *  visible columns. Lets a user flip between e.g. "My week" and "Overdue". */
+export interface SavedView {
+  id: string
+  projectId: string
+  name: string
+  view: "overview" | "list" | "board" | "calendar" | "gantt" | "table"
+  sortField: "manual" | "title" | "priority" | "dueDate" | "createdAt" | "updatedAt"
+  sortDir: "asc" | "desc"
+  filterPriority: "all" | "urgent" | "high" | "medium" | "low" | "none"
+  filterCompleted: "all" | "active" | "completed"
+  filterDueDate: "all" | "overdue" | "today" | "this_week" | "no_date"
+  /** Field keys hidden via the "Fields" menu. */
+  hiddenFields: string[]
+}
+
 export interface ClockPreferences {
   show: boolean
   format24: boolean
@@ -150,6 +166,8 @@ export interface Preferences {
   locale: "en" | "ar"
   /** Floating Pomodoro widget. Default off — opt-in. */
   pomodoroVisible: boolean
+  /** Saved per-project toolbar presets (view + sort + filters + columns). */
+  savedViews: SavedView[]
 }
 
 // Home dashboard sections — each one can be toggled on/off by the user.
@@ -265,6 +283,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   onboardingCompletedAt: "",
   locale: "en",
   pomodoroVisible: false,
+  savedViews: [],
 }
 
 export const HOME_SECTION_LABELS: Record<HomeSectionKey, string> = {
