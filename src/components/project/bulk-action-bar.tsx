@@ -6,7 +6,7 @@
  * start/stop the timer, set priority/status/due, complete, or delete.
  */
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   X,
   MessageCircle,
@@ -19,6 +19,8 @@ import {
   ChevronDown,
   Send,
   Loader2,
+  Tag,
+  Rss,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,10 +36,14 @@ import {
   bulkAddComment,
   bulkSetTimer,
   bulkDeleteTasks,
+  bulkAddLabel,
+  bulkAddToFeed,
+  getAllLabels,
 } from "@/lib/actions/task-actions"
-import type { taskStatuses } from "@/lib/db/schema"
+import type { taskStatuses, taskLabels } from "@/lib/db/schema"
 
 type TaskStatus = typeof taskStatuses.$inferSelect
+type TaskLabel = typeof taskLabels.$inferSelect
 
 const PRIORITIES = [
   { value: "urgent" as const, label: "Urgent", color: "#ef4444" },
@@ -71,6 +77,11 @@ export function BulkActionBar({
   const [commenting, setCommenting] = useState(false)
   const [comment, setComment] = useState("")
   const [busy, setBusy] = useState(false)
+  const [labels, setLabels] = useState<TaskLabel[]>([])
+
+  useEffect(() => {
+    getAllLabels().then(setLabels).catch(() => {})
+  }, [])
 
   async function run(fn: () => Promise<void>, msg?: string) {
     setBusy(true)
@@ -94,7 +105,7 @@ export function BulkActionBar({
   const btn = "h-8 gap-1.5 text-xs"
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 rounded-xl border bg-popover px-2.5 py-1.5 shadow-2xl">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center justify-center gap-1 rounded-xl border bg-popover px-2.5 py-1.5 shadow-2xl max-w-[95vw]">
       {commenting ? (
         <div className="flex items-center gap-1.5">
           <Input
@@ -167,6 +178,28 @@ export function BulkActionBar({
               <DropdownMenuItem onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { dueDate: null }), `Due date cleared on ${n}`)}>Clear</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Add label */}
+          {labels.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs hover:bg-accent disabled:opacity-50" disabled={busy}>
+                <Tag className="size-3.5" /> Label <ChevronDown className="size-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="max-h-72 overflow-auto">
+                {labels.map((l) => (
+                  <DropdownMenuItem key={l.id} onClick={() => run(() => bulkAddLabel(taskIds, projectId, l.id), `Label added to ${n}`)}>
+                    <span className="size-2.5 rounded-full mr-2" style={{ backgroundColor: l.color }} /> {l.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* Post to feed */}
+          <Button size="sm" variant="ghost" className={btn} disabled={busy}
+            onClick={() => run(() => bulkAddToFeed(taskIds, projectId), `Posted ${n} to feed`)}>
+            <Rss className="size-3.5" /> Feed
+          </Button>
 
           <Button size="sm" variant="ghost" className={btn} disabled={busy}
             onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { isCompleted: true }), `Completed ${n}`)}>

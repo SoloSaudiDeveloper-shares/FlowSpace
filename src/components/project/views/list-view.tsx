@@ -162,7 +162,7 @@ interface ListViewProps {
   /** Multi-select mode (bulk actions). */
   selectMode?: boolean
   selectedIds?: Set<string>
-  onToggleSelect?: (taskId: string) => void
+  onToggleSelect?: (taskId: string, opts?: { range?: boolean; order?: string[] }) => void
 }
 
 export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, selectMode, selectedIds, onToggleSelect }: ListViewProps) {
@@ -221,6 +221,16 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
   function toggleCollapse(statusId: string) {
     setCollapsed((prev) => ({ ...prev, [statusId]: !prev[statusId] }))
   }
+
+  // Visual top-to-bottom order of every visible row, used for Shift-click range
+  // select. Collapsed groups contribute no rows (you can't shift into them).
+  const flatOrderIds = statuses.flatMap((status) => {
+    if (collapsed[status.id]) return []
+    const groupTasks = tasksByStatus[status.id] || []
+    return flattenTree(buildTaskTree(groupTasks), expanded).map((t) => t.id)
+  })
+  const rowToggle = (id: string, opts?: { range?: boolean }) =>
+    onToggleSelect?.(id, { range: opts?.range, order: flatOrderIds })
 
   function openTask(task: Task, tab: "details" | "comments" = "details") {
     setSelectedTask(task)
@@ -330,7 +340,7 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
             nowTick={nowTick}
             selectMode={!!selectMode}
             selectedIds={selectedIds}
-            onToggleSelect={onToggleSelect}
+            onToggleSelect={rowToggle}
           />
         )
       })}
@@ -397,7 +407,7 @@ function StatusGroup({
   nowTick: number
   selectMode: boolean
   selectedIds?: Set<string>
-  onToggleSelect?: (id: string) => void
+  onToggleSelect?: (id: string, opts?: { range?: boolean }) => void
 }) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
@@ -506,7 +516,7 @@ function TaskRow({
   nowTick: number
   selectMode: boolean
   selected: boolean
-  onToggleSelect?: (id: string) => void
+  onToggleSelect?: (id: string, opts?: { range?: boolean }) => void
 }) {
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.none
   const barColor = PRIORITY_BAR[task.priority] ?? PRIORITY_BAR.none
@@ -525,7 +535,7 @@ function TaskRow({
         selected ? "bg-primary/10" : "hover:bg-accent/30"
       }`}
       style={{ paddingLeft: 16 + depth * INDENT_PX }}
-      onClick={() => (selectMode ? onToggleSelect?.(task.id) : onTaskClick(task))}
+      onClick={(e) => (selectMode ? onToggleSelect?.(task.id, { range: e.shiftKey }) : onTaskClick(task))}
       onContextMenu={(e) => onTaskContextMenu(e, task)}
     >
       <span className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: barColor }} aria-hidden />
@@ -534,7 +544,7 @@ function TaskRow({
       {selectMode && (
         <button
           className="shrink-0"
-          onClick={(e) => { e.stopPropagation(); onToggleSelect?.(task.id) }}
+          onClick={(e) => { e.stopPropagation(); onToggleSelect?.(task.id, { range: e.shiftKey }) }}
           aria-label={selected ? "Deselect" : "Select"}
         >
           {selected ? (

@@ -15,9 +15,10 @@ import {
   projects,
 } from "@/lib/db/schema"
 import { createId } from "@/lib/utils/ids"
-import { eq, and, asc, desc } from "drizzle-orm"
+import { eq, and, asc, desc, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { currentUserId } from "@/lib/auth/scope"
+import { createFeedEvent } from "./feed-actions"
 
 /**
  * Returns true iff the current authenticated user owns the given project
@@ -281,6 +282,43 @@ export async function bulkDeleteTasks(taskIds: string[], projectId: string) {
   if (!taskIds.length) return
   for (const id of taskIds) await db.delete(tasks).where(eq(tasks.id, id))
   await db.update(elements).set({ updatedAt: new Date().toISOString() }).where(eq(elements.id, projectId))
+  revalidatePath(`/projects/${projectId}`)
+}
+
+/** Attach a label to many tasks at once (skips ones that already have it). */
+export async function bulkAddLabel(taskIds: string[], projectId: string, labelId: string) {
+  if (!taskIds.length || !labelId) return
+  for (const id of taskIds) {
+    const existing = await db
+      .select()
+      .from(taskToLabels)
+      .where(and(eq(taskToLabels.taskId, id), eq(taskToLabels.labelId, labelId)))
+    if (existing.length === 0) {
+      await db.insert(taskToLabels).values({ taskId: id, labelId })
+    }
+  }
+  revalidatePath(`/projects/${projectId}`)
+}
+
+/** Post each selected task to the activity feed (one event per task). */
+export async function bulkAddToFeed(taskIds: string[], projectId: string, note?: string) {
+  if (!taskIds.length) return
+  const uid = await currentUserId()
+  const rows = await db.select().from(tasks).where(inArray(tasks.id, taskIds))
+  const summary = note?.trim()
+  for (const t of rows) {
+    await createFeedEvent({
+      type: "task_updated",
+      actorUserId: uid ?? undefined,
+      subjectTaskId: t.id,
+      parentElementId: projectId,
+      projectId,
+      title: t.title,
+      summary: summary || "Task highlighted",
+      priority: "normal",
+      sourceType: "manual",
+    })
+  }
   revalidatePath(`/projects/${projectId}`)
 }
 

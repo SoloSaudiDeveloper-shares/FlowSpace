@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import {
   LayoutDashboard,
   List,
@@ -115,17 +115,38 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
   // Multi-select (bulk actions) — only meaningful in the List view.
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  function toggleSelect(taskId: string) {
+  // Anchor row for Shift-click range select.
+  const selectAnchor = useRef<string | null>(null)
+  function toggleSelect(taskId: string, opts?: { range?: boolean; order?: string[] }) {
+    // Shift-click: select everything between the anchor and this row.
+    if (opts?.range && opts.order && selectAnchor.current) {
+      const order = opts.order
+      const a = order.indexOf(selectAnchor.current)
+      const b = order.indexOf(taskId)
+      if (a !== -1 && b !== -1) {
+        const [lo, hi] = a <= b ? [a, b] : [b, a]
+        const span = order.slice(lo, hi + 1)
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          for (const id of span) next.add(id)
+          return next
+        })
+        selectAnchor.current = taskId
+        return
+      }
+    }
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(taskId)) next.delete(taskId)
       else next.add(taskId)
       return next
     })
+    selectAnchor.current = taskId
   }
   function exitSelect() {
     setSelectMode(false)
     setSelectedIds(new Set())
+    selectAnchor.current = null
   }
 
   function toggleField(key: string) {
