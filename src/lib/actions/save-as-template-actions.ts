@@ -158,7 +158,7 @@ export async function saveElementAsTemplate(input: {
   }
 
   // templateType must be one of the templates.type enum values.
-  let templateType = el.type
+  const templateType = el.type
   const content: Record<string, unknown> = { version: 1 }
 
   switch (el.type) {

@@ -27,7 +27,7 @@ const jobs: Job[] = []
 const TICK_MS = 60_000
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __flowspace_cron_started: boolean | undefined
 }
 

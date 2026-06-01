@@ -285,7 +285,7 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   function openTask(task: Task, tab: "details" | "comments" = "details") {

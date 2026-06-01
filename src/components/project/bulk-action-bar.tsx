@@ -44,17 +44,10 @@ import {
 } from "@/lib/actions/task-actions"
 import { sendTasksDigestEmail, isTaskEmailReady } from "@/lib/actions/task-email-actions"
 import type { taskStatuses, taskLabels } from "@/lib/db/schema"
+import { PRIORITIES } from "@/lib/priority"
 
 type TaskStatus = typeof taskStatuses.$inferSelect
 type TaskLabel = typeof taskLabels.$inferSelect
-
-const PRIORITIES = [
-  { value: "urgent" as const, label: "Urgent", color: "#ef4444" },
-  { value: "high" as const, label: "High", color: "#f97316" },
-  { value: "medium" as const, label: "Medium", color: "#eab308" },
-  { value: "low" as const, label: "Low", color: "#3b82f6" },
-  { value: "none" as const, label: "None", color: "#94a3b8" },
-]
 
 function isoDate(offset: number) {
   const d = new Date()

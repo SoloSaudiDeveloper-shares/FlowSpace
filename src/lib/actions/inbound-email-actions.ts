@@ -90,7 +90,7 @@ export async function approveInboundEmail(
   }
 
   // Find or create the user's Inbox todo list (same one Telegram uses).
-  let listId = sqlite
+  const listId = sqlite
     .prepare(
       `SELECT target_list_id FROM telegram_bots WHERE user_id = ?`,
     )
