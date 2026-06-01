@@ -264,7 +264,10 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               aria-selected={isActive}
               aria-controls={`view-panel-${view.id}`}
               id={`view-tab-${view.id}`}
-              onClick={() => setActiveView(view.id)}
+              onClick={() => {
+                if (view.id !== "list" && view.id !== "board") exitSelect()
+                setActiveView(view.id)
+              }}
               className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
                 isActive
                   ? "border-primary text-foreground"
@@ -291,8 +294,8 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
             <Search className="size-3" />
           </button>
 
-          {/* Multi-select toggle (List view only) */}
-          {activeView === "list" && (
+          {/* Multi-select toggle (List + Board views) */}
+          {(activeView === "list" || activeView === "board") && (
             <button
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
               className={`flex items-center gap-1.5 h-7 px-2 text-xs rounded-md hover:bg-accent transition-colors ${
@@ -306,7 +309,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           )}
 
           {/* Select all / none — visible whenever select mode is on */}
-          {activeView === "list" && selectMode && (
+          {(activeView === "list" || activeView === "board") && selectMode && (
             <button
               onClick={toggleSelectAll}
               disabled={visibleTaskIds.length === 0}
@@ -605,7 +608,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
         )}
         {activeView === "board" && (
           <div className="p-6">
-            <TaskBoard projectId={projectId} statuses={statuses} tasks={tasks} progress={progress} taskMeta={taskMeta} />
+            <TaskBoard projectId={projectId} statuses={statuses} tasks={tasks} progress={progress} taskMeta={taskMeta} selectMode={selectMode} selectedIds={selectedIds} onToggleSelect={toggleSelect} />
           </div>
         )}
         {activeView === "calendar" && (

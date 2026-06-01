@@ -46,6 +46,9 @@ interface TaskBoardProps {
   tasks: Task[]
   progress: number
   taskMeta?: TaskCardMeta
+  selectMode?: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (taskId: string) => void
 }
 
 function StatusColumn({
@@ -54,12 +57,18 @@ function StatusColumn({
   projectId,
   onTaskClick,
   taskMeta,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
 }: {
   status: TaskStatus
   tasks: Task[]
   projectId: string
   onTaskClick: (task: Task) => void
   taskMeta?: TaskCardMeta
+  selectMode?: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (taskId: string) => void
 }) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
@@ -158,6 +167,9 @@ function StatusColumn({
               attachmentCount={taskMeta?.attachmentCounts[task.id]}
               dependencyCount={taskMeta?.dependencyCounts[task.id]}
               commentCount={taskMeta?.commentCounts[task.id]}
+              selectMode={selectMode}
+              selected={!!selectedIds?.has(task.id)}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </SortableContext>
@@ -221,7 +233,7 @@ function StatusColumn({
   )
 }
 
-export function TaskBoard({ projectId, statuses, tasks: allTasks, progress, taskMeta }: TaskBoardProps) {
+export function TaskBoard({ projectId, statuses, tasks: allTasks, progress, taskMeta, selectMode, selectedIds, onToggleSelect }: TaskBoardProps) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -326,6 +338,9 @@ export function TaskBoard({ projectId, statuses, tasks: allTasks, progress, task
               projectId={projectId}
               onTaskClick={handleTaskClick}
               taskMeta={taskMeta}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
             />
           ))}
 

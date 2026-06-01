@@ -56,6 +56,9 @@ interface TaskCardProps {
   attachmentCount?: number
   dependencyCount?: number
   commentCount?: number
+  selectMode?: boolean
+  selected?: boolean
+  onToggleSelect?: (taskId: string) => void
 }
 
 export function TaskCard({
@@ -69,6 +72,9 @@ export function TaskCard({
   attachmentCount = 0,
   dependencyCount = 0,
   commentCount = 0,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
 }: TaskCardProps) {
   const [popover, setPopover] = useState<{ kind: MetaKind; x: number; y: number } | null>(null)
   function openPopover(kind: MetaKind, e: React.MouseEvent) {
@@ -127,22 +133,38 @@ export function TaskCard({
       <div
         ref={setNodeRef}
         style={style}
-        className="group flex items-start gap-2 rounded-lg border bg-card p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-        onClick={onClick}
+        className={`group flex items-start gap-2 rounded-lg border bg-card p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${
+          selected ? "ring-2 ring-primary bg-primary/5" : ""
+        }`}
+        onClick={() => (selectMode ? onToggleSelect?.(task.id) : onClick())}
         onContextMenu={handleContextMenu}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => { if (e.key === "Enter") onClick() }}
+        onKeyDown={(e) => { if (e.key === "Enter") (selectMode ? onToggleSelect?.(task.id) : onClick()) }}
         aria-label={`Task: ${task.title}${task.isCompleted ? " (completed)" : ""}`}
       >
-        <button
-          className="mt-0.5 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          aria-label="Drag to reorder"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="size-4 text-muted-foreground" />
-        </button>
+        {selectMode ? (
+          <button
+            className="mt-0.5 shrink-0"
+            onClick={(e) => { e.stopPropagation(); onToggleSelect?.(task.id) }}
+            aria-label={selected ? "Deselect" : "Select"}
+          >
+            {selected ? (
+              <CheckSquare className="size-4 text-primary" />
+            ) : (
+              <Square className="size-4 text-muted-foreground/50" />
+            )}
+          </button>
+        ) : (
+          <button
+            className="mt-0.5 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            aria-label="Drag to reorder"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="size-4 text-muted-foreground" />
+          </button>
+        )}
 
         <div className="flex-1 min-w-0">
           {/* Title row */}
