@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input"
 import { OverviewView } from "./views/overview-view"
 import { ListView } from "./views/list-view"
 import { BulkActionBar } from "./bulk-action-bar"
-import { CheckSquare } from "lucide-react"
+import { CheckSquare, Square } from "lucide-react"
 import { TaskBoard } from "./task-board"
 import { CalendarView } from "./views/calendar-view"
 import { GanttView } from "./views/gantt-view"
@@ -205,6 +205,14 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
     return sortDir === "asc" ? cmp : -cmp
   })
 
+  // Select-all targets exactly the tasks currently visible (after filters/search).
+  const visibleTaskIds = tasks.map((t) => t.id)
+  const allVisibleSelected =
+    visibleTaskIds.length > 0 && visibleTaskIds.every((id) => selectedIds.has(id))
+  function toggleSelectAll() {
+    setSelectedIds(allVisibleSelected ? new Set() : new Set(visibleTaskIds))
+  }
+
   const activeFilterCount =
     (filterPriority !== "all" ? 1 : 0) +
     (filterCompleted !== "all" ? 1 : 0) +
@@ -272,7 +280,20 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               title="Select multiple tasks"
             >
               <CheckSquare className="size-3" />
-              Select
+              {selectMode ? "Done" : "Select"}
+            </button>
+          )}
+
+          {/* Select all / none — visible whenever select mode is on */}
+          {activeView === "list" && selectMode && (
+            <button
+              onClick={toggleSelectAll}
+              disabled={visibleTaskIds.length === 0}
+              className="flex items-center gap-1.5 h-7 px-2 text-xs rounded-md text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40"
+              title={allVisibleSelected ? "Deselect all" : "Select all visible tasks"}
+            >
+              {allVisibleSelected ? <Square className="size-3" /> : <CheckSquare className="size-3" />}
+              {allVisibleSelected ? "None" : "All"}
             </button>
           )}
 
