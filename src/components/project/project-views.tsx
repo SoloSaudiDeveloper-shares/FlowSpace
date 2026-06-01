@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   LayoutDashboard,
   List,
@@ -21,6 +21,8 @@ import {
   Check,
 } from "lucide-react"
 import { usePreferences, type SavedView } from "@/lib/hooks/use-preferences"
+import { createTask } from "@/lib/actions/task-actions"
+import { parseQuickAdd } from "@/lib/quick-add"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,6 +119,11 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
   const [viewsOpen, setViewsOpen] = useState(false)
+  // Quick-add (the `c` shortcut). Parses natural language on submit.
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [quickAddText, setQuickAddText] = useState("")
+  const [quickAddStatusId, setQuickAddStatusId] = useState<string>("")
+  const quickAddRef = useRef<HTMLInputElement>(null)
 
   // Multi-select (bulk actions) — only meaningful in the List view.
   const [selectMode, setSelectMode] = useState(false)
@@ -311,6 +318,49 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
     )
   }
 
+  // ── Keyboard shortcuts + quick-add ────────────────────────────────────────
+  function goView(v: ViewType) {
+    if (v !== "list" && v !== "board") exitSelect()
+    setActiveView(v)
+  }
+
+  async function handleQuickAdd() {
+    const raw = quickAddText.trim()
+    const sid = quickAddStatusId || statuses[0]?.id
+    if (!raw || !sid) return
+    const { title, priority, dueDate } = parseQuickAdd(raw)
+    setQuickAddText("")
+    await createTask(projectId, sid, title, { priority, dueDate })
+    quickAddRef.current?.focus() // stay open for rapid entry
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return
+      switch (e.key) {
+        case "1": goView("overview"); break
+        case "2": goView("list"); break
+        case "3": goView("board"); break
+        case "4": goView("calendar"); break
+        case "5": goView("gantt"); break
+        case "6": goView("table"); break
+        case "/": e.preventDefault(); setShowSearch(true); break
+        case "f": setShowFilterBar((v) => !v); break
+        case "c":
+          e.preventDefault()
+          setQuickAddOpen(true)
+          setTimeout(() => quickAddRef.current?.focus(), 0)
+          break
+        default: return
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Views Bar */}
@@ -325,10 +375,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               aria-selected={isActive}
               aria-controls={`view-panel-${view.id}`}
               id={`view-tab-${view.id}`}
-              onClick={() => {
-                if (view.id !== "list" && view.id !== "board") exitSelect()
-                setActiveView(view.id)
-              }}
+              onClick={() => goView(view.id)}
               className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
                 isActive
                   ? "border-primary text-foreground"
@@ -527,6 +574,46 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               <X className="size-3.5" />
             </button>
           )}
+        </div>
+      )}
+
+      {/* Quick-add bar (the `c` shortcut). Natural-language: "report fri #high" */}
+      {quickAddOpen && (
+        <div className="flex items-center gap-2 px-4 py-2 border-b bg-primary/5 shrink-0 animate-in slide-in-from-top-1 duration-150">
+          <Plus className="size-3.5 text-primary shrink-0" />
+          <Input
+            ref={quickAddRef}
+            autoFocus
+            placeholder={'Quick add — e.g. "Submit report fri #high"'}
+            value={quickAddText}
+            onChange={(e) => setQuickAddText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleQuickAdd()
+              if (e.key === "Escape") { setQuickAddOpen(false); setQuickAddText("") }
+            }}
+            className="h-7 text-sm border-none bg-transparent shadow-none focus-visible:ring-0 px-0"
+          />
+          {/* Target column */}
+          {statuses.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex items-center gap-1 h-6 px-2 text-xs rounded-full border text-muted-foreground hover:bg-accent shrink-0">
+                <span className="size-2 rounded-full" style={{ backgroundColor: (statuses.find((s) => s.id === quickAddStatusId) ?? statuses[0]).color }} />
+                {(statuses.find((s) => s.id === quickAddStatusId) ?? statuses[0]).name}
+                <ChevronDown className="size-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {statuses.map((s) => (
+                  <DropdownMenuItem key={s.id} onClick={() => setQuickAddStatusId(s.id)}>
+                    <span className="size-2.5 rounded-full mr-2" style={{ backgroundColor: s.color }} /> {s.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <button onClick={handleQuickAdd} className="text-xs text-primary font-medium px-2 shrink-0">Add</button>
+          <button onClick={() => { setQuickAddOpen(false); setQuickAddText("") }} className="text-muted-foreground hover:text-foreground shrink-0" title="Close (Esc)">
+            <X className="size-3.5" />
+          </button>
         </div>
       )}
 

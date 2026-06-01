@@ -33,6 +33,7 @@ import {
   stopTaskTimer,
 } from "@/lib/actions/task-actions"
 import { TaskDetailSheet } from "../task-detail-sheet"
+import { parseQuickAdd } from "@/lib/quick-add"
 import {
   ContextMenu,
   useContextMenu,
@@ -232,6 +233,53 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
   const rowToggle = (id: string, opts?: { range?: boolean }) =>
     onToggleSelect?.(id, { range: opts?.range, order: flatOrderIds })
 
+  // Keyboard cursor: j/k (or ↓/↑) move, Enter/e open, space toggles complete.
+  const [cursorId, setCursorId] = useState<string | null>(null)
+  const orderRef = useRef<string[]>([])
+  orderRef.current = flatOrderIds
+  const tasksRef = useRef<Task[]>(tasks)
+  tasksRef.current = tasks
+  const cursorIdRef = useRef<string | null>(null)
+  cursorIdRef.current = cursorId
+  const sheetOpenRef = useRef(false)
+  sheetOpenRef.current = sheetOpen
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return
+      if (sheetOpenRef.current) return
+      const order = orderRef.current
+      if (order.length === 0) return
+      const cur = cursorIdRef.current
+      const idx = cur ? order.indexOf(cur) : -1
+
+      const move = (nextIdx: number) => {
+        const id = order[nextIdx]
+        setCursorId(id)
+        document.getElementById(`lv-row-${id}`)?.scrollIntoView({ block: "nearest" })
+      }
+
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault()
+        move(idx < 0 ? 0 : Math.min(order.length - 1, idx + 1))
+      } else if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault()
+        move(idx < 0 ? 0 : Math.max(0, idx - 1))
+      } else if ((e.key === "Enter" || e.key === "e") && idx >= 0) {
+        const task = tasksRef.current.find((x) => x.id === cur)
+        if (task) { e.preventDefault(); openTask(task) }
+      } else if (e.key === " " && idx >= 0 && cur) {
+        const task = tasksRef.current.find((x) => x.id === cur)
+        if (task) { e.preventDefault(); updateTask(task.id, task.projectId, { isCompleted: !task.isCompleted }) }
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function openTask(task: Task, tab: "details" | "comments" = "details") {
     setSelectedTask(task)
     setSheetTab(tab)
@@ -341,6 +389,7 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
             selectMode={!!selectMode}
             selectedIds={selectedIds}
             onToggleSelect={rowToggle}
+            cursorId={cursorId}
           />
         )
       })}
@@ -391,6 +440,7 @@ function StatusGroup({
   selectMode,
   selectedIds,
   onToggleSelect,
+  cursorId,
 }: {
   status: TaskStatus
   tasks: Task[]
@@ -408,13 +458,15 @@ function StatusGroup({
   selectMode: boolean
   selectedIds?: Set<string>
   onToggleSelect?: (id: string, opts?: { range?: boolean }) => void
+  cursorId?: string | null
 }) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
 
   async function handleAdd() {
     if (!newTitle.trim()) return
-    await createTask(projectId, status.id, newTitle.trim())
+    const { title, priority, dueDate } = parseQuickAdd(newTitle)
+    await createTask(projectId, status.id, title, { priority, dueDate })
     setNewTitle("")
     setIsAdding(false)
   }
@@ -451,6 +503,7 @@ function StatusGroup({
               selectMode={selectMode}
               selected={!!selectedIds?.has(task.id)}
               onToggleSelect={onToggleSelect}
+              isCursor={cursorId === task.id}
             />
           ))}
 
@@ -459,7 +512,7 @@ function StatusGroup({
               <div className="relative flex-1">
                 <Input
                   autoFocus
-                  placeholder="Task name..."
+                  placeholder={'Task name…  (try "fri #high")'}
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   onKeyDown={(e) => {
@@ -503,6 +556,7 @@ function TaskRow({
   selectMode,
   selected,
   onToggleSelect,
+  isCursor,
 }: {
   task: Task
   depth: number
@@ -517,6 +571,7 @@ function TaskRow({
   selectMode: boolean
   selected: boolean
   onToggleSelect?: (id: string, opts?: { range?: boolean }) => void
+  isCursor?: boolean
 }) {
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.none
   const barColor = PRIORITY_BAR[task.priority] ?? PRIORITY_BAR.none
@@ -531,9 +586,10 @@ function TaskRow({
 
   return (
     <div
+      id={`lv-row-${task.id}`}
       className={`relative flex items-center gap-2 px-4 py-1.5 border-b cursor-pointer group ${
         selected ? "bg-primary/10" : "hover:bg-accent/30"
-      }`}
+      } ${isCursor ? "ring-1 ring-inset ring-primary" : ""}`}
       style={{ paddingLeft: 16 + depth * INDENT_PX }}
       onClick={(e) => (selectMode ? onToggleSelect?.(task.id, { range: e.shiftKey }) : onTaskClick(task))}
       onContextMenu={(e) => onTaskContextMenu(e, task)}

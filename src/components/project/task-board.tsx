@@ -33,6 +33,7 @@ import {
   updateTaskStatus,
 } from "@/lib/actions/task-actions"
 import { toast } from "sonner"
+import { parseQuickAdd } from "@/lib/quick-add"
 import type { tasks, taskStatuses, taskLabels } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 import type { TaskCardMeta } from "./project-views"
@@ -81,7 +82,8 @@ function StatusColumn({
 
   async function handleAdd() {
     if (!newTitle.trim()) return
-    await createTask(projectId, status.id, newTitle.trim())
+    const { title, priority, dueDate } = parseQuickAdd(newTitle)
+    await createTask(projectId, status.id, title, { priority, dueDate })
     setNewTitle("")
     setIsAdding(false)
   }
@@ -179,7 +181,7 @@ function StatusColumn({
           <div className="space-y-2">
             <Input
               autoFocus
-              placeholder="Task title..."
+              placeholder={'Task title…  (try "fri #high")'}
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={(e) => {

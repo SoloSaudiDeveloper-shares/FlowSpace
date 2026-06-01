@@ -100,7 +100,11 @@ export async function getTasksByProject(projectId: string) {
 export async function createTask(
   projectId: string,
   statusId: string,
-  title: string
+  title: string,
+  opts?: {
+    priority?: "urgent" | "high" | "medium" | "low" | "none"
+    dueDate?: string | null
+  }
 ) {
   const existing = await db
     .select()
@@ -119,6 +123,8 @@ export async function createTask(
     projectId,
     statusId,
     title,
+    priority: opts?.priority ?? "none",
+    dueDate: opts?.dueDate ?? null,
     sortOrder: maxOrder + 1,
     createdAt: now,
     updatedAt: now,

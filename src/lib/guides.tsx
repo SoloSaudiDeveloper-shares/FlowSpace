@@ -23,6 +23,7 @@ import {
   Calendar,
   Activity,
   Gauge,
+  Keyboard,
 } from "lucide-react"
 import type { GuideStep } from "@/components/shared/guide-dialog"
 import { AI_PROMPT_TEMPLATE } from "@/lib/import/ai-import-parser"
@@ -35,6 +36,7 @@ export type GuideId =
   | "calendarSync"
   | "serverEvents"
   | "aiResponseLength"
+  | "quickAdd"
 
 export interface GuideMeta {
   id: GuideId
@@ -520,11 +522,75 @@ Due: 2026-07-15
       },
     ],
   },
+
+  quickAdd: {
+    id: "quickAdd",
+    label: "Quick add & shortcuts",
+    blurb: "Type tasks in plain language; drive the board with the keyboard.",
+    icon: Keyboard,
+    steps: [
+      {
+        title: "Quick add with natural language",
+        body: (
+          <p>
+            Press <code className="px-1 py-0.5 bg-muted/60 rounded">c</code> anywhere
+            in a project to open the quick-add bar, then type the task the way
+            you&apos;d say it. FlowSpace pulls out the due date and priority and
+            files the rest as the title. It also works in the inline{" "}
+            <strong>Add task</strong> boxes on the List and Board.
+          </p>
+        ),
+      },
+      {
+        title: "What it understands",
+        body: (
+          <ul className="space-y-1.5">
+            <Row title="Priority">
+              <code className="px-1 py-0.5 bg-muted/60 rounded">#urgent</code>{" "}
+              <code className="px-1 py-0.5 bg-muted/60 rounded">#high</code>{" "}
+              <code className="px-1 py-0.5 bg-muted/60 rounded">#medium</code>{" "}
+              <code className="px-1 py-0.5 bg-muted/60 rounded">#low</code>
+            </Row>
+            <Row title="When">
+              <code className="px-1 py-0.5 bg-muted/60 rounded">today</code>,{" "}
+              <code className="px-1 py-0.5 bg-muted/60 rounded">tomorrow</code>,{" "}
+              <code className="px-1 py-0.5 bg-muted/60 rounded">next week</code>,
+              a weekday like <code className="px-1 py-0.5 bg-muted/60 rounded">fri</code>,
+              or an exact date <code className="px-1 py-0.5 bg-muted/60 rounded">2026-06-10</code>
+            </Row>
+            <Row title="Example">
+              <code className="px-1 py-0.5 bg-muted/60 rounded">Submit report fri #high</code>{" "}
+              → a high-priority task &ldquo;Submit report&rdquo; due this Friday
+            </Row>
+          </ul>
+        ),
+      },
+      {
+        title: "Keyboard shortcuts",
+        body: (
+          <div className="space-y-1.5">
+            <Cheat code="1 – 6" desc="switch view (Overview, List, Board, Calendar, Gantt, Table)" />
+            <Cheat code="c" desc="open quick-add" />
+            <Cheat code="/" desc="search" />
+            <Cheat code="f" desc="toggle the filter bar" />
+            <Cheat code="j / k" desc="move the cursor down / up the List (↓ / ↑ also work)" />
+            <Cheat code="Enter / e" desc="open the task under the cursor" />
+            <Cheat code="Space" desc="mark the task under the cursor complete / incomplete" />
+            <p className="pt-1 text-muted-foreground">
+              Shortcuts pause whenever you&apos;re typing in a field, so they
+              never get in the way.
+            </p>
+          </div>
+        ),
+      },
+    ],
+  },
 }
 
 /** Ordered list for the Help → Guides hub. */
 export const GUIDE_LIST: GuideMeta[] = [
   GUIDES.markdownFormat,
+  GUIDES.quickAdd,
   GUIDES.telegramBot,
   GUIDES.calendarSync,
   GUIDES.customFields,
