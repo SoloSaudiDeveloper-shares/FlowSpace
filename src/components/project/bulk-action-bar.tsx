@@ -21,6 +21,7 @@ import {
   Loader2,
   Tag,
   Rss,
+  Mail,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,6 +41,7 @@ import {
   bulkAddToFeed,
   getAllLabels,
 } from "@/lib/actions/task-actions"
+import { sendTasksDigestEmail, isTaskEmailReady } from "@/lib/actions/task-email-actions"
 import type { taskStatuses, taskLabels } from "@/lib/db/schema"
 
 type TaskStatus = typeof taskStatuses.$inferSelect
@@ -78,10 +80,37 @@ export function BulkActionBar({
   const [comment, setComment] = useState("")
   const [busy, setBusy] = useState(false)
   const [labels, setLabels] = useState<TaskLabel[]>([])
+  // Email-as-digest composer.
+  const [emailReady, setEmailReady] = useState(false)
+  const [emailing, setEmailing] = useState(false)
+  const [emailTo, setEmailTo] = useState("")
+  const [emailNote, setEmailNote] = useState("")
 
   useEffect(() => {
     getAllLabels().then(setLabels).catch(() => {})
+    isTaskEmailReady().then((r) => setEmailReady(r.ready)).catch(() => {})
   }, [])
+
+  async function sendDigest() {
+    const to = emailTo.trim()
+    if (!to) return
+    setBusy(true)
+    try {
+      const res = await sendTasksDigestEmail({ taskIds, projectId, to, customMessage: emailNote.trim() || undefined })
+      if (res.ok) {
+        toast.success(`Emailed ${res.count} task${res.count === 1 ? "" : "s"} to ${to}`)
+        setEmailing(false)
+        setEmailTo("")
+        setEmailNote("")
+      } else {
+        toast.error(res.error)
+      }
+    } catch {
+      toast.error("Couldn't send the email")
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function run(fn: () => Promise<void>, msg?: string) {
     setBusy(true)
@@ -120,6 +149,30 @@ export function BulkActionBar({
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
           </Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setCommenting(false)}>Cancel</Button>
+        </div>
+      ) : emailing ? (
+        <div className="flex items-center gap-1.5">
+          <Mail className="size-4 text-muted-foreground ml-1 shrink-0" />
+          <Input
+            autoFocus
+            type="email"
+            value={emailTo}
+            onChange={(e) => setEmailTo(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") sendDigest(); if (e.key === "Escape") setEmailing(false) }}
+            placeholder={`Email ${n} task${n === 1 ? "" : "s"} to…`}
+            className="h-8 w-56 text-sm"
+          />
+          <Input
+            value={emailNote}
+            onChange={(e) => setEmailNote(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") sendDigest(); if (e.key === "Escape") setEmailing(false) }}
+            placeholder="Note (optional)"
+            className="h-8 w-44 text-sm"
+          />
+          <Button size="sm" className={btn} disabled={busy || !emailTo.trim()} onClick={sendDigest}>
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setEmailing(false)}>Cancel</Button>
         </div>
       ) : (
         <>
@@ -200,6 +253,13 @@ export function BulkActionBar({
             onClick={() => run(() => bulkAddToFeed(taskIds, projectId), `Posted ${n} to feed`)}>
             <Rss className="size-3.5" /> Feed
           </Button>
+
+          {/* Email as one combined digest */}
+          {emailReady && (
+            <Button size="sm" variant="ghost" className={btn} disabled={busy} onClick={() => setEmailing(true)}>
+              <Mail className="size-3.5" /> Email
+            </Button>
+          )}
 
           <Button size="sm" variant="ghost" className={btn} disabled={busy}
             onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { isCompleted: true }), `Completed ${n}`)}>
