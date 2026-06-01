@@ -23,6 +23,7 @@ import { useState, type ReactNode } from "react"
 import { Sparkles, ArrowLeft, ArrowRight, Check, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { useT } from "@/lib/hooks/use-i18n"
 
 export interface GuideStep {
   title: string
@@ -32,6 +33,7 @@ export interface GuideStep {
 }
 
 function CodeBlock({ code }: { code: string }) {
+  const { t } = useT()
   const [copied, setCopied] = useState(false)
   return (
     <div className="relative mt-3">
@@ -40,7 +42,7 @@ function CodeBlock({ code }: { code: string }) {
       </pre>
       <button
         type="button"
-        aria-label="Copy"
+        aria-label={t("guide.copy")}
         onClick={() => {
           navigator.clipboard.writeText(code).catch(() => undefined)
           setCopied(true)
@@ -66,6 +68,7 @@ export function GuideDialog({
   subject: string
   steps: GuideStep[]
 }) {
+  const { t } = useT()
   const [idx, setIdx] = useState(0)
 
   // Always start at the first step when the dialog (re)opens. Adjusting state
@@ -92,7 +95,7 @@ export function GuideDialog({
             {subject}
           </span>
           <span className="ml-auto whitespace-nowrap text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
-            Step {safeIdx + 1} of {steps.length}
+            {t("guide.step").replace("{n}", String(safeIdx + 1)).replace("{total}", String(steps.length))}
           </span>
         </div>
 
@@ -112,7 +115,7 @@ export function GuideDialog({
             disabled={isFirst}
           >
             <ArrowLeft className="size-3" />
-            Back
+            {t("guide.back")}
           </Button>
           <div className="flex items-center gap-0.5">
             {steps.map((_, i) => (
@@ -135,7 +138,7 @@ export function GuideDialog({
               onClick={() => onOpenChange(false)}
             >
               <Check className="size-3" />
-              Done
+              {t("guide.done")}
             </Button>
           ) : (
             <Button
@@ -143,7 +146,7 @@ export function GuideDialog({
               className="h-7 text-xs gap-1.5"
               onClick={() => setIdx((i) => Math.min(steps.length - 1, i + 1))}
             >
-              Next
+              {t("guide.next")}
               <ArrowRight className="size-3" />
             </Button>
           )}

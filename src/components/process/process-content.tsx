@@ -5,6 +5,7 @@ import { ListOrdered, Workflow } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StepsView } from "./steps-view"
 import { FlowchartView } from "./flowchart-view"
+import { useT } from "@/lib/hooks/use-i18n"
 import type { processSteps } from "@/lib/db/schema"
 
 type ProcessStep = typeof processSteps.$inferSelect
@@ -16,6 +17,7 @@ interface ProcessContentProps {
 
 export function ProcessContent({ processId, steps }: ProcessContentProps) {
   const [view, setView] = useState<"steps" | "flowchart">("steps")
+  const { t } = useT()
 
   return (
     <div className="space-y-4">
@@ -28,7 +30,7 @@ export function ProcessContent({ processId, steps }: ProcessContentProps) {
           onClick={() => setView("steps")}
         >
           <ListOrdered className="size-4" />
-          Steps
+          {t("process.steps")}
         </Button>
         <Button
           variant={view === "flowchart" ? "secondary" : "ghost"}
@@ -37,7 +39,7 @@ export function ProcessContent({ processId, steps }: ProcessContentProps) {
           onClick={() => setView("flowchart")}
         >
           <Workflow className="size-4" />
-          Flowchart
+          {t("process.flowchart")}
         </Button>
       </div>
 

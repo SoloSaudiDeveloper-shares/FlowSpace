@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import { restoreElement, permanentlyDeleteElement } from "@/lib/actions/element-actions"
 import type { Element } from "@/lib/db/schema"
 
@@ -28,13 +29,13 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   process: GitBranch,
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  project: "Project",
-  page: "Page",
-  canvas: "Canvas",
-  todo_list: "Todo List",
-  reminder: "Reminder",
-  process: "Process",
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  project: "trash.type.project",
+  page: "trash.type.page",
+  canvas: "trash.type.canvas",
+  todo_list: "trash.type.todoList",
+  reminder: "trash.type.reminder",
+  process: "trash.type.process",
 }
 
 interface TrashListProps {
@@ -43,17 +44,18 @@ interface TrashListProps {
 }
 
 export function TrashList({ deleted, archived }: TrashListProps) {
+  const { t } = useT()
   const [tab, setTab] = useState<"deleted" | "archived">("deleted")
   const items = tab === "deleted" ? deleted : archived
 
   async function handleRestore(id: string) {
     await restoreElement(id)
-    toast.success("Item restored")
+    toast.success(t("trash.restored"))
   }
 
   async function handlePermanentDelete(id: string) {
     await permanentlyDeleteElement(id)
-    toast.success("Permanently deleted")
+    toast.success(t("trash.permanentlyDeleted"))
   }
 
   return (
@@ -67,7 +69,7 @@ export function TrashList({ deleted, archived }: TrashListProps) {
           }`}
         >
           <Trash2 className="size-4" />
-          Deleted
+          {t("trash.deleted")}
           <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5 ml-1">{deleted.length}</Badge>
         </button>
         <button
@@ -77,7 +79,7 @@ export function TrashList({ deleted, archived }: TrashListProps) {
           }`}
         >
           <Archive className="size-4" />
-          Archived
+          {t("trash.archived")}
           <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5 ml-1">{archived.length}</Badge>
         </button>
       </div>
@@ -87,14 +89,14 @@ export function TrashList({ deleted, archived }: TrashListProps) {
           {tab === "deleted" ? (
             <>
               <Trash2 className="size-12 mb-3 opacity-30" />
-              <p className="text-sm">Trash is empty</p>
-              <p className="text-xs mt-1">Deleted items will appear here</p>
+              <p className="text-sm">{t("trash.emptyTrash")}</p>
+              <p className="text-xs mt-1">{t("trash.emptyTrashHint")}</p>
             </>
           ) : (
             <>
               <Archive className="size-12 mb-3 opacity-30" />
-              <p className="text-sm">No archived items</p>
-              <p className="text-xs mt-1">Archived items will appear here</p>
+              <p className="text-sm">{t("trash.noArchived")}</p>
+              <p className="text-xs mt-1">{t("trash.noArchivedHint")}</p>
             </>
           )}
         </div>
@@ -113,7 +115,7 @@ export function TrashList({ deleted, archived }: TrashListProps) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    {TYPE_LABELS[item.type]} &middot; {tab === "deleted" ? "Deleted" : "Archived"}{" "}
+                    {TYPE_LABEL_KEYS[item.type] ? t(TYPE_LABEL_KEYS[item.type]) : item.type} &middot; {tab === "deleted" ? t("trash.deleted") : t("trash.archived")}{" "}
                     {new Date(item.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                   </p>
                 </div>
@@ -124,7 +126,7 @@ export function TrashList({ deleted, archived }: TrashListProps) {
                     onClick={() => handleRestore(item.id)}
                   >
                     <RotateCcw className="size-3.5 mr-1.5" />
-                    Restore
+                    {t("trash.restore")}
                   </Button>
                   {tab === "deleted" && (
                     <Button
@@ -133,7 +135,7 @@ export function TrashList({ deleted, archived }: TrashListProps) {
                       onClick={() => handlePermanentDelete(item.id)}
                     >
                       <AlertTriangle className="size-3.5 mr-1.5" />
-                      Delete forever
+                      {t("trash.deleteForever")}
                     </Button>
                   )}
                 </div>

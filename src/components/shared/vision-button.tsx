@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { ScanEye, Loader2, X } from "lucide-react"
 import { useAI } from "@/lib/hooks/use-ai"
 import { usePreferences } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -22,12 +23,14 @@ interface VisionButtonProps {
 
 export function VisionButton({
   onResult,
-  prompt = "Describe this image in detail.",
+  prompt,
   className = "",
   size = "md",
 }: VisionButtonProps) {
   const { preferences } = usePreferences()
   const { enabled, connected, analyzeImage } = useAI()
+  const { t } = useT()
+  const effectivePrompt = prompt ?? t("visbtn.defaultPrompt")
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [popoverOpen, setPopoverOpen] = useState(false)
@@ -97,7 +100,7 @@ export function VisionButton({
         reader.readAsDataURL(file)
       })
 
-      const response = await analyzeImage(base64, prompt)
+      const response = await analyzeImage(base64, effectivePrompt)
 
       setResult(response.text)
       setPopoverOpen(true)
@@ -130,7 +133,7 @@ export function VisionButton({
         ref={btnRef}
         type="button"
         disabled={loading}
-        title={loading ? "Analyzing image..." : "Analyze an image with AI vision"}
+        title={loading ? t("visbtn.analyzing") : t("visbtn.analyzeWithAI")}
         onClick={handleClick}
         className={`
           inline-flex items-center justify-center rounded-full transition-all
@@ -145,7 +148,7 @@ export function VisionButton({
           }
           ${className}
         `}
-        aria-label="Analyze image"
+        aria-label={t("visbtn.analyzeAria")}
       >
         {loading ? (
           <Loader2 className={`${iconSizes[size]} animate-spin`} />
@@ -163,7 +166,7 @@ export function VisionButton({
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-muted-foreground">
-              Vision Analysis
+              {t("visbtn.title")}
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -175,7 +178,7 @@ export function VisionButton({
                 }}
                 className="text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-accent transition-colors"
               >
-                New image
+                {t("visbtn.newImage")}
               </button>
               <button
                 type="button"
@@ -198,7 +201,7 @@ export function VisionButton({
               }}
               className="mt-2 w-full text-xs text-center py-1.5 rounded-md border hover:bg-accent transition-colors"
             >
-              Insert into editor
+              {t("visbtn.insert")}
             </button>
           )}
         </div>

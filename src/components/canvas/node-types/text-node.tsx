@@ -5,11 +5,13 @@ import { Handle, Position, NodeResizer, type NodeProps, type Node } from "@xyflo
 import { SpeechButton } from "@/components/shared/speech-button"
 import { TTSButton } from "@/components/shared/tts-button"
 import { AIActionButton } from "@/components/shared/ai-action-button"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type TextData = { label?: string }
 type TextNodeType = Node<TextData, "text">
 
 export function TextNode({ data, selected }: NodeProps<TextNodeType>) {
+  const { t } = useT()
   const [text, setText] = useState(data.label ?? "")
 
   return (
@@ -34,12 +36,12 @@ export function TextNode({ data, selected }: NodeProps<TextNodeType>) {
             actions={["summarize", "expand", "fix_grammar", "improve", "continue"]}
             size="sm"
           />
-          <TTSButton text={text} size="sm" tooltip="Read aloud" />
+          <TTSButton text={text} size="sm" tooltip={t("canvas.readAloud")} />
           <SpeechButton
-            onTranscript={(t) => { const v = text ? `${text} ${t}` : t; setText(v); data.label = v }}
+            onTranscript={(transcript) => { const v = text ? `${text} ${transcript}` : transcript; setText(v); data.label = v }}
             size="sm"
             showPulse={false}
-            tooltip="Dictate"
+            tooltip={t("canvas.dictate")}
           />
         </div>
       )}
@@ -51,7 +53,7 @@ export function TextNode({ data, selected }: NodeProps<TextNodeType>) {
             setText(e.target.value)
             data.label = e.target.value
           }}
-          placeholder="Type text..."
+          placeholder={t("canvas.text.ph")}
           className="w-full h-full bg-transparent text-sm outline-none resize-none placeholder:text-muted-foreground/50"
         />
       </div>

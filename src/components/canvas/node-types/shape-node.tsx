@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Handle, Position, NodeResizer, type NodeProps, type Node } from "@xyflow/react"
 import { SpeechButton } from "@/components/shared/speech-button"
 import { ShapeElement } from "../shapes"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type ShapeData = {
   shapeId?: string
@@ -29,6 +30,7 @@ const PALETTE = [
 ]
 
 export function ShapeNode({ data, selected }: NodeProps<ShapeNodeType>) {
+  const { t } = useT()
   const [label, setLabel] = useState(data.label ?? "")
   const [fill, setFill] = useState(data.fill ?? "#6366f133")
   const [stroke, setStroke] = useState(data.stroke ?? "#6366f1")
@@ -50,10 +52,10 @@ export function ShapeNode({ data, selected }: NodeProps<ShapeNodeType>) {
       {selected && (
         <div className="absolute -top-9 right-0 flex gap-0.5 nodrag nopan z-10">
           <SpeechButton
-            onTranscript={(t) => { const v = label ? `${label} ${t}` : t; setLabel(v); data.label = v }}
+            onTranscript={(transcript) => { const v = label ? `${label} ${transcript}` : transcript; setLabel(v); data.label = v }}
             size="sm"
             showPulse={false}
-            tooltip="Dictate"
+            tooltip={t("canvas.dictate")}
           />
         </div>
       )}
@@ -67,7 +69,7 @@ export function ShapeNode({ data, selected }: NodeProps<ShapeNodeType>) {
               setLabel(e.target.value)
               data.label = e.target.value
             }}
-            placeholder="Label..."
+            placeholder={t("canvas.shapeNode.label.ph")}
             rows={2}
             className="w-full bg-transparent text-sm text-center outline-none resize-none placeholder:text-foreground/30 leading-tight"
           />
@@ -80,7 +82,7 @@ export function ShapeNode({ data, selected }: NodeProps<ShapeNodeType>) {
           {PALETTE.map((c, i) => (
             <button
               key={i}
-              title="Set color"
+              title={t("canvas.shapeNode.setColor")}
               className={`size-4 rounded-full border border-gray-400 transition-transform hover:scale-110 ${
                 fill === c.fill ? "ring-2 ring-primary ring-offset-1" : ""
               }`}

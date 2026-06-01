@@ -3,11 +3,13 @@
 import { useState, useCallback } from "react"
 import { Handle, Position, NodeResizer, type NodeProps, type Node } from "@xyflow/react"
 import { SpeechButton } from "@/components/shared/speech-button"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type CardData = { label?: string; description?: string }
 type CardNodeType = Node<CardData, "card">
 
 export function CardNode({ data, selected }: NodeProps<CardNodeType>) {
+  const { t } = useT()
   const [label, setLabel] = useState(data.label ?? "")
   const [description, setDescription] = useState(data.description ?? "")
 
@@ -27,13 +29,13 @@ export function CardNode({ data, selected }: NodeProps<CardNodeType>) {
             onTranscript={(text) => { const v = label ? `${label} ${text}` : text; setLabel(v); data.label = v }}
             size="sm"
             showPulse={false}
-            tooltip="Dictate title"
+            tooltip={t("canvas.card.dictateTitle")}
           />
           <SpeechButton
             onTranscript={(text) => { const v = description ? `${description} ${text}` : text; setDescription(v); data.description = v }}
             size="sm"
             showPulse={false}
-            tooltip="Dictate description"
+            tooltip={t("canvas.card.dictateDescription")}
           />
         </div>
       )}
@@ -45,7 +47,7 @@ export function CardNode({ data, selected }: NodeProps<CardNodeType>) {
             setLabel(e.target.value)
             data.label = e.target.value
           }}
-          placeholder="Card title"
+          placeholder={t("canvas.card.title.ph")}
           className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-muted-foreground/50"
         />
         <div className="flex-1">
@@ -55,7 +57,7 @@ export function CardNode({ data, selected }: NodeProps<CardNodeType>) {
               setDescription(e.target.value)
               data.description = e.target.value
             }}
-            placeholder="Description..."
+            placeholder={t("canvas.card.description.ph")}
             className="w-full h-full bg-transparent text-xs text-muted-foreground outline-none resize-none placeholder:text-muted-foreground/30"
           />
         </div>

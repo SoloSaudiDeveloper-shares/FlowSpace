@@ -31,44 +31,28 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { useT } from "@/lib/hooks/use-i18n"
+import { translate } from "@/lib/i18n/strings"
 import {
   analyzeImageWithAI,
   saveVisionAsPage,
 } from "@/lib/actions/vision-actions"
 
 const PROMPT_PRESETS = [
-  {
-    label: "Describe",
-    prompt: "Describe what's in this image in 3-5 concise bullets.",
-  },
-  {
-    label: "Transcribe text",
-    prompt:
-      "Transcribe any text visible in this image. Preserve formatting. If there's no text say 'no visible text'.",
-  },
-  {
-    label: "Receipt → totals",
-    prompt:
-      "This is a receipt. Extract: merchant name, date, total amount, currency. Return as JSON.",
-  },
-  {
-    label: "Chart → insights",
-    prompt:
-      "This is a chart. Summarise: what is being measured, the key trend, and any standout data points.",
-  },
-  {
-    label: "Whiteboard → tasks",
-    prompt:
-      "This is a whiteboard. Pull out any action items as a checklist. Use `- [ ]` markdown style.",
-  },
+  { labelKey: "vision.preset.describe", promptKey: "vision.preset.describePrompt" },
+  { labelKey: "vision.preset.transcribe", promptKey: "vision.preset.transcribePrompt" },
+  { labelKey: "vision.preset.receipt", promptKey: "vision.preset.receiptPrompt" },
+  { labelKey: "vision.preset.chart", promptKey: "vision.preset.chartPrompt" },
+  { labelKey: "vision.preset.whiteboard", promptKey: "vision.preset.whiteboardPrompt" },
 ]
 
 export function VisionWorkspace() {
   const router = useRouter()
+  const { t, locale } = useT()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [filename, setFilename] = useState<string>("")
-  const [prompt, setPrompt] = useState(PROMPT_PRESETS[0].prompt)
+  const [prompt, setPrompt] = useState(() => translate(locale, "vision.preset.describePrompt"))
   const [analyzing, setAnalyzing] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -79,11 +63,11 @@ export function VisionWorkspace() {
 
   async function loadFile(file: File) {
     if (!file.type.startsWith("image/")) {
-      toast.error("Please pick an image file.")
+      toast.error(t("vision.pickImageError"))
       return
     }
     if (file.size > 8 * 1024 * 1024) {
-      toast.error("Image is too big (max 8 MB).")
+      toast.error(t("vision.tooBigError"))
       return
     }
     setFilename(file.name)
@@ -141,7 +125,7 @@ export function VisionWorkspace() {
     setSaving(true)
     try {
       const r = await saveVisionAsPage({
-        title: pageTitle || filename || "Image analysis",
+        title: pageTitle || filename || t("vision.defaultTitle"),
         dataUrl,
         analysis: result,
       })
@@ -149,7 +133,7 @@ export function VisionWorkspace() {
         toast.error(r.error)
         return
       }
-      toast.success("Saved as a Page")
+      toast.success(t("vision.savedAsPage"))
       router.push(`/pages/${r.pageId}`)
     } finally {
       setSaving(false)
@@ -169,12 +153,10 @@ export function VisionWorkspace() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight mb-1 flex items-center gap-2">
           <ScanEye className="size-6 text-primary" />
-          Vision
+          {t("vision.title")}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Drop an image, ask a question. Uses your configured AI provider
-          (Settings → AI features). Receipts, charts, whiteboards, text in
-          photos — all fair game.
+          {t("vision.subtitle")}
         </p>
       </div>
 
@@ -198,9 +180,9 @@ export function VisionWorkspace() {
             <Upload className="size-5 text-primary" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium">Drop an image here</p>
+            <p className="text-sm font-medium">{t("vision.dropHere")}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              or click to browse · paste from clipboard works too · max 8 MB
+              {t("vision.dropHint")}
             </p>
           </div>
           <input
@@ -230,7 +212,7 @@ export function VisionWorkspace() {
               size="icon"
               className="absolute top-2 right-2 size-7"
               onClick={reset}
-              aria-label="Remove image"
+              aria-label={t("vision.removeImage")}
             >
               <X className="size-3.5" />
             </Button>
@@ -246,23 +228,26 @@ export function VisionWorkspace() {
       {dataUrl && (
         <div className="space-y-2">
           <label className="block text-xs font-medium text-muted-foreground">
-            Prompt
+            {t("vision.promptLabel")}
           </label>
           <div className="flex flex-wrap gap-1.5 mb-2">
-            {PROMPT_PRESETS.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => setPrompt(p.prompt)}
-                className={`px-2 py-1 rounded-full text-[11px] border transition-colors ${
-                  prompt === p.prompt
-                    ? "border-primary bg-primary/10 text-foreground"
-                    : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+            {PROMPT_PRESETS.map((p) => {
+              const presetPrompt = t(p.promptKey)
+              return (
+                <button
+                  key={p.labelKey}
+                  type="button"
+                  onClick={() => setPrompt(presetPrompt)}
+                  className={`px-2 py-1 rounded-full text-[11px] border transition-colors ${
+                    prompt === presetPrompt
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  }`}
+                >
+                  {t(p.labelKey)}
+                </button>
+              )
+            })}
           </div>
           <textarea
             value={prompt}
@@ -272,7 +257,7 @@ export function VisionWorkspace() {
           />
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] text-muted-foreground/70">
-              Vision-capable model required. Configured in Settings.
+              {t("vision.modelNote")}
             </p>
             <Button onClick={handleAnalyse} disabled={analyzing} size="sm" className="gap-1.5">
               {analyzing ? (
@@ -280,7 +265,7 @@ export function VisionWorkspace() {
               ) : (
                 <Sparkles className="size-3.5" />
               )}
-              {analyzing ? "Analysing…" : "Analyse"}
+              {analyzing ? t("vision.analysing") : t("vision.analyse")}
             </Button>
           </div>
         </div>
@@ -301,7 +286,7 @@ export function VisionWorkspace() {
             <div className="flex items-center justify-between px-3 py-2 border-b">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium flex items-center gap-1.5">
                 <Sparkles className="size-3 text-primary" />
-                Analysis
+                {t("vision.analysis")}
               </p>
               <Button
                 size="sm"
@@ -318,7 +303,7 @@ export function VisionWorkspace() {
                 ) : (
                   <Copy className="size-3" />
                 )}
-                {copied ? "Copied" : "Copy"}
+                {copied ? t("vision.copied") : t("vision.copy")}
               </Button>
             </div>
             <div className="p-3 text-sm leading-relaxed whitespace-pre-wrap">
@@ -327,16 +312,15 @@ export function VisionWorkspace() {
           </div>
 
           <div className="rounded-xl border bg-card p-3 space-y-2">
-            <p className="text-xs font-medium">Save as a Page</p>
+            <p className="text-xs font-medium">{t("vision.saveAsPage")}</p>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Creates a new Page in your workspace with the image + analysis
-              embedded. You can edit it after.
+              {t("vision.saveAsPageDesc")}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Input
                 value={pageTitle}
                 onChange={(e) => setPageTitle(e.target.value)}
-                placeholder="Page title"
+                placeholder={t("vision.pageTitlePlaceholder")}
                 className="h-9 flex-1 min-w-[180px]"
               />
               <Button
@@ -350,7 +334,7 @@ export function VisionWorkspace() {
                 ) : (
                   <FileText className="size-3.5" />
                 )}
-                {saving ? "Saving…" : "Save as Page"}
+                {saving ? t("vision.saving") : t("vision.saveAsPage")}
               </Button>
             </div>
           </div>

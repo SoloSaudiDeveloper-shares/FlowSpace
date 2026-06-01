@@ -5,6 +5,7 @@ import { Handle, Position, NodeResizer, type NodeProps, type Node } from "@xyflo
 import { SpeechButton } from "@/components/shared/speech-button"
 import { TTSButton } from "@/components/shared/tts-button"
 import { AIActionButton } from "@/components/shared/ai-action-button"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type StickyData = { label?: string; color?: string }
 type StickyNodeType = Node<StickyData, "sticky_note">
@@ -12,6 +13,7 @@ type StickyNodeType = Node<StickyData, "sticky_note">
 const COLORS = ["#fef08a", "#bbf7d0", "#bfdbfe", "#fecdd3", "#e9d5ff", "#fed7aa"]
 
 export function StickyNoteNode({ data, selected }: NodeProps<StickyNodeType>) {
+  const { t } = useT()
   const [text, setText] = useState(data.label ?? "")
   const [color, setColor] = useState(data.color ?? "#fef08a")
   const [showColors, setShowColors] = useState(false)
@@ -41,12 +43,12 @@ export function StickyNoteNode({ data, selected }: NodeProps<StickyNodeType>) {
             actions={["summarize", "expand", "fix_grammar", "improve", "continue"]}
             size="sm"
           />
-          <TTSButton text={text} size="sm" tooltip="Read aloud" />
+          <TTSButton text={text} size="sm" tooltip={t("canvas.readAloud")} />
           <SpeechButton
-            onTranscript={(t) => { const v = text ? `${text} ${t}` : t; setText(v); data.label = v }}
+            onTranscript={(transcript) => { const v = text ? `${text} ${transcript}` : transcript; setText(v); data.label = v }}
             size="sm"
             showPulse={false}
-            tooltip="Dictate"
+            tooltip={t("canvas.dictate")}
           />
         </div>
       )}
@@ -59,7 +61,7 @@ export function StickyNoteNode({ data, selected }: NodeProps<StickyNodeType>) {
               setText(e.target.value)
               data.label = e.target.value
             }}
-            placeholder="Write something..."
+            placeholder={t("canvas.sticky.ph")}
             className="w-full h-full bg-transparent text-sm text-gray-800 outline-none resize-none placeholder:text-gray-400"
           />
         </div>

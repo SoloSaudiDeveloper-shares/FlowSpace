@@ -3,6 +3,7 @@
 import { forwardRef, useState, useCallback, type InputHTMLAttributes } from "react"
 import { Input } from "@/components/ui/input"
 import { SpeechButton } from "./speech-button"
+import { useT } from "@/lib/hooks/use-i18n"
 
 interface SpeechInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "onChange"> {
   /** Controlled value */
@@ -30,6 +31,7 @@ export const SpeechInput = forwardRef<HTMLInputElement, SpeechInputProps>(
     },
     ref,
   ) {
+    const { t } = useT()
     const [interimPreview, setInterimPreview] = useState("")
 
     const handleTranscript = useCallback(
@@ -73,7 +75,7 @@ export const SpeechInput = forwardRef<HTMLInputElement, SpeechInputProps>(
               onInterim={handleInterim}
               size={speechSize}
               showPulse={false}
-              tooltip="Dictate"
+              tooltip={t("speechin.dictate")}
             />
           </div>
         )}

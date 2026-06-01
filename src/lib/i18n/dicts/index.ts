@@ -18,6 +18,9 @@ import * as templates from "./templates"
 import * as layout from "./layout"
 import * as shared from "./shared"
 import * as misc from "./misc"
+import * as auth from "./auth"
+import * as canvas from "./canvas"
+import * as misc2 from "./misc2"
 
 const modules = [
   core,
@@ -34,6 +37,9 @@ const modules = [
   layout,
   shared,
   misc,
+  auth,
+  canvas,
+  misc2,
 ]
 
 export const EN: Record<string, string> = Object.assign({}, ...modules.map((m) => m.en))

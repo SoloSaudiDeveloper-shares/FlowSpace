@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Handle, Position, NodeResizer, type NodeProps, type Node } from "@xyflow/react"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   FolderKanban,
   FileText,
@@ -40,6 +41,7 @@ const TYPE_COLORS: Record<string, string> = {
 }
 
 export function EmbedNode({ data, selected }: NodeProps<EmbedNodeType>) {
+  const { t } = useT()
   const [label, setLabel] = useState(data.label ?? "")
 
   const Icon = (data.elementType && TYPE_ICONS[data.elementType]) || Link2
@@ -58,7 +60,7 @@ export function EmbedNode({ data, selected }: NodeProps<EmbedNodeType>) {
         <div className="flex items-center gap-2">
           <Icon className="size-4 shrink-0 text-muted-foreground" />
           <span className="text-xs font-semibold truncate flex-1">
-            {data.elementTitle || "No element linked"}
+            {data.elementTitle || t("canvas.embed.noElement")}
           </span>
           {data.elementId && (
             <ExternalLink className="size-3 text-muted-foreground shrink-0" />
@@ -75,7 +77,7 @@ export function EmbedNode({ data, selected }: NodeProps<EmbedNodeType>) {
             setLabel(e.target.value)
             data.label = e.target.value
           }}
-          placeholder="Add note..."
+          placeholder={t("canvas.embed.note.ph")}
           className="w-full bg-transparent text-xs text-muted-foreground outline-none placeholder:text-muted-foreground/30 mt-auto"
         />
       </div>

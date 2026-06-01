@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { NodeResizer, type NodeProps, type Node } from "@xyflow/react"
 import { SpeechButton } from "@/components/shared/speech-button"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type GroupData = { label?: string; color?: string }
 type GroupNodeType = Node<GroupData, "group">
@@ -17,6 +18,7 @@ const GROUP_COLORS = [
 ]
 
 export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
+  const { t } = useT()
   const [label, setLabel] = useState(data.label ?? "")
   const [color, setColor] = useState(data.color ?? GROUP_COLORS[0].value)
 
@@ -45,7 +47,7 @@ export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
             }}
             size="sm"
             showPulse={false}
-            tooltip="Dictate label"
+            tooltip={t("canvas.group.dictateLabel")}
           />
         </div>
       )}
@@ -58,7 +60,7 @@ export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
               setLabel(e.target.value)
               data.label = e.target.value
             }}
-            placeholder="Group label..."
+            placeholder={t("canvas.group.label.ph")}
             className="w-full bg-transparent text-xs font-semibold uppercase tracking-wider outline-none placeholder:text-muted-foreground/40"
           />
         </div>
@@ -75,7 +77,7 @@ export function GroupNode({ data, selected }: NodeProps<GroupNodeType>) {
                   color === c.value ? "scale-125 border-foreground" : "border-transparent"
                 }`}
                 style={{ backgroundColor: c.border }}
-                title={c.label}
+                title={t("canvas.color." + c.label.toLowerCase())}
               />
             ))}
           </div>

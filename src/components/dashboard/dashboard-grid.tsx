@@ -50,6 +50,7 @@ import type { Element, ElementType, Task } from "@/lib/db/schema"
 import type { dashboardWidgets, reminders as remindersSchema, activityLog as activityLogSchema } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 import { SpeechButton } from "@/components/shared/speech-button"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type Widget = typeof dashboardWidgets.$inferSelect
 
@@ -74,15 +75,15 @@ function getElementHref(el: Element): string {
   }
 }
 
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string, t: (key: string) => string) {
   const date = new Date(dateStr)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
-  if (hours < 1) return "Just now"
-  if (hours < 24) return `${hours}h ago`
-  if (days < 7) return `${days}d ago`
+  if (hours < 1) return t("dash.justNow")
+  if (hours < 24) return t("dash.hoursAgo").replace("{n}", String(hours))
+  if (days < 7) return t("dash.daysAgo").replace("{n}", String(days))
   return date.toLocaleDateString()
 }
 
@@ -90,6 +91,7 @@ function formatDate(dateStr: string) {
 
 function RecentWidget({ elements }: { elements: Element[] }) {
   const router = useRouter()
+  const { t } = useT()
   return (
     <div className="space-y-1">
       {elements.slice(0, 8).map((el) => {
@@ -103,13 +105,13 @@ function RecentWidget({ elements }: { elements: Element[] }) {
             <Icon className="size-3.5 shrink-0 text-muted-foreground" />
             <span className="truncate flex-1">{el.title}</span>
             <span className="text-xs text-muted-foreground shrink-0">
-              {formatDate(el.updatedAt)}
+              {formatDate(el.updatedAt, t)}
             </span>
           </div>
         )
       })}
       {elements.length === 0 && (
-        <p className="text-xs text-muted-foreground text-center py-4">No recent items</p>
+        <p className="text-xs text-muted-foreground text-center py-4">{t("dash.noRecent")}</p>
       )}
     </div>
   )
@@ -117,6 +119,7 @@ function RecentWidget({ elements }: { elements: Element[] }) {
 
 function FavoritesWidget({ elements }: { elements: Element[] }) {
   const router = useRouter()
+  const { t } = useT()
   return (
     <div className="space-y-1">
       {elements.map((el) => {
@@ -133,7 +136,7 @@ function FavoritesWidget({ elements }: { elements: Element[] }) {
         )
       })}
       {elements.length === 0 && (
-        <p className="text-xs text-muted-foreground text-center py-4">No favorites yet</p>
+        <p className="text-xs text-muted-foreground text-center py-4">{t("dash.noFavorites")}</p>
       )}
     </div>
   )
@@ -144,6 +147,14 @@ function QuickCaptureWidget() {
   const [type, setType] = useState<ElementType>("todo_list")
   const [creating, setCreating] = useState(false)
   const router = useRouter()
+  const { t } = useT()
+
+  const TYPE_LABEL_KEYS: Record<string, string> = {
+    todo_list: "dash.type.todoList",
+    page: "dash.type.page",
+    project: "dash.type.project",
+    canvas: "dash.type.canvas",
+  }
 
   async function handleCreate() {
     if (!title.trim() || creating) return
@@ -161,7 +172,7 @@ function QuickCaptureWidget() {
     <div className="space-y-2.5">
       <div className="relative flex items-center gap-2">
         <Input
-          placeholder="Type or speak to create..."
+          placeholder={t("dash.capturePlaceholder")}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") handleCreate() }}
@@ -172,7 +183,7 @@ function QuickCaptureWidget() {
             onTranscript={(text) => setTitle((prev) => prev ? `${prev} ${text}` : text)}
             size="sm"
             showPulse
-            tooltip="Speak to capture"
+            tooltip={t("dash.speakToCapture")}
           />
           {title.trim() && (
             <Button
@@ -188,18 +199,18 @@ function QuickCaptureWidget() {
         </div>
       </div>
       <div className="flex gap-1 flex-wrap">
-        {(["todo_list", "page", "project", "canvas"] as ElementType[]).map((t) => {
-          const Icon = TYPE_ICONS[t]
+        {(["todo_list", "page", "project", "canvas"] as ElementType[]).map((et) => {
+          const Icon = TYPE_ICONS[et]
           return (
             <Button
-              key={t}
-              variant={type === t ? "secondary" : "ghost"}
+              key={et}
+              variant={type === et ? "secondary" : "ghost"}
               size="sm"
               className="text-xs gap-1 h-7"
-              onClick={() => setType(t)}
+              onClick={() => setType(et)}
             >
               <Icon className="size-3" />
-              {t.replace("_", " ")}
+              {t(TYPE_LABEL_KEYS[et])}
             </Button>
           )
         })}
@@ -216,6 +227,7 @@ import { PRIORITY_TEXT_CLASS as PRIORITY_COLORS } from "@/lib/priority"
 
 function MyTasksWidget({ tasks: taskList }: { tasks: TaskWithProject[] }) {
   const router = useRouter()
+  const { t } = useT()
   return (
     <div className="space-y-1">
       {taskList.slice(0, 8).map(({ task, project }) => (
@@ -236,7 +248,7 @@ function MyTasksWidget({ tasks: taskList }: { tasks: TaskWithProject[] }) {
         </div>
       ))}
       {taskList.length === 0 && (
-        <p className="text-xs text-muted-foreground text-center py-4">No open tasks</p>
+        <p className="text-xs text-muted-foreground text-center py-4">{t("dash.noOpenTasks")}</p>
       )}
     </div>
   )
@@ -251,6 +263,7 @@ type ReminderWithElement = {
 
 function RemindersWidget({ reminders }: { reminders: ReminderWithElement[] }) {
   const router = useRouter()
+  const { t } = useT()
   const now = new Date()
   return (
     <div className="space-y-1">
@@ -272,7 +285,7 @@ function RemindersWidget({ reminders }: { reminders: ReminderWithElement[] }) {
         )
       })}
       {reminders.length === 0 && (
-        <p className="text-xs text-muted-foreground text-center py-4">No upcoming reminders</p>
+        <p className="text-xs text-muted-foreground text-center py-4">{t("dash.noReminders")}</p>
       )}
     </div>
   )
@@ -285,22 +298,23 @@ type ActivityWithElement = {
   element: Element
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  created: "Created",
-  updated: "Updated",
-  deleted: "Deleted",
-  completed: "Completed",
-  reopened: "Reopened",
-  status_changed: "Status changed",
-  priority_changed: "Priority changed",
-  assigned_user: "Assigned",
-  added_comment: "Commented",
-  approval_requested: "Approval requested",
-  approval_resolved: "Approval resolved",
+const ACTION_LABEL_KEYS: Record<string, string> = {
+  created: "dash.action.created",
+  updated: "dash.action.updated",
+  deleted: "dash.action.deleted",
+  completed: "dash.action.completed",
+  reopened: "dash.action.reopened",
+  status_changed: "dash.action.statusChanged",
+  priority_changed: "dash.action.priorityChanged",
+  assigned_user: "dash.action.assignedUser",
+  added_comment: "dash.action.addedComment",
+  approval_requested: "dash.action.approvalRequested",
+  approval_resolved: "dash.action.approvalResolved",
 }
 
 function ActivityFeedWidget({ activities }: { activities: ActivityWithElement[] }) {
   const router = useRouter()
+  const { t } = useT()
   return (
     <div className="space-y-1">
       {activities.slice(0, 8).map(({ activity, element }) => (
@@ -311,17 +325,17 @@ function ActivityFeedWidget({ activities }: { activities: ActivityWithElement[] 
         >
           <Activity className="size-3.5 shrink-0 text-muted-foreground" />
           <span className="truncate flex-1">
-            <span className="text-muted-foreground">{ACTION_LABELS[activity.action] || activity.action}</span>
+            <span className="text-muted-foreground">{ACTION_LABEL_KEYS[activity.action] ? t(ACTION_LABEL_KEYS[activity.action]) : activity.action}</span>
             {" "}
             {element.title}
           </span>
           <span className="text-[11px] text-muted-foreground shrink-0">
-            {formatDate(activity.createdAt)}
+            {formatDate(activity.createdAt, t)}
           </span>
         </div>
       ))}
       {activities.length === 0 && (
-        <p className="text-xs text-muted-foreground text-center py-4">No recent activity</p>
+        <p className="text-xs text-muted-foreground text-center py-4">{t("dash.noActivity")}</p>
       )}
     </div>
   )
@@ -348,11 +362,12 @@ export function DashboardGrid({
 }: DashboardGridProps) {
   const [addOpen, setAddOpen] = useState(false)
   const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
+  const { t } = useT()
 
   function handleWidgetContextMenu(e: React.MouseEvent, widget: Widget) {
     const items: ContextMenuEntry[] = [
       {
-        label: "Remove Widget",
+        label: t("dash.removeWidget"),
         icon: X,
         variant: "destructive",
         onClick: () => deleteDashboardWidget(widget.id),
@@ -381,12 +396,12 @@ export function DashboardGrid({
   }
 
   const WIDGET_OPTIONS = [
-    { type: "recent_elements" as const, label: "Recent Elements", icon: Clock, w: 2, h: 2 },
-    { type: "favorites" as const, label: "Favorites", icon: Star, w: 1, h: 2 },
-    { type: "quick_capture" as const, label: "Quick Capture", icon: Pencil, w: 1, h: 1 },
-    { type: "my_tasks" as const, label: "My Tasks", icon: CheckSquare, w: 2, h: 2 },
-    { type: "reminders" as const, label: "Upcoming Reminders", icon: Bell, w: 1, h: 2 },
-    { type: "activity_feed" as const, label: "Activity Feed", icon: Activity, w: 2, h: 2 },
+    { type: "recent_elements" as const, label: "Recent Elements", labelKey: "dash.widget.recentElements", icon: Clock, w: 2, h: 2 },
+    { type: "favorites" as const, label: "Favorites", labelKey: "dash.widget.favorites", icon: Star, w: 1, h: 2 },
+    { type: "quick_capture" as const, label: "Quick Capture", labelKey: "dash.widget.quickCapture", icon: Pencil, w: 1, h: 1 },
+    { type: "my_tasks" as const, label: "My Tasks", labelKey: "dash.widget.myTasks", icon: CheckSquare, w: 2, h: 2 },
+    { type: "reminders" as const, label: "Upcoming Reminders", labelKey: "dash.widget.reminders", icon: Bell, w: 1, h: 2 },
+    { type: "activity_feed" as const, label: "Activity Feed", labelKey: "dash.widget.activityFeed", icon: Activity, w: 2, h: 2 },
   ]
 
   return (
@@ -421,12 +436,12 @@ export function DashboardGrid({
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger className="rounded-lg border border-dashed p-4 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors min-h-[120px]">
             <Plus className="size-6" />
-            <span className="text-sm">Add Widget</span>
+            <span className="text-sm">{t("dash.addWidget")}</span>
           </DialogTrigger>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
-              <DialogTitle>Add Widget</DialogTitle>
-              <DialogDescription>Choose a widget to add to your dashboard.</DialogDescription>
+              <DialogTitle>{t("dash.addWidget")}</DialogTitle>
+              <DialogDescription>{t("dash.addWidgetDesc")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
               {WIDGET_OPTIONS.map((opt) => (
@@ -449,7 +464,7 @@ export function DashboardGrid({
                   <div className="size-8 rounded-md bg-muted flex items-center justify-center">
                     <opt.icon className="size-4" />
                   </div>
-                  <span className="text-sm font-medium">{opt.label}</span>
+                  <span className="text-sm font-medium">{t(opt.labelKey)}</span>
                 </button>
               ))}
             </div>

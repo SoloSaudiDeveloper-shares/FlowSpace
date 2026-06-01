@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   listMyHabits,
   createHabit,
@@ -22,6 +23,7 @@ import {
 const STARTER_COLORS = ["#a78bfa", "#60a5fa", "#67e8f9", "#6ee7b7", "#fbbf24", "#fb7185"]
 
 export function HabitsContent() {
+  const { t } = useT()
   const [habits, setHabits] = useState<Habit[]>([])
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState("")
@@ -74,7 +76,7 @@ export function HabitsContent() {
     try {
       await checkInHabit(habit.id)
     } catch {
-      toast.error("Couldn't save — refreshing")
+      toast.error(t("habits.saveError"))
       await refresh()
     }
   }
@@ -82,9 +84,9 @@ export function HabitsContent() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight mb-1">Habits</h1>
+        <h1 className="text-2xl font-bold tracking-tight mb-1">{t("habits.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Small daily check-ins. The streak counter rewards consistency.
+          {t("habits.subtitle")}
         </p>
       </div>
 
@@ -94,13 +96,13 @@ export function HabitsContent() {
       >
         <div className="flex items-center gap-2">
           <Plus className="size-4 text-primary" />
-          <span className="text-sm font-medium">New habit</span>
+          <span className="text-sm font-medium">{t("habits.new")}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="What do you want to do every day?"
+            placeholder={t("habits.placeholder")}
             maxLength={100}
             className="flex-1 min-w-[200px] h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
@@ -114,13 +116,13 @@ export function HabitsContent() {
                   color === c ? "scale-110 ring-2 ring-foreground" : "opacity-60 hover:opacity-100"
                 }`}
                 style={{ background: c }}
-                aria-label={`Color ${c}`}
+                aria-label={t("habits.color").replace("{c}", c)}
               />
             ))}
           </div>
           <Button size="sm" className="h-9 text-xs" disabled={!name.trim() || creating}>
             {creating ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : <Plus className="size-3.5 mr-1.5" />}
-            Add
+            {t("habits.add")}
           </Button>
         </div>
       </form>
@@ -130,7 +132,7 @@ export function HabitsContent() {
       ) : habits.length === 0 ? (
         <div className="px-4 py-12 text-center text-sm text-muted-foreground/80 italic border-2 border-dashed border-border/40 rounded-lg">
           <Repeat className="size-6 mx-auto mb-2 opacity-50" />
-          No habits yet — add one above to start tracking.
+          {t("habits.empty")}
         </div>
       ) : (
         <div className="space-y-2">
@@ -150,7 +152,7 @@ export function HabitsContent() {
                     ? "border-emerald-400 bg-emerald-500/15"
                     : "border-border hover:border-primary"
                 }`}
-                aria-label={h.doneToday ? "Undo today's check-in" : "Check in for today"}
+                aria-label={h.doneToday ? t("habits.undoCheckin") : t("habits.checkin")}
               >
                 {h.doneToday && <Check className="size-4 text-emerald-400" />}
               </button>
@@ -169,12 +171,12 @@ export function HabitsContent() {
                 variant="ghost"
                 className="h-7 w-7 p-0 text-muted-foreground opacity-0 group-hover:opacity-100"
                 onClick={async () => {
-                  if (!confirm(`Archive "${h.name}"?`)) return
+                  if (!confirm(t("habits.archiveConfirm").replace("{name}", h.name))) return
                   await archiveHabit(h.id)
                   setHabits((hs) => hs.filter((x) => x.id !== h.id))
-                  toast.success("Archived")
+                  toast.success(t("habits.archived"))
                 }}
-                aria-label="Archive habit"
+                aria-label={t("habits.archiveAria")}
               >
                 <Archive className="size-3.5" />
               </Button>

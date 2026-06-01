@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Volume2, VolumeX, Loader2 } from "lucide-react"
 import { useAI } from "@/lib/hooks/use-ai"
 import { usePreferences } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 
 interface TTSButtonProps {
   /** Text to read aloud */
@@ -20,10 +21,11 @@ export function TTSButton({
   text,
   className = "",
   size = "md",
-  tooltip = "Read aloud",
+  tooltip,
 }: TTSButtonProps) {
   const { preferences } = usePreferences()
   const { enabled, speak, stopSpeaking, isSpeaking } = useAI()
+  const { t } = useT()
   const [loading, setLoading] = useState(false)
 
   if (!preferences.aiEnabled || !enabled) return null
@@ -62,7 +64,7 @@ export function TTSButton({
       type="button"
       onClick={handleClick}
       disabled={loading}
-      title={isSpeaking ? "Stop reading" : loading ? "Loading TTS model..." : tooltip}
+      title={isSpeaking ? t("ttsbtn.stopReading") : loading ? t("ttsbtn.loadingModel") : (tooltip ?? t("ttsbtn.readAloud"))}
       className={`
         inline-flex items-center justify-center rounded-full transition-all
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
@@ -76,7 +78,7 @@ export function TTSButton({
         }
         ${className}
       `}
-      aria-label={isSpeaking ? "Stop reading aloud" : "Read aloud"}
+      aria-label={isSpeaking ? t("ttsbtn.stopAria") : t("ttsbtn.readAria")}
     >
       {loading ? (
         <Loader2 className={`${iconSizes[size]} animate-spin`} />

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { FolderKanban } from "lucide-react"
+import { useT } from "@/lib/hooks/use-i18n"
 import type { Element } from "@/lib/db/schema"
 
 interface SubProjectBarProps {
@@ -11,10 +12,11 @@ interface SubProjectBarProps {
 
 export function SubProjectBar({ subProjects }: SubProjectBarProps) {
   const router = useRouter()
+  const { t } = useT()
 
   return (
     <div className="flex items-center gap-1 px-4 py-1.5 border-b bg-muted/20 overflow-x-auto shrink-0">
-      <span className="text-xs text-muted-foreground mr-1 shrink-0">Sub-projects:</span>
+      <span className="text-xs text-muted-foreground mr-1 shrink-0">{t("subproj.label")}</span>
       {subProjects.map((sp) => (
         <button
           key={sp.id}

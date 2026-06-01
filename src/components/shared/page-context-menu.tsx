@@ -6,6 +6,7 @@ import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components
 import { useAI } from "@/lib/hooks/use-ai"
 import { useSpeechRecognition } from "@/lib/hooks/use-speech-recognition"
 import { usePreferences } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 
 interface PageContextMenuProps {
   children: ReactNode
@@ -17,6 +18,7 @@ export function PageContextMenu({ children, className }: PageContextMenuProps) {
   const { disposeAll, modelStates } = useAI()
   const { status: speechStatus, unloadModel } = useSpeechRecognition()
   const { preferences } = usePreferences()
+  const { t } = useT()
 
   const speechLoaded = speechStatus === "ready" || speechStatus === "listening"
   // Only meaningful when models are actually loaded IN THE BROWSER. With an
@@ -40,7 +42,7 @@ export function PageContextMenu({ children, className }: PageContextMenuProps) {
 
     if (preferences.speechEnabled && speechLoaded) {
       items.push({
-        label: "Unload Speech Model",
+        label: t("pcm.unloadSpeech"),
         icon: Mic,
         onClick: () => unloadModel(),
       })
@@ -49,7 +51,7 @@ export function PageContextMenu({ children, className }: PageContextMenuProps) {
     // Only when something is actually loaded locally (not for API providers).
     if (preferences.aiEnabled && aiModelsLoaded) {
       items.push({
-        label: "Unload AI Models",
+        label: t("pcm.unloadAI"),
         icon: Cpu,
         onClick: () => disposeAll(),
       })
@@ -58,7 +60,7 @@ export function PageContextMenu({ children, className }: PageContextMenuProps) {
     if (items.length >= 2) {
       items.push({ separator: true })
       items.push({
-        label: "Unload All Models",
+        label: t("pcm.unloadAll"),
         icon: BrainCircuit,
         onClick: () => {
           if (speechLoaded) unloadModel()

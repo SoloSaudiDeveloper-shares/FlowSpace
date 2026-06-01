@@ -3,11 +3,13 @@
 import { useState, useRef } from "react"
 import { Handle, Position, NodeResizer, type NodeProps, type Node } from "@xyflow/react"
 import { ImageIcon, Upload } from "lucide-react"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type ImageData = { src?: string; label?: string; objectFit?: "cover" | "contain" | "fill" }
 type ImageNodeType = Node<ImageData, "image">
 
 export function ImageNode({ data, selected }: NodeProps<ImageNodeType>) {
+  const { t } = useT()
   const [src, setSrc] = useState(data.src ?? "")
   const [label, setLabel] = useState(data.label ?? "")
   const [objectFit, setObjectFit] = useState<"cover" | "contain" | "fill">(data.objectFit ?? "cover")
@@ -26,7 +28,7 @@ export function ImageNode({ data, selected }: NodeProps<ImageNodeType>) {
   }
 
   function handleUrlPaste() {
-    const url = prompt("Enter image URL:")
+    const url = prompt(t("canvas.image.urlPrompt"))
     if (url) {
       setSrc(url)
       data.src = url
@@ -65,7 +67,7 @@ export function ImageNode({ data, selected }: NodeProps<ImageNodeType>) {
                 setLabel(e.target.value)
                 data.label = e.target.value
               }}
-              placeholder="Caption..."
+              placeholder={t("canvas.image.caption.ph")}
               className="bg-black/50 text-white text-xs rounded px-2 py-1 outline-none w-2/3 placeholder:text-white/50"
             />
             <button
@@ -84,13 +86,13 @@ export function ImageNode({ data, selected }: NodeProps<ImageNodeType>) {
               onClick={() => fileRef.current?.click()}
               className="flex items-center gap-1 px-2 py-1 text-xs rounded-md border hover:bg-accent transition-colors"
             >
-              <Upload className="size-3" /> Upload
+              <Upload className="size-3" /> {t("canvas.image.upload")}
             </button>
             <button
               onClick={handleUrlPaste}
               className="px-2 py-1 text-xs rounded-md border hover:bg-accent transition-colors"
             >
-              URL
+              {t("canvas.image.url")}
             </button>
           </div>
           <input

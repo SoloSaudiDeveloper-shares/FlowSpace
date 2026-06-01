@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { ChevronDown, ChevronRight, X } from "lucide-react"
 import { SHAPES, ShapeElement, type ShapeDef } from "./shapes"
+import { useT } from "@/lib/hooks/use-i18n"
 
 interface ShapePickerProps {
   onSelect: (shapeId: string) => void
@@ -10,6 +11,7 @@ interface ShapePickerProps {
 }
 
 export function ShapePicker({ onSelect, onClose }: ShapePickerProps) {
+  const { t } = useT()
   const [basicOpen, setBasicOpen] = useState(true)
   const [flowchartOpen, setFlowchartOpen] = useState(true)
 
@@ -20,7 +22,7 @@ export function ShapePicker({ onSelect, onClose }: ShapePickerProps) {
     <div className="fixed z-50 left-4 top-20 w-56 bg-background border rounded-lg shadow-xl flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
-        <span className="text-sm font-medium">Shapes</span>
+        <span className="text-sm font-medium">{t("canvas.shapes")}</span>
         <button
           onClick={onClose}
           className="size-5 flex items-center justify-center rounded hover:bg-accent"
@@ -37,12 +39,12 @@ export function ShapePicker({ onSelect, onClose }: ShapePickerProps) {
             onClick={() => setBasicOpen((v) => !v)}
           >
             {basicOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-            Basic Shapes
+            {t("canvas.shapes.basic")}
           </button>
           {basicOpen && (
             <div className="grid grid-cols-5 gap-0.5 mt-1">
               {basicShapes.map((shape) => (
-                <ShapeIcon key={shape.id} shape={shape} onSelect={onSelect} />
+                <ShapeIcon key={shape.id} shape={shape} onSelect={onSelect} label={t("canvas.shape." + shape.id)} />
               ))}
             </div>
           )}
@@ -55,12 +57,12 @@ export function ShapePicker({ onSelect, onClose }: ShapePickerProps) {
             onClick={() => setFlowchartOpen((v) => !v)}
           >
             {flowchartOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-            Flowchart
+            {t("canvas.shapes.flowchart")}
           </button>
           {flowchartOpen && (
             <div className="grid grid-cols-5 gap-0.5 mt-1">
               {flowchartShapes.map((shape) => (
-                <ShapeIcon key={shape.id} shape={shape} onSelect={onSelect} />
+                <ShapeIcon key={shape.id} shape={shape} onSelect={onSelect} label={t("canvas.shape." + shape.id)} />
               ))}
             </div>
           )}
@@ -70,10 +72,10 @@ export function ShapePicker({ onSelect, onClose }: ShapePickerProps) {
   )
 }
 
-function ShapeIcon({ shape, onSelect }: { shape: ShapeDef; onSelect: (id: string) => void }) {
+function ShapeIcon({ shape, onSelect, label }: { shape: ShapeDef; onSelect: (id: string) => void; label: string }) {
   return (
     <button
-      title={shape.label}
+      title={label}
       onClick={() => onSelect(shape.id)}
       className="flex items-center justify-center rounded hover:bg-accent p-1 aspect-square"
     >

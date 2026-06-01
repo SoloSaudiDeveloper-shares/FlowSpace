@@ -5,6 +5,7 @@ import { Plus, Trash2, GripVertical, ChevronDown, ChevronRight, CheckSquare, Squ
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { SpeechButton } from "@/components/shared/speech-button"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   createProcessStep,
   updateProcessStep,
@@ -21,6 +22,7 @@ interface StepsViewProps {
 }
 
 export function StepsView({ processId, steps }: StepsViewProps) {
+  const { t } = useT()
   const [newTitle, setNewTitle] = useState("")
 
   const completedCount = steps.filter((s) => s.isCompleted).length
@@ -60,7 +62,7 @@ export function StepsView({ processId, steps }: StepsViewProps) {
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Input
-            placeholder="Add a new step..."
+            placeholder={t("steps.addPlaceholder")}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleAdd() }}
@@ -71,7 +73,7 @@ export function StepsView({ processId, steps }: StepsViewProps) {
               onTranscript={(text) => setNewTitle((prev) => prev ? `${prev} ${text}` : text)}
               size="sm"
               showPulse={false}
-              tooltip="Dictate step"
+              tooltip={t("steps.dictateStep")}
             />
           </div>
         </div>
@@ -92,6 +94,7 @@ function StepItem({
   index: number
   processId: string
 }) {
+  const { t } = useT()
   const [expanded, setExpanded] = useState(false)
   const [title, setTitle] = useState(step.title)
   const [description, setDescription] = useState(step.description ?? "")
@@ -100,17 +103,17 @@ function StepItem({
   function handleContextMenu(e: React.MouseEvent) {
     const items: ContextMenuEntry[] = [
       {
-        label: step.isCompleted ? "Mark Incomplete" : "Mark Complete",
+        label: step.isCompleted ? t("steps.markIncomplete") : t("steps.markComplete"),
         icon: step.isCompleted ? Square : CheckSquare,
         onClick: () => updateProcessStep(step.id, processId, { isCompleted: !step.isCompleted }),
       },
       {
-        label: expanded ? "Collapse" : "Expand",
+        label: expanded ? t("steps.collapse") : t("steps.expand"),
         onClick: () => setExpanded((v) => !v),
       },
       { separator: true },
       {
-        label: "Delete Step",
+        label: t("steps.delete"),
         icon: Trash2,
         variant: "destructive",
         onClick: () => deleteProcessStep(step.id, processId),
@@ -185,7 +188,7 @@ function StepItem({
                     updateProcessStep(step.id, processId, { description })
                   }
                 }}
-                placeholder="Add details for this step..."
+                placeholder={t("steps.detailsPlaceholder")}
                 className="w-full bg-transparent text-sm text-muted-foreground outline-none resize-none min-h-[60px] placeholder:text-muted-foreground/50 pr-9"
               />
               <div className="absolute top-1 right-1">
@@ -193,7 +196,7 @@ function StepItem({
                   onTranscript={(text) => setDescription((prev) => prev ? `${prev} ${text}` : text)}
                   size="sm"
                   showPulse={false}
-                  tooltip="Dictate details"
+                  tooltip={t("steps.dictateDetails")}
                 />
               </div>
             </div>
