@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import {
   ChevronDown,
   ChevronRight,
@@ -217,10 +217,15 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
   }
 
   // Preserve the order coming from the toolbar (already filtered + sorted).
-  const tasksByStatus = statuses.reduce((acc, s) => {
-    acc[s.id] = tasks.filter((t) => t.statusId === s.id)
-    return acc
-  }, {} as Record<string, Task[]>)
+  // Memoized so the per-second live-timer tick doesn't re-bucket every task.
+  const tasksByStatus = useMemo(
+    () =>
+      statuses.reduce((acc, s) => {
+        acc[s.id] = tasks.filter((t) => t.statusId === s.id)
+        return acc
+      }, {} as Record<string, Task[]>),
+    [tasks, statuses],
+  )
 
   function toggleCollapse(statusId: string) {
     setCollapsed((prev) => ({ ...prev, [statusId]: !prev[statusId] }))

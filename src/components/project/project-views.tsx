@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import {
   LayoutDashboard,
   List,
@@ -171,73 +171,52 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
     })
   }
 
-  // Apply filters
-  let tasks = rawTasks
+  // Apply filters + sort. Memoized so it doesn't re-run on every unrelated
+  // render (search keystrokes, the live-timer tick, select toggles, …).
+  const tasks = useMemo(() => {
+    let result = rawTasks
 
-  // Search
-  if (searchQuery.trim()) {
-    const q = searchQuery.toLowerCase()
-    tasks = tasks.filter((t) => t.title.toLowerCase().includes(q))
-  }
-
-  // Priority filter
-  if (filterPriority !== "all") {
-    tasks = tasks.filter((t) => t.priority === filterPriority)
-  }
-
-  // Completion filter
-  if (filterCompleted === "active") {
-    tasks = tasks.filter((t) => !t.isCompleted)
-  } else if (filterCompleted === "completed") {
-    tasks = tasks.filter((t) => t.isCompleted)
-  }
-
-  // Due date filter
-  if (filterDueDate !== "all") {
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const weekEnd = new Date(today)
-    weekEnd.setDate(weekEnd.getDate() + (7 - weekEnd.getDay()))
-
-    tasks = tasks.filter((t) => {
-      if (filterDueDate === "no_date") return !t.dueDate
-      if (!t.dueDate) return false
-      const due = new Date(t.dueDate)
-      if (filterDueDate === "overdue") return due < today && !t.isCompleted
-      if (filterDueDate === "today") return due >= today && due < new Date(today.getTime() + 86400000)
-      if (filterDueDate === "this_week") return due >= today && due <= weekEnd
-      return true
-    })
-  }
-
-  // Apply sort
-  tasks = [...tasks].sort((a, b) => {
-    let cmp = 0
-    switch (sortField) {
-      case "manual":
-        cmp = a.sortOrder - b.sortOrder
-        break
-      case "title":
-        cmp = a.title.localeCompare(b.title)
-        break
-      case "priority":
-        cmp = (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4)
-        break
-      case "dueDate": {
-        const da = a.dueDate ?? ""
-        const db_ = b.dueDate ?? ""
-        cmp = da.localeCompare(db_)
-        break
-      }
-      case "createdAt":
-        cmp = a.createdAt.localeCompare(b.createdAt)
-        break
-      case "updatedAt":
-        cmp = a.updatedAt.localeCompare(b.updatedAt)
-        break
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((t) => t.title.toLowerCase().includes(q))
     }
-    return sortDir === "asc" ? cmp : -cmp
-  })
+    if (filterPriority !== "all") {
+      result = result.filter((t) => t.priority === filterPriority)
+    }
+    if (filterCompleted === "active") {
+      result = result.filter((t) => !t.isCompleted)
+    } else if (filterCompleted === "completed") {
+      result = result.filter((t) => t.isCompleted)
+    }
+    if (filterDueDate !== "all") {
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const weekEnd = new Date(today)
+      weekEnd.setDate(weekEnd.getDate() + (7 - weekEnd.getDay()))
+      result = result.filter((t) => {
+        if (filterDueDate === "no_date") return !t.dueDate
+        if (!t.dueDate) return false
+        const due = new Date(t.dueDate)
+        if (filterDueDate === "overdue") return due < today && !t.isCompleted
+        if (filterDueDate === "today") return due >= today && due < new Date(today.getTime() + 86400000)
+        if (filterDueDate === "this_week") return due >= today && due <= weekEnd
+        return true
+      })
+    }
+
+    return [...result].sort((a, b) => {
+      let cmp = 0
+      switch (sortField) {
+        case "manual": cmp = a.sortOrder - b.sortOrder; break
+        case "title": cmp = a.title.localeCompare(b.title); break
+        case "priority": cmp = (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4); break
+        case "dueDate": cmp = (a.dueDate ?? "").localeCompare(b.dueDate ?? ""); break
+        case "createdAt": cmp = a.createdAt.localeCompare(b.createdAt); break
+        case "updatedAt": cmp = a.updatedAt.localeCompare(b.updatedAt); break
+      }
+      return sortDir === "asc" ? cmp : -cmp
+    })
+  }, [rawTasks, searchQuery, filterPriority, filterCompleted, filterDueDate, sortField, sortDir])
 
   // Select-all targets exactly the tasks currently visible (after filters/search).
   const visibleTaskIds = tasks.map((t) => t.id)
