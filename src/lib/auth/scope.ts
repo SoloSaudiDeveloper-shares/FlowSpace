@@ -23,6 +23,21 @@ export async function currentUserId(): Promise<string | null> {
 }
 
 /**
+ * Require the caller to hold one of the given roles. Throws "Not authenticated"
+ * or "Forbidden". Use to gate admin-only / privileged server actions.
+ */
+export async function requireRole(...allowed: string[]) {
+  const u = await requireAuth()
+  if (!allowed.includes(u.role)) throw new Error("Forbidden")
+  return u
+}
+
+/** Require an administrative role (owner or admin). */
+export async function requireAdmin() {
+  return requireRole("owner", "admin")
+}
+
+/**
  * Verifies the element exists AND is owned by the current user.
  * Throws "Not authenticated" or "Forbidden" so server actions never
  * silently leak data.

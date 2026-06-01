@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { taskAttachments } from "@/lib/db/schema"
+import { taskAttachments, tasks, elements } from "@/lib/db/schema"
 import { createId } from "@/lib/utils/ids"
-import { eq } from "drizzle-orm"
+import { eq, and } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import fs from "fs"
 import path from "path"
 import { getDataDir } from "@/lib/utils/data-dir"
+import { currentUserId } from "@/lib/auth/scope"
 
 const UPLOAD_DIR = path.join(getDataDir(), "uploads")
 
@@ -15,8 +16,24 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 }
 
+/** True if `uid` owns the project that owns `taskId`. */
+async function ownsTask(taskId: string, uid: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .innerJoin(elements, eq(elements.id, tasks.projectId))
+    .where(and(eq(tasks.id, taskId), eq(elements.createdBy, uid)))
+    .limit(1)
+  return rows.length > 0
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const uid = await currentUserId()
+    if (!uid) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const formData = await request.formData()
     const file = formData.get("file") as File
     const taskId = formData.get("taskId") as string
@@ -29,6 +46,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!(await ownsTask(taskId, uid))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     // Limit file size to 10MB
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json(
@@ -38,7 +59,9 @@ export async function POST(request: NextRequest) {
     }
 
     const id = createId()
-    const ext = path.extname(file.name)
+    // Sanitize the extension to plain alphanumerics + dot so the stored
+    // filename (`<id><ext>`) can never contain path separators.
+    const ext = path.extname(file.name).replace(/[^a-zA-Z0-9.]/g, "").slice(0, 12)
     const safeFileName = `${id}${ext}`
     const filePath = path.join(UPLOAD_DIR, safeFileName)
 
@@ -72,6 +95,11 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const uid = await currentUserId()
+    if (!uid) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id, projectId } = await request.json()
 
     if (!id) {
@@ -81,12 +109,15 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Get attachment info
-    const attachment = await db
-      .select()
+    // Get attachment info — only if the caller owns its task's project.
+    const rows = await db
+      .select({ attachment: taskAttachments })
       .from(taskAttachments)
-      .where(eq(taskAttachments.id, id))
+      .innerJoin(tasks, eq(tasks.id, taskAttachments.taskId))
+      .innerJoin(elements, eq(elements.id, tasks.projectId))
+      .where(and(eq(taskAttachments.id, id), eq(elements.createdBy, uid)))
       .limit(1)
+    const attachment = rows.map((r) => r.attachment)
 
     if (attachment[0]) {
       // Delete file from disk

@@ -2,16 +2,20 @@
 
 import { db } from "@/lib/db"
 import { elements, tasks, taskStatuses, taskLabels, taskToLabels, todoItems, processSteps } from "@/lib/db/schema"
-import { eq, and, desc } from "drizzle-orm"
+import { eq, and, desc, inArray } from "drizzle-orm"
+import { currentUserId, requireOwnedElement } from "@/lib/auth/scope"
 
 type ExportFormat = "json" | "csv"
 
 export async function exportElements(format: ExportFormat) {
-  const allElements = await db
-    .select()
-    .from(elements)
-    .where(eq(elements.isDeleted, false))
-    .orderBy(desc(elements.updatedAt))
+  const uid = await currentUserId()
+  const allElements = uid
+    ? await db
+        .select()
+        .from(elements)
+        .where(and(eq(elements.isDeleted, false), eq(elements.createdBy, uid)))
+        .orderBy(desc(elements.updatedAt))
+    : []
 
   if (format === "json") {
     return JSON.stringify(allElements, null, 2)
@@ -36,6 +40,7 @@ export async function exportElements(format: ExportFormat) {
 }
 
 export async function exportTasks(projectId: string, format: ExportFormat) {
+  await requireOwnedElement(projectId)
   const projectTasks = await db
     .select()
     .from(tasks)
@@ -82,16 +87,28 @@ export async function exportTasks(projectId: string, format: ExportFormat) {
 }
 
 export async function exportAllData() {
+  const uid = await currentUserId()
+  if (!uid) {
+    return JSON.stringify({ exportedAt: new Date().toISOString(), version: "1.0", elements: [], tasks: [], taskStatuses: [], taskLabels: [], todoItems: [], processSteps: [] }, null, 2)
+  }
+
+  // Scope every table to the calling user's own elements.
   const allElements = await db
     .select()
     .from(elements)
-    .where(eq(elements.isDeleted, false))
+    .where(and(eq(elements.isDeleted, false), eq(elements.createdBy, uid)))
+  const elementIds = allElements.map((e) => e.id)
 
-  const allTasks = await db.select().from(tasks)
-  const allStatuses = await db.select().from(taskStatuses)
-  const allLabels = await db.select().from(taskLabels)
-  const allTodoItems = await db.select().from(todoItems)
-  const allProcessSteps = await db.select().from(processSteps)
+  const allTasks = elementIds.length ? await db.select().from(tasks).where(inArray(tasks.projectId, elementIds)) : []
+  const allStatuses = elementIds.length ? await db.select().from(taskStatuses).where(inArray(taskStatuses.projectId, elementIds)) : []
+  const allTodoItems = elementIds.length ? await db.select().from(todoItems).where(inArray(todoItems.listId, elementIds)) : []
+  const allProcessSteps = elementIds.length ? await db.select().from(processSteps).where(inArray(processSteps.processId, elementIds)) : []
+
+  // Only the labels actually attached to the user's tasks.
+  const taskIds = allTasks.map((t) => t.id)
+  const labelLinks = taskIds.length ? await db.select().from(taskToLabels).where(inArray(taskToLabels.taskId, taskIds)) : []
+  const labelIds = [...new Set(labelLinks.map((l) => l.labelId))]
+  const allLabels = labelIds.length ? await db.select().from(taskLabels).where(inArray(taskLabels.id, labelIds)) : []
 
   return JSON.stringify(
     {

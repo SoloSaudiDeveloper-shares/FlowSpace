@@ -283,6 +283,22 @@ export async function updateUser(
     isActive?: boolean
   }
 ) {
+  const me = await getCurrentUser()
+  if (!me) throw new Error("Not authenticated")
+  const isAdmin = me.role === "owner" || me.role === "admin"
+
+  // Non-admins may only edit their OWN profile, and never role/isActive.
+  if (!isAdmin) {
+    if (id !== me.id) throw new Error("Forbidden")
+    if (data.role !== undefined || data.isActive !== undefined) {
+      throw new Error("Forbidden")
+    }
+  }
+  // Only an owner can grant the owner role (prevents admin → owner escalation).
+  if (data.role === "owner" && me.role !== "owner") {
+    throw new Error("Forbidden")
+  }
+
   const now = new Date().toISOString()
   await db
     .update(users)
@@ -293,6 +309,10 @@ export async function updateUser(
 }
 
 export async function deleteUser(id: string) {
+  const me = await getCurrentUser()
+  if (!me || (me.role !== "owner" && me.role !== "admin")) {
+    throw new Error("Forbidden")
+  }
   const user = await getUser(id)
   if (!user) return
   if (user.role === "owner") return

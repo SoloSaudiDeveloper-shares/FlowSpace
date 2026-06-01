@@ -38,6 +38,28 @@ async function ownsProject(projectId: string): Promise<boolean> {
   return rows.length > 0
 }
 
+/**
+ * Gate a mutating action: throws "Forbidden" unless the caller owns the
+ * project. Combine with a `projectId` constraint on the row-level WHERE so a
+ * caller can't touch another project's rows by passing a mismatched id.
+ */
+async function requireProjectAccess(projectId: string): Promise<void> {
+  if (!(await ownsProject(projectId))) throw new Error("Forbidden")
+}
+
+/**
+ * Return only the task ids that actually belong to `projectId` (used to scope
+ * bulk operations so a caller can't smuggle in ids from another project).
+ */
+async function idsInProject(taskIds: string[], projectId: string): Promise<string[]> {
+  if (!taskIds.length) return []
+  const rows = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(and(inArray(tasks.id, taskIds), eq(tasks.projectId, projectId)))
+  return rows.map((r) => r.id)
+}
+
 // ─── Task Statuses ──────────────────────────────────────────────────────
 
 export async function getTaskStatuses(projectId: string) {
@@ -53,6 +75,7 @@ export async function createTaskStatus(
   projectId: string,
   data: { name: string; color: string; isDoneState?: boolean }
 ) {
+  await requireProjectAccess(projectId)
   const existing = await getTaskStatuses(projectId)
   const maxOrder = existing.length > 0
     ? Math.max(...existing.map((s) => s.sortOrder))
@@ -77,12 +100,21 @@ export async function updateTaskStatus(
   projectId: string,
   data: { name?: string; color?: string; isDoneState?: boolean; sortOrder?: number }
 ) {
-  await db.update(taskStatuses).set(data).where(eq(taskStatuses.id, id))
+  await requireProjectAccess(projectId)
+  await db.update(taskStatuses).set(data).where(and(eq(taskStatuses.id, id), eq(taskStatuses.projectId, projectId)))
   revalidatePath(`/projects/${projectId}`)
 }
 
 export async function deleteTaskStatus(id: string, projectId: string) {
-  await db.delete(tasks).where(eq(tasks.statusId, id))
+  await requireProjectAccess(projectId)
+  // Only delete the column + its tasks if the column actually belongs here.
+  const owned = await db
+    .select({ id: taskStatuses.id })
+    .from(taskStatuses)
+    .where(and(eq(taskStatuses.id, id), eq(taskStatuses.projectId, projectId)))
+    .limit(1)
+  if (!owned.length) return
+  await db.delete(tasks).where(and(eq(tasks.statusId, id), eq(tasks.projectId, projectId)))
   await db.delete(taskStatuses).where(eq(taskStatuses.id, id))
   revalidatePath(`/projects/${projectId}`)
 }
@@ -108,6 +140,7 @@ export async function createTask(
     repeatRule?: string | null
   }
 ) {
+  await requireProjectAccess(projectId)
   const existing = await db
     .select()
     .from(tasks)
@@ -160,6 +193,7 @@ export async function updateTask(
     repeatRule?: string | null
   }
 ) {
+  await requireProjectAccess(projectId)
   const now = new Date().toISOString()
 
   const updateData: Record<string, unknown> = { ...data, updatedAt: now }
@@ -171,7 +205,7 @@ export async function updateTask(
   // to spawn the next occurrence of a recurring task.
   let cur: typeof tasks.$inferSelect | undefined
   if (data.isCompleted === true) {
-    const rows = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+    const rows = await db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, projectId))).limit(1)
     cur = rows[0]
     const startedAt = cur?.timeTrackingStartedAt
     if (startedAt) {
@@ -181,7 +215,7 @@ export async function updateTask(
     }
   }
 
-  await db.update(tasks).set(updateData).where(eq(tasks.id, id))
+  await db.update(tasks).set(updateData).where(and(eq(tasks.id, id), eq(tasks.projectId, projectId)))
 
   // Recurrence: completing a repeating task spawns its next occurrence with
   // the date(s) rolled forward. The completed copy stays in Done.
@@ -231,7 +265,8 @@ export async function updateTask(
 }
 
 export async function deleteTask(id: string, projectId: string) {
-  await db.delete(tasks).where(eq(tasks.id, id))
+  await requireProjectAccess(projectId)
+  await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, projectId)))
   await db
     .update(elements)
     .set({ updatedAt: new Date().toISOString() })
@@ -246,8 +281,9 @@ export async function deleteTask(id: string, projectId: string) {
  * is completed, or it's deleted. No-op if already running.
  */
 export async function startTaskTimer(id: string, projectId: string) {
+  await requireProjectAccess(projectId)
   const now = new Date().toISOString()
-  const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+  const cur = await db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, projectId))).limit(1)
   if (!cur[0] || cur[0].timeTrackingStartedAt) return
   await db.update(tasks).set({ timeTrackingStartedAt: now, updatedAt: now }).where(eq(tasks.id, id))
   await db.update(elements).set({ updatedAt: now }).where(eq(elements.id, projectId))
@@ -256,8 +292,9 @@ export async function startTaskTimer(id: string, projectId: string) {
 
 /** Stop the timer and bank the elapsed seconds into timeTracked. No-op if not running. */
 export async function stopTaskTimer(id: string, projectId: string) {
+  await requireProjectAccess(projectId)
   const now = new Date().toISOString()
-  const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+  const cur = await db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, projectId))).limit(1)
   if (!cur[0] || !cur[0].timeTrackingStartedAt) return
   const elapsed = Math.max(0, Math.floor((Date.now() - new Date(cur[0].timeTrackingStartedAt).getTime()) / 1000))
   await db
@@ -281,8 +318,10 @@ export async function bulkUpdateTasks(
   },
 ) {
   if (!taskIds.length) return
+  await requireProjectAccess(projectId)
+  const ids = await idsInProject(taskIds, projectId)
   const now = new Date().toISOString()
-  for (const id of taskIds) {
+  for (const id of ids) {
     const updateData: Record<string, unknown> = { ...data, updatedAt: now }
     if (data.isCompleted !== undefined) {
       updateData.completedAt = data.isCompleted ? now : null
@@ -304,7 +343,9 @@ export async function bulkUpdateTasks(
 export async function bulkAddComment(taskIds: string[], projectId: string, content: string) {
   const text = content.trim()
   if (!taskIds.length || !text) return
-  for (const id of taskIds) {
+  await requireProjectAccess(projectId)
+  const ids = await idsInProject(taskIds, projectId)
+  for (const id of ids) {
     await db.insert(taskComments).values({ id: createId(), taskId: id, content: text })
   }
   revalidatePath(`/projects/${projectId}`)
@@ -313,8 +354,10 @@ export async function bulkAddComment(taskIds: string[], projectId: string, conte
 /** Start (running=true) or stop the timer on many tasks at once. */
 export async function bulkSetTimer(taskIds: string[], projectId: string, running: boolean) {
   if (!taskIds.length) return
+  await requireProjectAccess(projectId)
+  const ids = await idsInProject(taskIds, projectId)
   const now = new Date().toISOString()
-  for (const id of taskIds) {
+  for (const id of ids) {
     const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
     if (!cur[0]) continue
     if (running && !cur[0].timeTrackingStartedAt) {
@@ -333,7 +376,9 @@ export async function bulkSetTimer(taskIds: string[], projectId: string, running
 
 export async function bulkDeleteTasks(taskIds: string[], projectId: string) {
   if (!taskIds.length) return
-  for (const id of taskIds) await db.delete(tasks).where(eq(tasks.id, id))
+  await requireProjectAccess(projectId)
+  const ids = await idsInProject(taskIds, projectId)
+  for (const id of ids) await db.delete(tasks).where(eq(tasks.id, id))
   await db.update(elements).set({ updatedAt: new Date().toISOString() }).where(eq(elements.id, projectId))
   revalidatePath(`/projects/${projectId}`)
 }
@@ -341,7 +386,9 @@ export async function bulkDeleteTasks(taskIds: string[], projectId: string) {
 /** Attach a label to many tasks at once (skips ones that already have it). */
 export async function bulkAddLabel(taskIds: string[], projectId: string, labelId: string) {
   if (!taskIds.length || !labelId) return
-  for (const id of taskIds) {
+  await requireProjectAccess(projectId)
+  const ids = await idsInProject(taskIds, projectId)
+  for (const id of ids) {
     const existing = await db
       .select()
       .from(taskToLabels)
@@ -356,8 +403,10 @@ export async function bulkAddLabel(taskIds: string[], projectId: string, labelId
 /** Post each selected task to the activity feed (one event per task). */
 export async function bulkAddToFeed(taskIds: string[], projectId: string, note?: string) {
   if (!taskIds.length) return
+  await requireProjectAccess(projectId)
   const uid = await currentUserId()
-  const rows = await db.select().from(tasks).where(inArray(tasks.id, taskIds))
+  const ids = await idsInProject(taskIds, projectId)
+  const rows = ids.length ? await db.select().from(tasks).where(inArray(tasks.id, ids)) : []
   const summary = note?.trim()
   for (const t of rows) {
     await createFeedEvent({
@@ -381,12 +430,13 @@ export async function moveTask(
   newStatusId: string,
   newSortOrder: number
 ) {
+  await requireProjectAccess(projectId)
   const now = new Date().toISOString()
 
   const status = await db
     .select()
     .from(taskStatuses)
-    .where(eq(taskStatuses.id, newStatusId))
+    .where(and(eq(taskStatuses.id, newStatusId), eq(taskStatuses.projectId, projectId)))
     .limit(1)
 
   await db
@@ -398,7 +448,7 @@ export async function moveTask(
       completedAt: status[0]?.isDoneState ? now : null,
       updatedAt: now,
     })
-    .where(eq(tasks.id, taskId))
+    .where(and(eq(tasks.id, taskId), eq(tasks.projectId, projectId)))
 
   // Update project progress
   const allTasks = await db.select().from(tasks).where(eq(tasks.projectId, projectId))
@@ -438,6 +488,7 @@ export async function createSubtask(
   parentTaskId: string,
   title: string,
 ) {
+  await requireProjectAccess(projectId)
   const existing = await getSubtasks(parentTaskId)
   const maxOrder =
     existing.length > 0
@@ -483,6 +534,7 @@ export async function getTaskLabels(taskId: string) {
 }
 
 export async function addLabelToTask(taskId: string, labelId: string, projectId: string) {
+  await requireProjectAccess(projectId)
   const existing = await db
     .select()
     .from(taskToLabels)
@@ -495,6 +547,7 @@ export async function addLabelToTask(taskId: string, labelId: string, projectId:
 }
 
 export async function removeLabelFromTask(taskId: string, labelId: string, projectId: string) {
+  await requireProjectAccess(projectId)
   await db
     .delete(taskToLabels)
     .where(and(eq(taskToLabels.taskId, taskId), eq(taskToLabels.labelId, labelId)))
@@ -523,6 +576,7 @@ export async function getTaskChecklists(taskId: string) {
 }
 
 export async function createChecklist(taskId: string, title: string, projectId: string) {
+  await requireProjectAccess(projectId)
   const existing = await db
     .select()
     .from(taskChecklists)
@@ -542,6 +596,7 @@ export async function createChecklist(taskId: string, title: string, projectId: 
 }
 
 export async function deleteChecklist(id: string, projectId: string) {
+  await requireProjectAccess(projectId)
   await db.delete(taskChecklistItems).where(eq(taskChecklistItems.checklistId, id))
   await db.delete(taskChecklists).where(eq(taskChecklists.id, id))
   revalidatePath(`/projects/${projectId}`)
@@ -552,6 +607,7 @@ export async function addChecklistItem(
   title: string,
   projectId: string,
 ) {
+  await requireProjectAccess(projectId)
   const existing = await db
     .select()
     .from(taskChecklistItems)
@@ -571,6 +627,7 @@ export async function addChecklistItem(
 }
 
 export async function toggleChecklistItem(id: string, isCompleted: boolean, projectId: string) {
+  await requireProjectAccess(projectId)
   await db
     .update(taskChecklistItems)
     .set({
@@ -582,6 +639,7 @@ export async function toggleChecklistItem(id: string, isCompleted: boolean, proj
 }
 
 export async function deleteChecklistItem(id: string, projectId: string) {
+  await requireProjectAccess(projectId)
   await db.delete(taskChecklistItems).where(eq(taskChecklistItems.id, id))
   revalidatePath(`/projects/${projectId}`)
 }
@@ -690,6 +748,7 @@ export async function addTaskDependency(
   type: "blocks" | "blocked_by" | "relates_to",
   projectId: string,
 ) {
+  await requireProjectAccess(projectId)
   const existing = await db
     .select()
     .from(taskDependencies)
@@ -714,6 +773,7 @@ export async function addTaskDependency(
 }
 
 export async function removeTaskDependency(id: string, projectId: string) {
+  await requireProjectAccess(projectId)
   await db.delete(taskDependencies).where(eq(taskDependencies.id, id))
   revalidatePath(`/projects/${projectId}`)
 }
@@ -721,10 +781,11 @@ export async function removeTaskDependency(id: string, projectId: string) {
 // ─── Duplicate Task ───────────────────────────────────────────────────
 
 export async function duplicateTask(taskId: string, projectId: string) {
+  await requireProjectAccess(projectId)
   const original = await db
     .select()
     .from(tasks)
-    .where(eq(tasks.id, taskId))
+    .where(and(eq(tasks.id, taskId), eq(tasks.projectId, projectId)))
     .limit(1)
 
   if (original.length === 0) return null

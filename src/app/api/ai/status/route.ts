@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createOllamaClient } from "@/lib/ai/ollama-client"
+import { currentUserId } from "@/lib/auth/scope"
 
 /**
  * GET /api/ai/status?ollamaUrl=...
@@ -8,6 +9,9 @@ import { createOllamaClient } from "@/lib/ai/ollama-client"
  */
 export async function GET(request: NextRequest) {
   try {
+    if (!(await currentUserId())) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     const ollamaUrl = request.nextUrl.searchParams.get("ollamaUrl") || undefined
     const client = createOllamaClient(ollamaUrl)
     const available = await client.isAvailable()

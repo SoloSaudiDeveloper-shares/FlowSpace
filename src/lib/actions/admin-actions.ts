@@ -10,6 +10,7 @@ import path from "node:path"
 import os from "node:os"
 
 import { getDataDir } from "@/lib/utils/data-dir"
+import { requireAdmin } from "@/lib/auth/scope"
 
 const DATA_DIR = getDataDir()
 const DB_PATH = path.join(DATA_DIR, "app.db")
@@ -44,6 +45,7 @@ export async function getServerHealth(): Promise<{
   uploadsSize: number
   backupsSize: number
 }> {
+  await requireAdmin()
   const dbSize = fs.existsSync(DB_PATH) ? fs.statSync(DB_PATH).size : 0
   const uploadsSize = getDirSize(UPLOADS_DIR)
   const backupsSize = getDirSize(BACKUPS_DIR)
@@ -63,6 +65,7 @@ export async function getServerHealth(): Promise<{
 export async function getDatabaseStats(): Promise<{
   tables: Array<{ name: string; rowCount: number }>
 }> {
+  await requireAdmin()
   const tableNames = [
     "elements",
     "tasks",
@@ -116,6 +119,7 @@ export async function getDatabaseStats(): Promise<{
 }
 
 export async function getActiveSessionCount(): Promise<number> {
+  await requireAdmin()
   const now = new Date().toISOString()
   const result = await db
     .select({ count: sql<number>`count(*)` })
@@ -125,6 +129,7 @@ export async function getActiveSessionCount(): Promise<number> {
 }
 
 export async function getRecentServerEvents(limit = 50) {
+  await requireAdmin()
   return db
     .select()
     .from(serverEvents)
@@ -164,6 +169,7 @@ export async function logServerEvent(data: {
 }
 
 export async function getStorageBreakdown() {
+  await requireAdmin()
   const dbSize = fs.existsSync(DB_PATH) ? fs.statSync(DB_PATH).size : 0
   const uploadsSize = getDirSize(UPLOADS_DIR)
   const backupsSize = getDirSize(BACKUPS_DIR)
@@ -197,6 +203,7 @@ export async function getStorageBreakdown() {
 }
 
 export async function cleanupExpiredSessions() {
+  await requireAdmin()
   const now = new Date().toISOString()
   const result = sqlite
     .prepare(`DELETE FROM sessions WHERE expires_at < ?`)
@@ -206,6 +213,7 @@ export async function cleanupExpiredSessions() {
 }
 
 export async function getSystemInfo() {
+  await requireAdmin()
   const cpus = os.cpus()
 
   return {

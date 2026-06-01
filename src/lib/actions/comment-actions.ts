@@ -7,6 +7,7 @@ import { eq, desc, asc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { createMentionsFromText } from "@/lib/actions/mention-actions"
 import { getCurrentUser } from "@/lib/actions/user-actions"
+import { requireOwnedElement } from "@/lib/auth/scope"
 
 export async function getTaskComments(taskId: string) {
   return db
@@ -21,6 +22,7 @@ export async function addTaskComment(
   content: string,
   projectId: string,
 ) {
+  await requireOwnedElement(projectId)
   const id = createId()
   const now = new Date().toISOString()
 
@@ -60,6 +62,7 @@ export async function updateComment(
   content: string,
   projectId: string,
 ) {
+  await requireOwnedElement(projectId)
   await db
     .update(taskComments)
     .set({ content, updatedAt: new Date().toISOString() })
@@ -69,6 +72,7 @@ export async function updateComment(
 }
 
 export async function deleteComment(id: string, projectId: string) {
+  await requireOwnedElement(projectId)
   await db.delete(taskComments).where(eq(taskComments.id, id))
   revalidatePath(`/projects/${projectId}`)
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createOllamaClient } from "@/lib/ai/ollama-client"
+import { currentUserId } from "@/lib/auth/scope"
 
 /**
  * POST /api/ai/chat
@@ -18,6 +19,11 @@ import { createOllamaClient } from "@/lib/ai/ollama-client"
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth-gate: this route fetches an arbitrary `ollamaUrl` server-side, so
+    // only authenticated users may drive it (prevents anonymous SSRF probing).
+    if (!(await currentUserId())) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     const body = await request.json()
     const {
       model,
