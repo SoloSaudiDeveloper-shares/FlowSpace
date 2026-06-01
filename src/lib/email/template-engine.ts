@@ -18,6 +18,7 @@
  */
 
 import "server-only"
+import { escapeHtml as escapeHtmlStr } from "@/lib/utils"
 
 export interface TemplateContext {
   [key: string]: unknown
@@ -39,12 +40,7 @@ function lookup(ctx: TemplateContext, path: string): unknown {
 
 /** Escape HTML to keep the template safe against context with markup. */
 function escapeHtml(s: unknown): string {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
+  return escapeHtmlStr(String(s))
 }
 
 /**

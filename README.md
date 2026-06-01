@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FlowSpace
 
-## Getting Started
+A self-hosted, local-first productivity workspace — projects, tasks (board /
+list / table / calendar / gantt), pages, canvases, todo lists, reminders,
+processes, forms, automations, an activity feed, and a Telegram bot. Built to
+run on your own box with no external database.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router, `output: "standalone"`) — note: the middleware
+  lives in `src/proxy.ts` (renamed in this Next version).
+- **SQLite** via **better-sqlite3** + **Drizzle ORM** — the DB is a single file
+  under `./data/app.db`; schema bootstraps itself on first boot (no migration
+  CLI needed). Uploads + backups also live under `./data`.
+- **React 19**, **Tailwind v4**, **base-ui** primitives, shadcn-style components.
+- Optional integrations: Google OAuth + Calendar sync, outbound email
+  (Resend or Gmail SMTP), inbound email, a per-user Telegram bot, and a generic
+  AI provider (OpenAI-compatible, local Ollama, Gemini, or Anthropic).
+
+## Quick start (development)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # fill in only what you need; all of it is optional
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The first run creates `./data/app.db` and bootstraps the schema. To seed an
+initial admin user, see the scripts under `scripts/` (e.g. `bootstrap-admin.mjs`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Every integration is optional and toggled by environment variables — the app
+boots fine with none set. See **`.env.example`** for the full annotated list
+(public URL, Google OAuth/Calendar, email transports, inbound-email secret,
+Telegram voice, local AI). AI provider keys for in-app features are configured
+per-user in **Settings → AI** (stored in the DB, never in env).
 
-## Learn More
+## Production / self-hosting
 
-To learn more about Next.js, take a look at the following resources:
+- **`BUILD.md`** — building the standalone bundle.
+- **`DEPLOY.md`** — general deployment notes.
+- **`ORACLE-DEPLOY.md`** — the reference deployment: Docker on an Oracle ARM VM
+  behind Caddy (HTTPS) + Cloudflare.
+- **`OLLAMA.md`** — wiring up a local LLM.
+- **`FEATURES.md`** — feature overview.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run build   # next build, standalone output
+npm start       # serve the built app
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Back up by copying the `./data` directory (DB + uploads) — that's the whole
+application state.

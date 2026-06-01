@@ -23,6 +23,7 @@ import { eq, inArray } from "drizzle-orm"
 import { requireAuth } from "@/lib/auth/scope"
 import { sendEmail, isEmailConfigured } from "@/lib/email/send"
 import { createFeedEvent } from "@/lib/actions/feed-actions"
+import { escapeHtml, escapeAttr } from "@/lib/utils"
 
 const PRIORITY_TONE: Record<string, { label: string; color: string }> = {
   urgent: { label: "Urgent", color: "#ef4444" },
@@ -391,16 +392,4 @@ function buildEmailBody(args: {
 
 function metaRow(label: string, valueHtml: string): string {
   return `<tr><td style="padding:4px 16px 4px 0;color:#64748b;font-size:13px;">${escapeHtml(label)}</td><td style="padding:4px 0;font-size:13px;">${valueHtml}</td></tr>`
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
-}
-function escapeAttr(s: string): string {
-  return escapeHtml(s)
 }

@@ -23,6 +23,7 @@ import ExcelJS from "exceljs"
 import { sqlite } from "@/lib/db"
 import { requireAuth } from "@/lib/auth/scope"
 import { sendEmail, isEmailConfigured } from "@/lib/email/send"
+import { escapeHtml } from "@/lib/utils"
 
 export interface TodoListExportResult {
   ok: true
@@ -239,12 +240,4 @@ export async function emailTodoListXlsx(
     ],
   })
   return result.ok ? { ok: true } : result
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
 }

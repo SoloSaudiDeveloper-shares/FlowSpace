@@ -123,14 +123,9 @@ export function CommandPalette() {
             href: getElementHref({ id: el.id, type: el.type }),
           },
         }))
-        const stats = await embeddingsIndex.syncIndex(entries)
+        await embeddingsIndex.syncIndex(entries)
         if (!cancelled) {
           setIndexStatus("ready")
-          if (stats.added > 0 || stats.updated > 0 || stats.removed > 0) {
-            console.log(
-              `[Embeddings] Sync complete: +${stats.added} added, ~${stats.updated} updated, -${stats.removed} removed, =${stats.unchanged} unchanged`
-            )
-          }
         }
       } catch (err) {
         console.error("[Embeddings] Sync failed:", err)

@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react"
 
@@ -588,8 +589,16 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Memoize so the context value is stable across renders that don't change
+  // preferences — this provider wraps the whole app, so an unmemoized value
+  // would re-render every consumer (sidebar, pages, widgets) on every tick.
+  const value = useMemo(
+    () => ({ preferences, updatePreference, resetPreferences }),
+    [preferences, updatePreference, resetPreferences],
+  )
+
   return (
-    <PreferencesContext.Provider value={{ preferences, updatePreference, resetPreferences }}>
+    <PreferencesContext.Provider value={value}>
       {children}
     </PreferencesContext.Provider>
   )

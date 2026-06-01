@@ -10,7 +10,7 @@
  * the user's preference loads.
  */
 
-import { createContext, useContext, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useCallback, type ReactNode } from "react"
 import { translate, localeDirection, type Locale } from "@/lib/i18n/strings"
 import { usePreferences } from "@/lib/hooks/use-preferences"
 
@@ -32,17 +32,14 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     document.documentElement.dir = localeDirection(locale)
   }, [locale])
 
-  return (
-    <I18nContext.Provider
-      value={{
-        locale,
-        t: (key) => translate(locale, key),
-        setLocale: (l) => updatePreference("locale", l),
-      }}
-    >
-      {children}
-    </I18nContext.Provider>
-  )
+  const t = useCallback((key: string) => translate(locale, key), [locale])
+  const setLocale = useCallback((l: Locale) => updatePreference("locale", l), [updatePreference])
+
+  // Stable value so every useT() consumer (used pervasively, e.g. the whole
+  // sidebar) doesn't re-render on unrelated provider renders.
+  const value = useMemo(() => ({ locale, t, setLocale }), [locale, t, setLocale])
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 
 export function useT() {
