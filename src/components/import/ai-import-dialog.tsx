@@ -52,17 +52,18 @@ import {
   type ImportElementType,
 } from "@/lib/import/ai-import-parser"
 import { importFromAI } from "@/lib/actions/import-actions"
+import { useT } from "@/lib/hooks/use-i18n"
 
 const TYPE_META: Record<
   ImportElementType,
-  { label: string; icon: React.ComponentType<{ className?: string }>; color: string; href: (id: string) => string }
+  { labelKey: string; icon: React.ComponentType<{ className?: string }>; color: string; href: (id: string) => string }
 > = {
-  project:  { label: "Project",   icon: FolderKanban, color: "#a78bfa", href: (id) => `/projects/${id}` },
-  page:     { label: "Page",      icon: FileText,     color: "#60a5fa", href: (id) => `/pages/${id}` },
-  todo:     { label: "Todo list", icon: ListTodo,     color: "#fbbf24", href: (id) => `/todos/${id}` },
-  canvas:   { label: "Canvas",    icon: Layout,       color: "#67e8f9", href: (id) => `/canvas/${id}` },
-  reminder: { label: "Reminder",  icon: Bell,         color: "#fb7185", href: () => `/reminders` },
-  process:  { label: "Process",   icon: GitBranch,    color: "#6ee7b7", href: (id) => `/process/${id}` },
+  project:  { labelKey: "misc.import.typeProject",  icon: FolderKanban, color: "#a78bfa", href: (id) => `/projects/${id}` },
+  page:     { labelKey: "misc.import.typePage",     icon: FileText,     color: "#60a5fa", href: (id) => `/pages/${id}` },
+  todo:     { labelKey: "misc.import.typeTodo",     icon: ListTodo,     color: "#fbbf24", href: (id) => `/todos/${id}` },
+  canvas:   { labelKey: "misc.import.typeCanvas",   icon: Layout,       color: "#67e8f9", href: (id) => `/canvas/${id}` },
+  reminder: { labelKey: "misc.import.typeReminder", icon: Bell,         color: "#fb7185", href: () => `/reminders` },
+  process:  { labelKey: "misc.import.typeProcess",  icon: GitBranch,    color: "#6ee7b7", href: (id) => `/process/${id}` },
 }
 
 import { PRIORITY_BY_VALUE as PRIORITY_META } from "@/lib/priority"
@@ -74,6 +75,7 @@ export function AIImportDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
+  const { t } = useT()
   const router = useRouter()
   const [text, setText] = useState("")
   const [importing, setImporting] = useState(false)
@@ -90,9 +92,9 @@ export function AIImportDialog({
       await navigator.clipboard.writeText(AI_PROMPT_TEMPLATE)
       setPromptCopied(true)
       setTimeout(() => setPromptCopied(false), 1500)
-      toast.success("Prompt copied — paste it into Claude or ChatGPT")
+      toast.success(t("misc.import.promptCopied"))
     } catch {
-      toast.error("Couldn't copy. Select the prompt text manually.")
+      toast.error(t("misc.import.copyError"))
     }
   }
 
@@ -102,13 +104,13 @@ export function AIImportDialog({
     try {
       const result = await importFromAI(parsed)
       if (result.ok) {
-        toast.success(`Imported "${parsed.title}"`)
+        toast.success(t("misc.import.imported").replace("{title}", parsed.title))
         setImported({ id: result.id, type: parsed.type })
       } else {
         toast.error(result.error)
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Import failed")
+      toast.error(err instanceof Error ? err.message : t("misc.import.importFailed"))
     } finally {
       setImporting(false)
     }
@@ -129,11 +131,10 @@ export function AIImportDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary" />
-            Import from AI
+            {t("misc.import.title")}
           </DialogTitle>
           <DialogDescription>
-            Brainstorm with Claude or ChatGPT, then paste their structured output here.
-            FlowSpace creates the project, tasks, and notes automatically.
+            {t("misc.import.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -156,14 +157,14 @@ export function AIImportDialog({
             <div className="flex flex-col gap-2 min-h-0">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Paste markdown
+                  {t("misc.import.pasteMarkdown")}
                 </span>
                 <button
                   onClick={copyPrompt}
                   className="text-xs flex items-center gap-1 px-2 py-1 rounded-md border bg-card hover:bg-accent transition-colors"
                 >
                   {promptCopied ? <Check className="size-3" /> : <Clipboard className="size-3" />}
-                  {promptCopied ? "Copied" : "Copy AI prompt"}
+                  {promptCopied ? t("misc.import.copied") : t("misc.import.copyPrompt")}
                 </button>
               </div>
               <textarea
@@ -184,15 +185,15 @@ Heading to Tokyo for two weeks…`}
                 className="flex-1 min-h-[260px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
               />
               <p className="text-[11px] text-muted-foreground leading-snug">
-                Tip: hit <strong>&ldquo;Copy AI prompt&rdquo;</strong> above, paste it into Claude/ChatGPT after your brainstorm — they&apos;ll output exactly what you need to paste back here.
+                {t("misc.import.tip")}
               </p>
-              <SectionHelp guideId="markdownFormat" label="Markdown format guide" />
+              <SectionHelp guideId="markdownFormat" label={t("misc.import.markdownGuide")} />
             </div>
 
             {/* ── Preview ────────────────────────────────────────── */}
             <div className="flex flex-col gap-2 min-h-0">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Preview
+                {t("misc.import.preview")}
               </span>
               <div className="flex-1 min-h-[260px] rounded-md border border-border/60 bg-card/40 overflow-y-auto p-4">
                 {parsed ? <Preview parsed={parsed} /> : <EmptyPreview />}
@@ -204,7 +205,7 @@ Heading to Tokyo for two weeks…`}
         {!imported && (
           <div className="flex items-center justify-end gap-2 pt-2 border-t">
             <Button variant="ghost" onClick={close} disabled={importing}>
-              Cancel
+              {t("misc.import.cancel")}
             </Button>
             <Button onClick={handleImport} disabled={!parsed || importing}>
               {importing ? (
@@ -212,7 +213,7 @@ Heading to Tokyo for two weeks…`}
               ) : (
                 <ArrowRight className="size-3.5 mr-1.5" />
               )}
-              {importing ? "Importing…" : "Import"}
+              {importing ? t("misc.import.importing") : t("misc.import.importButton")}
             </Button>
           </div>
         )}
@@ -224,6 +225,7 @@ Heading to Tokyo for two weeks…`}
 // ─── Preview pane ───────────────────────────────────────────────────────
 
 function Preview({ parsed }: { parsed: ParsedImport }) {
+  const { t } = useT()
   const meta = TYPE_META[parsed.type]
   const Icon = meta.icon
   return (
@@ -237,7 +239,7 @@ function Preview({ parsed }: { parsed: ParsedImport }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            {meta.label}
+            {t(meta.labelKey)}
           </div>
           <div className="text-base font-semibold truncate">{parsed.title}</div>
         </div>
@@ -249,7 +251,7 @@ function Preview({ parsed }: { parsed: ParsedImport }) {
           <Pill label={parsed.status} tone="muted" />
         )}
         {parsed.dueDate && (
-          <Pill icon={CalendarClock} label={`Due ${parsed.dueDate}`} tone="muted" />
+          <Pill icon={CalendarClock} label={t("misc.import.due").replace("{date}", parsed.dueDate)} tone="muted" />
         )}
         {parsed.tags.map((t) => (
           <Pill key={t} icon={Tag} label={t} tone="muted" />
@@ -260,32 +262,32 @@ function Preview({ parsed }: { parsed: ParsedImport }) {
       {parsed.tasks.length > 0 && (
         <div>
           <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
-            {parsed.tasks.length} task{parsed.tasks.length === 1 ? "" : "s"}
+            {(parsed.tasks.length === 1 ? t("misc.import.taskCount") : t("misc.import.taskCountPlural")).replace("{count}", String(parsed.tasks.length))}
           </div>
           <div className="space-y-1">
-            {parsed.tasks.map((t, i) => {
-              const p = PRIORITY_META[t.priority]
+            {parsed.tasks.map((task, i) => {
+              const p = PRIORITY_META[task.priority]
               return (
                 <div key={i} className="flex items-center gap-2 text-xs">
-                  {t.isCompleted ? (
+                  {task.isCompleted ? (
                     <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
                   ) : (
                     <Circle className="size-3.5 text-muted-foreground shrink-0" />
                   )}
-                  <span className={`flex-1 truncate ${t.isCompleted ? "line-through text-muted-foreground" : ""}`}>
-                    {t.title}
+                  <span className={`flex-1 truncate ${task.isCompleted ? "line-through text-muted-foreground" : ""}`}>
+                    {task.title}
                   </span>
-                  {t.priority !== "none" && (
+                  {task.priority !== "none" && (
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0"
                       style={{ background: `${p.color}25`, color: p.color }}
                     >
-                      {t.priority === "urgent" || t.priority === "high" ? <Flame className="size-2.5" /> : null}
+                      {task.priority === "urgent" || task.priority === "high" ? <Flame className="size-2.5" /> : null}
                       {p.label}
                     </span>
                   )}
-                  {t.dueDate && (
-                    <span className="text-[10px] text-muted-foreground shrink-0">{t.dueDate}</span>
+                  {task.dueDate && (
+                    <span className="text-[10px] text-muted-foreground shrink-0">{task.dueDate}</span>
                   )}
                 </div>
               )
@@ -298,7 +300,7 @@ function Preview({ parsed }: { parsed: ParsedImport }) {
       {parsed.notes && (
         <div>
           <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
-            Notes
+            {t("misc.import.notes")}
           </div>
           <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed line-clamp-6">
             {parsed.notes}
@@ -311,7 +313,7 @@ function Preview({ parsed }: { parsed: ParsedImport }) {
         <div className="px-3 py-2 rounded-md border border-amber-500/40 bg-amber-500/5">
           <div className="text-[11px] font-medium text-amber-200/90 flex items-center gap-1.5 mb-1">
             <AlertTriangle className="size-3" />
-            {parsed.warnings.length} warning{parsed.warnings.length === 1 ? "" : "s"}
+            {(parsed.warnings.length === 1 ? t("misc.import.warningCount") : t("misc.import.warningCountPlural")).replace("{count}", String(parsed.warnings.length))}
           </div>
           <ul className="text-[11px] text-amber-200/70 space-y-0.5 list-disc pl-4">
             {parsed.warnings.map((w, i) => (
@@ -325,11 +327,12 @@ function Preview({ parsed }: { parsed: ParsedImport }) {
 }
 
 function EmptyPreview() {
+  const { t } = useT()
   return (
     <div className="h-full flex flex-col items-center justify-center text-center text-xs text-muted-foreground gap-2">
       <Sparkles className="size-6 opacity-30" />
-      <p>Paste FlowSpace-format markdown to see a preview.</p>
-      <p className="opacity-60">First line must look like <code className="px-1 rounded bg-muted">{`# Project: Title`}</code>.</p>
+      <p>{t("misc.import.emptyPreview")}</p>
+      <p className="opacity-60">{t("misc.import.emptyPreviewHint")} <code className="px-1 rounded bg-muted">{`# Project: Title`}</code>.</p>
     </div>
   )
 }
@@ -362,7 +365,9 @@ function SuccessState({
   onOpen: () => void
   onAnother: () => void
 }) {
+  const { t } = useT()
   const meta = TYPE_META[type]
+  const typeLabel = t(meta.labelKey).toLowerCase()
   return (
     <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
       <div
@@ -372,17 +377,17 @@ function SuccessState({
         <CheckCircle2 className="size-7" />
       </div>
       <div>
-        <p className="text-lg font-semibold">Imported</p>
+        <p className="text-lg font-semibold">{t("misc.import.successTitle")}</p>
         <p className="text-sm text-muted-foreground">
-          Your new {meta.label.toLowerCase()} is ready in your workspace.
+          {t("misc.import.successBody").replace("{type}", typeLabel)}
         </p>
       </div>
       <div className="flex gap-2">
         <Button variant="outline" onClick={onAnother}>
-          Import another
+          {t("misc.import.importAnother")}
         </Button>
         <Button onClick={onOpen}>
-          Open {meta.label.toLowerCase()}
+          {t("misc.import.openType").replace("{type}", typeLabel)}
           <ArrowRight className="size-3.5 ml-1.5" />
         </Button>
       </div>

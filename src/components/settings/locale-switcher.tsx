@@ -19,8 +19,10 @@ import {
   type ArabicFont,
 } from "@/lib/hooks/use-preferences"
 import { LOCALES } from "@/lib/i18n/strings"
+import { useT } from "@/lib/hooks/use-i18n"
 
 export function LocaleSwitcher() {
+  const { t } = useT()
   const { preferences, updatePreference } = usePreferences()
   const locale = preferences.locale === "ar" ? "ar" : "en"
   const arabicFont = preferences.arabicFont ?? "cairo"
@@ -30,13 +32,10 @@ export function LocaleSwitcher() {
       <div className="px-4 py-3 rounded-lg border bg-card">
         <div className="flex items-center gap-2 mb-2">
           <Globe className="size-3.5 text-muted-foreground" />
-          <h3 className="text-sm font-medium">Language</h3>
+          <h3 className="text-sm font-medium">{t("settings.locale.language")}</h3>
         </div>
         <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-          Switches the chrome strings (sidebar, page titles, login, settings
-          tabs, common buttons) and flips the whole layout to right-to-left
-          for Arabic. Some deep page content still falls back to English —
-          coverage is expanding.
+          {t("settings.locale.languageHelp")}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {LOCALES.map((l) => {
@@ -66,17 +65,15 @@ export function LocaleSwitcher() {
       <div className="px-4 py-3 rounded-lg border bg-card">
         <div className="flex items-center gap-2 mb-2">
           <Type className="size-3.5 text-muted-foreground" />
-          <h3 className="text-sm font-medium">Arabic font</h3>
+          <h3 className="text-sm font-medium">{t("settings.locale.arabicFont")}</h3>
           {locale !== "ar" && (
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
-              applies in Arabic
+              {t("settings.locale.appliesInArabic")}
             </span>
           )}
         </div>
         <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-          The default UI fonts don&apos;t include Arabic letters, so Arabic
-          gets its own typeface. Pick whichever you like best — it applies
-          across the whole app whenever the language is Arabic.
+          {t("settings.locale.arabicFontHelp")}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {ARABIC_FONT_OPTIONS.map((font) => {
@@ -96,7 +93,7 @@ export function LocaleSwitcher() {
                   <span className="text-sm font-semibold">{font.label}</span>
                   {isActive && (
                     <span className="text-[10px] uppercase tracking-wider text-primary font-medium">
-                      active
+                      {t("settings.locale.active")}
                     </span>
                   )}
                 </div>
@@ -119,11 +116,10 @@ export function LocaleSwitcher() {
       <div className="px-4 py-3 rounded-lg border bg-card">
         <div className="flex items-center gap-2 mb-2">
           <Sparkles className="size-3.5 text-muted-foreground" />
-          <h3 className="text-sm font-medium">Onboarding tour</h3>
+          <h3 className="text-sm font-medium">{t("settings.locale.tour")}</h3>
         </div>
         <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-          The 7-step guided tour that runs the first time you sign in. Replay
-          it any time to re-discover what's where.
+          {t("settings.locale.tourHelp")}
         </p>
         <Button
           size="sm"
@@ -131,12 +127,12 @@ export function LocaleSwitcher() {
           className="h-8 text-xs gap-1.5"
           onClick={() => {
             updatePreference("onboardingCompletedAt", "")
-            toast.success("Tour will play again on next reload")
+            toast.success(t("settings.locale.tourReplayToast"))
             setTimeout(() => window.location.reload(), 800)
           }}
         >
           <Sparkles className="size-3" />
-          Replay tour
+          {t("settings.locale.replayTour")}
         </Button>
       </div>
     </div>

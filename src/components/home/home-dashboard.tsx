@@ -47,6 +47,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { useWorkspaceName } from "@/lib/hooks/use-workspace-name"
+import { useT } from "@/lib/hooks/use-i18n"
 import { useAuth } from "@/lib/hooks/use-auth"
 import {
   usePreferences,
@@ -69,18 +70,18 @@ import { Inbox } from "lucide-react"
 const TYPE_META: Record<
   keyof DashboardSummary["counts"],
   {
-    label: string
+    labelKey: string
     icon: React.ComponentType<{ className?: string }>
     accent: string // hex
     href: string
   }
 > = {
-  project:   { label: "Projects",   icon: FolderKanban, accent: "#a78bfa", href: "/?type=project" },
-  page:      { label: "Pages",      icon: FileText,     accent: "#60a5fa", href: "/?type=page" },
-  canvas:    { label: "Canvases",   icon: Layout,       accent: "#67e8f9", href: "/?type=canvas" },
-  todo_list: { label: "Todo lists", icon: ListTodo,     accent: "#fbbf24", href: "/?type=todo_list" },
-  reminder:  { label: "Reminders",  icon: Bell,         accent: "#fb7185", href: "/?type=reminder" },
-  process:   { label: "Processes",  icon: GitBranch,    accent: "#6ee7b7", href: "/?type=process" },
+  project:   { labelKey: "home.type.projects",  icon: FolderKanban, accent: "#a78bfa", href: "/?type=project" },
+  page:      { labelKey: "home.type.pages",     icon: FileText,     accent: "#60a5fa", href: "/?type=page" },
+  canvas:    { labelKey: "home.type.canvases",  icon: Layout,       accent: "#67e8f9", href: "/?type=canvas" },
+  todo_list: { labelKey: "home.type.todoLists", icon: ListTodo,     accent: "#fbbf24", href: "/?type=todo_list" },
+  reminder:  { labelKey: "home.type.reminders", icon: Bell,         accent: "#fb7185", href: "/?type=reminder" },
+  process:   { labelKey: "home.type.processes", icon: GitBranch,    accent: "#6ee7b7", href: "/?type=process" },
 }
 
 const PROJECT_STATUS_COLORS = {
@@ -90,10 +91,10 @@ const PROJECT_STATUS_COLORS = {
   completed: "#6ee7b7",
 }
 
-function greeting(name?: string | null) {
+/** Returns the dict key for the time-of-day greeting. */
+function greetingKey() {
   const h = new Date().getHours()
-  const part = h < 5 ? "Working late" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
-  return name ? `${part}, ${name.split(" ")[0]}` : part
+  return h < 5 ? "home.greeting.late" : h < 12 ? "home.greeting.morning" : h < 18 ? "home.greeting.afternoon" : "home.greeting.evening"
 }
 
 function isSectionVisible(prefs: Record<string, boolean | undefined>, key: HomeSectionKey): boolean {
@@ -109,14 +110,19 @@ function HeroBlock({
   onCustomize: () => void
   onImport: () => void
 }) {
+  const { t } = useT()
   const { workspaceName } = useWorkspaceName()
   const { user } = useAuth()
   const { preferences } = usePreferences()
   const suffix = preferences.workspaceSuffix
+  const firstName = user?.displayName?.split(" ")[0]
+  const greetingText = firstName
+    ? `${t(greetingKey())}, ${firstName}`
+    : t(greetingKey())
   return (
     <div className="flex items-end justify-between gap-4 pb-1">
       <div>
-        <p className="text-sm text-muted-foreground">{greeting(user?.displayName)}</p>
+        <p className="text-sm text-muted-foreground">{greetingText}</p>
         <h1 className="text-3xl font-bold tracking-tight mt-1">
           {workspaceName}
           {suffix && <span className="text-muted-foreground font-medium">: {suffix}</span>}
@@ -130,7 +136,7 @@ function HeroBlock({
           className="gap-1.5 text-muted-foreground hover:text-foreground"
         >
           <Sparkles className="size-3.5" />
-          Import from AI
+          {t("home.hero.importFromAi")}
         </Button>
         <Button
           variant="ghost"
@@ -139,7 +145,7 @@ function HeroBlock({
           className="gap-1.5 text-muted-foreground hover:text-foreground"
         >
           <Settings2 className="size-3.5" />
-          Customize
+          {t("home.hero.customize")}
         </Button>
       </div>
     </div>
@@ -150,6 +156,7 @@ function HeroBlock({
 
 function KpiRow({ counts }: { counts: DashboardSummary["counts"] }) {
   const router = useRouter()
+  const { t } = useT()
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       {(Object.keys(TYPE_META) as (keyof typeof TYPE_META)[]).map((key) => {
@@ -190,7 +197,7 @@ function KpiRow({ counts }: { counts: DashboardSummary["counts"] }) {
             </div>
             <div className="relative">
               <div className="text-2xl font-bold tabular-nums leading-none">{c.total}</div>
-              <div className="text-xs text-muted-foreground mt-1.5">{meta.label}</div>
+              <div className="text-xs text-muted-foreground mt-1.5">{t(meta.labelKey)}</div>
             </div>
           </button>
         )
@@ -261,6 +268,7 @@ function ProjectPulse({
   avgProgress: number
   taskTotals: DashboardSummary["taskTotals"]
 }) {
+  const { t } = useT()
   const total =
     projectStatus.active +
     projectStatus.planning +
@@ -268,10 +276,10 @@ function ProjectPulse({
     projectStatus.completed
 
   const segments = [
-    { label: "Active",    value: projectStatus.active,    color: PROJECT_STATUS_COLORS.active },
-    { label: "Planning",  value: projectStatus.planning,  color: PROJECT_STATUS_COLORS.planning },
-    { label: "Paused",    value: projectStatus.paused,    color: PROJECT_STATUS_COLORS.paused },
-    { label: "Completed", value: projectStatus.completed, color: PROJECT_STATUS_COLORS.completed },
+    { key: "active",    label: t("home.pulse.status.active"),    value: projectStatus.active,    color: PROJECT_STATUS_COLORS.active },
+    { key: "planning",  label: t("home.pulse.status.planning"),  value: projectStatus.planning,  color: PROJECT_STATUS_COLORS.planning },
+    { key: "paused",    label: t("home.pulse.status.paused"),    value: projectStatus.paused,    color: PROJECT_STATUS_COLORS.paused },
+    { key: "completed", label: t("home.pulse.status.completed"), value: projectStatus.completed, color: PROJECT_STATUS_COLORS.completed },
   ]
 
   return (
@@ -279,9 +287,11 @@ function ProjectPulse({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold flex items-center gap-2">
           <Sparkles className="size-3.5 text-primary" />
-          Project pulse
+          {t("home.pulse.title")}
         </h2>
-        <span className="text-xs text-muted-foreground">{total} project{total === 1 ? "" : "s"}</span>
+        <span className="text-xs text-muted-foreground">
+          {t(total === 1 ? "home.pulse.projectCount" : "home.pulse.projectCountP").replace("{n}", String(total))}
+        </span>
       </div>
 
       <div className="grid grid-cols-[auto_1fr] gap-5 items-center">
@@ -289,16 +299,16 @@ function ProjectPulse({
         <div className="relative">
           <Donut segments={segments} />
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-xs text-muted-foreground">Overall</span>
+            <span className="text-xs text-muted-foreground">{t("home.pulse.overall")}</span>
             <span className="text-2xl font-bold tabular-nums">{avgProgress}%</span>
-            <span className="text-[10px] text-muted-foreground">complete</span>
+            <span className="text-[10px] text-muted-foreground">{t("home.pulse.complete")}</span>
           </div>
         </div>
 
         {/* Legend */}
         <div className="space-y-1.5">
           {segments.map((s) => (
-            <div key={s.label} className="flex items-center gap-2 text-xs">
+            <div key={s.key} className="flex items-center gap-2 text-xs">
               <span
                 className="size-2.5 rounded-sm shrink-0"
                 style={{ background: s.color }}
@@ -312,9 +322,9 @@ function ProjectPulse({
 
       {/* Task stats row */}
       <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t border-border/60">
-        <Stat label="Open tasks"  value={taskTotals.open}    icon={Clock}        tone="muted" />
-        <Stat label="Done"        value={taskTotals.done}    icon={CheckCircle2} tone="good" />
-        <Stat label="Overdue"     value={taskTotals.overdue} icon={AlertCircle}  tone={taskTotals.overdue > 0 ? "bad" : "muted"} />
+        <Stat label={t("home.pulse.stat.openTasks")} value={taskTotals.open}    icon={Clock}        tone="muted" />
+        <Stat label={t("home.pulse.stat.done")}      value={taskTotals.done}    icon={CheckCircle2} tone="good" />
+        <Stat label={t("home.pulse.stat.overdue")}   value={taskTotals.overdue} icon={AlertCircle}  tone={taskTotals.overdue > 0 ? "bad" : "muted"} />
       </div>
     </div>
   )
@@ -348,24 +358,25 @@ function Stat({
 
 function TodayBlock({ upcoming }: { upcoming: DashboardSummary["upcoming"] }) {
   const router = useRouter()
+  const { t } = useT()
   const overdueCount = upcoming.filter((u) => u.overdue).length
   return (
     <div className="rounded-xl border bg-card p-5 flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold flex items-center gap-2">
           <Clock className="size-3.5 text-primary" />
-          Today & upcoming
+          {t("home.today.title")}
         </h2>
         {overdueCount > 0 && (
           <span className="text-[11px] font-medium text-rose-400 flex items-center gap-1">
             <AlertCircle className="size-3" />
-            {overdueCount} overdue
+            {t("home.today.overdue").replace("{n}", String(overdueCount))}
           </span>
         )}
       </div>
       {upcoming.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-6">
-          Nothing on the radar for the next 7 days. Quiet seas ahead.
+          {t("home.today.empty")}
         </p>
       ) : (
         <div className="space-y-1 -mx-1 flex-1">
@@ -388,7 +399,7 @@ function TodayBlock({ upcoming }: { upcoming: DashboardSummary["upcoming"] }) {
                   <span className="block truncate">{item.title}</span>
                   {item.projectTitle && (
                     <span className="block text-[10px] text-muted-foreground/70 truncate">
-                      in {item.projectTitle}
+                      {t("home.today.inProject").replace("{project}", item.projectTitle)}
                     </span>
                   )}
                 </span>
@@ -411,6 +422,7 @@ function TodayBlock({ upcoming }: { upcoming: DashboardSummary["upcoming"] }) {
 // ─── Activity heatmap (30-day) ────────────────────────────────────────────
 
 function ActivityHeatmap({ days }: { days: { date: string; count: number }[] }) {
+  const { t } = useT()
   const max = useMemo(() => Math.max(1, ...days.map((d) => d.count)), [days])
   const total = days.reduce((s, d) => s + d.count, 0)
   const activeDays = days.filter((d) => d.count > 0).length
@@ -419,10 +431,13 @@ function ActivityHeatmap({ days }: { days: { date: string; count: number }[] }) 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold flex items-center gap-2">
           <TrendingUp className="size-3.5 text-primary" />
-          Activity — last 30 days
+          {t("home.activity.title")}
         </h2>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {total} event{total === 1 ? "" : "s"} · {activeDays}/{days.length} days active
+          {t(total === 1 ? "home.activity.summary" : "home.activity.summaryP")
+            .replace("{events}", String(total))
+            .replace("{active}", String(activeDays))
+            .replace("{total}", String(days.length))}
         </span>
       </div>
       <div className="flex items-end gap-1 h-20">
@@ -432,7 +447,9 @@ function ActivityHeatmap({ days }: { days: { date: string; count: number }[] }) 
           return (
             <div
               key={d.date}
-              title={`${d.date} — ${d.count} event${d.count === 1 ? "" : "s"}`}
+              title={t(d.count === 1 ? "home.activity.dayTooltip" : "home.activity.dayTooltipP")
+                .replace("{date}", d.date)
+                .replace("{n}", String(d.count))}
               className="flex-1 rounded-sm transition-colors hover:bg-primary"
               style={{
                 height: `${h}px`,
@@ -447,7 +464,7 @@ function ActivityHeatmap({ days }: { days: { date: string; count: number }[] }) 
       </div>
       <div className="flex justify-between text-[10px] text-muted-foreground/70 mt-2">
         <span>{days[0]?.date.slice(5)}</span>
-        <span>Today</span>
+        <span>{t("home.activity.today")}</span>
       </div>
     </div>
   )
@@ -457,6 +474,7 @@ function ActivityHeatmap({ days }: { days: { date: string; count: number }[] }) 
 
 function QuickCaptureCompact() {
   const router = useRouter()
+  const { t } = useT()
   const [title, setTitle] = useState("")
   const [type, setType] = useState<ElementType>("project")
   const [busy, setBusy] = useState(false)
@@ -484,11 +502,11 @@ function QuickCaptureCompact() {
     <div className="rounded-xl border bg-card p-5">
       <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
         <Sparkles className="size-3.5 text-primary" />
-        Capture
+        {t("home.capture.title")}
       </h2>
       <div className="relative">
         <Input
-          placeholder="What's on your mind?"
+          placeholder={t("home.capture.placeholder")}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") go() }}
@@ -499,7 +517,7 @@ function QuickCaptureCompact() {
             onTranscript={(t) => setTitle((p) => p ? `${p} ${t}` : t)}
             size="sm"
             showPulse
-            tooltip="Speak (high-accuracy Whisper)"
+            tooltip={t("home.capture.speakTip")}
             preferAccuracy
           />
           {title.trim() && (
@@ -510,13 +528,13 @@ function QuickCaptureCompact() {
         </div>
       </div>
       <div className="flex flex-wrap gap-1 mt-3">
-        {(["project", "page", "canvas", "todo_list", "reminder", "process"] as ElementType[]).map((t) => {
-          const m = TYPE_META[t as keyof typeof TYPE_META]
-          const active = type === t
+        {(["project", "page", "canvas", "todo_list", "reminder", "process"] as ElementType[]).map((et) => {
+          const m = TYPE_META[et as keyof typeof TYPE_META]
+          const active = type === et
           return (
             <button
-              key={t}
-              onClick={() => setType(t)}
+              key={et}
+              onClick={() => setType(et)}
               className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${
                 active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
@@ -526,7 +544,7 @@ function QuickCaptureCompact() {
                   : { borderColor: "rgba(255,255,255,0.08)" }
               }
             >
-              {m.label.toLowerCase()}
+              {t(m.labelKey)}
             </button>
           )
         })}
@@ -550,6 +568,7 @@ function RecentRow({
   favorites: Element[]
 }) {
   const router = useRouter()
+  const { t } = useT()
   const [tab, setTab] = useState<"recent" | "favorites">("recent")
   const list = tab === "recent" ? recent.slice(0, 8) : favorites.slice(0, 8)
   const TypeIcons: Record<ElementType, React.ComponentType<{ className?: string }>> = {
@@ -577,7 +596,7 @@ function RecentRow({
           }`}
         >
           <Clock className="size-3.5" />
-          Recent
+          {t("home.recent.tab.recent")}
         </button>
         <span className="text-muted-foreground/40">·</span>
         <button
@@ -587,12 +606,12 @@ function RecentRow({
           }`}
         >
           <Star className="size-3.5" />
-          Favorites
+          {t("home.recent.tab.favorites")}
         </button>
       </div>
       {list.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-6">
-          {tab === "recent" ? "Nothing recent yet." : "Star items from the sidebar to pin them here."}
+          {tab === "recent" ? t("home.recent.empty.recent") : t("home.recent.empty.favorites")}
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -632,6 +651,7 @@ function CustomizeDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
+  const { t } = useT()
   const { preferences, updatePreference } = usePreferences()
   const sections = preferences.homeSections ?? {}
   function toggle(key: HomeSectionKey) {
@@ -643,10 +663,9 @@ function CustomizeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Customize home</DialogTitle>
+          <DialogTitle>{t("home.customize.title")}</DialogTitle>
           <DialogDescription>
-            Toggle the panels you want on your home page. Hidden panels can be
-            re-added any time.
+            {t("home.customize.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
@@ -665,7 +684,7 @@ function CustomizeDialog({
                 <div>
                   <p className="text-sm font-medium">{HOME_SECTION_LABELS[k]}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {visible ? "Visible on home" : "Hidden"}
+                    {visible ? t("home.customize.visible") : t("home.customize.hidden")}
                   </p>
                 </div>
                 {visible ? (
@@ -693,6 +712,7 @@ export function HomeDashboard({
   recent: Element[]
   favorites: Element[]
 }) {
+  const { t } = useT()
   const [customizing, setCustomizing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [inboxOpen, setInboxOpen] = useState(false)
@@ -739,14 +759,14 @@ export function HomeDashboard({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">
-              {pendingCount} import{pendingCount === 1 ? "" : "s"} waiting for your review
+              {t(pendingCount === 1 ? "home.pending.title" : "home.pending.titleP").replace("{n}", String(pendingCount))}
             </p>
             <p className="text-xs text-muted-foreground">
-              Payloads from your Telegram bot — preview & approve before they land in the workspace.
+              {t("home.pending.desc")}
             </p>
           </div>
           <span className="text-xs text-primary font-medium group-hover:translate-x-0.5 transition-transform">
-            Review →
+            {t("home.pending.review")}
           </span>
         </button>
       )}

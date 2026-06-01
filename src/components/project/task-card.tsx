@@ -22,6 +22,7 @@ import {
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { useT } from "@/lib/hooks/use-i18n"
 import { deleteTask, updateTask, duplicateTask, restoreTasks } from "@/lib/actions/task-actions"
 import { toast } from "sonner"
 import type { tasks, taskLabels } from "@/lib/db/schema"
@@ -71,6 +72,7 @@ export function TaskCard({
   selected = false,
   onToggleSelect,
 }: TaskCardProps) {
+  const { t } = useT()
   const [popover, setPopover] = useState<{ kind: MetaKind; x: number; y: number } | null>(null)
   function openPopover(kind: MetaKind, e: React.MouseEvent) {
     e.stopPropagation()
@@ -99,28 +101,28 @@ export function TaskCard({
   function handleContextMenu(e: React.MouseEvent) {
     const items: ContextMenuEntry[] = [
       {
-        label: "Edit",
+        label: t("proj.menu.edit"),
         onClick: onClick,
       },
       {
-        label: task.isCompleted ? "Mark Incomplete" : "Mark Complete",
+        label: task.isCompleted ? t("proj.menu.markIncompleteCap") : t("proj.menu.markCompleteCap"),
         icon: task.isCompleted ? Square : CheckSquare,
         onClick: () => updateTask(task.id, task.projectId, { isCompleted: !task.isCompleted }),
       },
       {
-        label: "Duplicate",
+        label: t("proj.menu.duplicate"),
         icon: Copy,
         onClick: () => duplicateTask(task.id, task.projectId),
       },
       { separator: true },
       {
-        label: "Delete",
+        label: t("proj.menu.delete"),
         icon: Trash2,
         variant: "destructive",
         onClick: async () => {
           const snap = await deleteTask(task.id, task.projectId)
-          toast.success("Task deleted", {
-            action: snap ? { label: "Undo", onClick: () => restoreTasks([snap], task.projectId) } : undefined,
+          toast.success(t("proj.toast.taskDeleted"), {
+            action: snap ? { label: t("proj.toast.undo"), onClick: () => restoreTasks([snap], task.projectId) } : undefined,
           })
         },
       },
@@ -141,13 +143,13 @@ export function TaskCard({
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === "Enter") (selectMode ? onToggleSelect?.(task.id) : onClick()) }}
-        aria-label={`Task: ${task.title}${task.isCompleted ? " (completed)" : ""}`}
+        aria-label={(task.isCompleted ? t("proj.card.taskCompleted") : t("proj.card.task")).replace("{title}", task.title)}
       >
         {selectMode ? (
           <button
             className="mt-0.5 shrink-0"
             onClick={(e) => { e.stopPropagation(); onToggleSelect?.(task.id) }}
-            aria-label={selected ? "Deselect" : "Select"}
+            aria-label={selected ? t("proj.row.deselect") : t("proj.row.select")}
           >
             {selected ? (
               <CheckSquare className="size-4 text-primary" />
@@ -158,7 +160,7 @@ export function TaskCard({
         ) : (
           <button
             className="mt-0.5 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-            aria-label="Drag to reorder"
+            aria-label={t("proj.card.dragToReorder")}
             {...attributes}
             {...listeners}
           >
@@ -183,7 +185,7 @@ export function TaskCard({
                 }
               }}
               className="mt-0.5 shrink-0"
-              aria-label={task.isCompleted ? "Mark incomplete" : "Mark complete"}
+              aria-label={task.isCompleted ? t("proj.card.markIncomplete") : t("proj.card.markComplete")}
             >
               {task.isCompleted ? (
                 <CheckSquare className="size-3.5 text-primary" />
@@ -217,7 +219,7 @@ export function TaskCard({
           {/* Bottom indicators row */}
           <div className="flex items-center gap-2.5 mt-2 flex-wrap">
             {task.priority !== "none" && (
-              <Flag className="size-3" style={{ color: priority.color }} aria-label={`Priority: ${priority.label}`} />
+              <Flag className="size-3" style={{ color: priority.color }} aria-label={t("proj.card.priority").replace("{label}", priority.label)} />
             )}
 
             {task.dueDate && (
@@ -228,11 +230,11 @@ export function TaskCard({
             )}
 
             {hasDescription && (
-              <FileText className="size-3 text-muted-foreground" aria-label="Has description" />
+              <FileText className="size-3 text-muted-foreground" aria-label={t("proj.card.hasDescription")} />
             )}
 
             {task.repeatRule && (
-              <Repeat className="size-3 text-muted-foreground" aria-label="Repeats" />
+              <Repeat className="size-3 text-muted-foreground" aria-label={t("proj.card.repeats")} />
             )}
 
             {subtaskCount > 0 && (
@@ -261,7 +263,7 @@ export function TaskCard({
               <button
                 onClick={(e) => openPopover("attachments", e)}
                 className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-                title="Attachments"
+                title={t("proj.card.attachments")}
               >
                 <Paperclip className="size-3" />
                 {attachmentCount}
@@ -271,7 +273,7 @@ export function TaskCard({
               <button
                 onClick={(e) => openPopover("dependencies", e)}
                 className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-                title="Dependencies"
+                title={t("proj.card.dependencies")}
               >
                 <Link2 className="size-3" />
                 {dependencyCount}
@@ -281,7 +283,7 @@ export function TaskCard({
               <button
                 onClick={(e) => openPopover("comments", e)}
                 className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-                title="Comments"
+                title={t("proj.card.comments")}
               >
                 <MessageCircle className="size-3" />
                 {commentCount}

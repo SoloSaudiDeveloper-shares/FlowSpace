@@ -83,6 +83,7 @@ import { EmailInSection } from "@/components/settings/email-in-section"
 import { CalendarSyncSection } from "@/components/settings/calendar-sync-section"
 import { VoiceUsageCard } from "@/components/settings/voice-usage-card"
 import { getTelegramFeatureEnabled } from "@/lib/actions/telegram-actions"
+import { useT } from "@/lib/hooks/use-i18n"
 
 /** Small sub-component so we can use the JSX-tag form on a dynamic icon. */
 function DescriptionPanel({
@@ -90,17 +91,18 @@ function DescriptionPanel({
 }: {
   item: { icon: React.ComponentType<{ className?: string }>; label: string; description: string }
 }) {
+  const { t } = useT()
   const Icon = item.icon
   return (
     <aside
       className="sticky top-0 hidden xl:flex flex-col w-64 shrink-0 border-l border-border/40 bg-card/30 h-screen overflow-hidden"
-      aria-label="Section description"
+      aria-label={t("settings.currentSection")}
     >
       {/* Inner scroll area — keeps the bg painting full-height even when
           content is short, while still allowing scroll for long copy. */}
       <div className="flex flex-col gap-3 p-5 overflow-y-auto">
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">
-          Current section
+          {t("settings.currentSection")}
         </div>
         <div
           key={item.label}
@@ -121,6 +123,7 @@ function DescriptionPanel({
 }
 
 export function SettingsContent() {
+  const { t } = useT()
   const [exporting, setExporting] = useState(false)
   const [promptsDialogOpen, setPromptsDialogOpen] = useState(false)
   const { preferences, updatePreference, resetPreferences } = usePreferences()
@@ -159,7 +162,7 @@ export function SettingsContent() {
     if (!isOwner) return
     const trimmed = workspaceNameDraft.trim()
     if (!trimmed) {
-      toast.error("Workspace name cannot be empty")
+      toast.error(t("settings.workspace.name.empty"))
       return
     }
     setWorkspaceNameSaving(true)
@@ -168,9 +171,9 @@ export function SettingsContent() {
       await setWorkspaceName(trimmed)
       // Notify in-tab listeners (sidebar) so they re-fetch without reload.
       window.dispatchEvent(new CustomEvent("flowspace:workspace-name-changed"))
-      toast.success("Workspace name updated for everyone")
+      toast.success(t("settings.workspace.name.updated"))
     } catch {
-      toast.error("Failed to update workspace name")
+      toast.error(t("settings.workspace.name.failed"))
     } finally {
       setWorkspaceNameSaving(false)
     }
@@ -183,9 +186,9 @@ export function SettingsContent() {
       const { setSignupsEnabled } = await import("@/lib/actions/server-settings-actions")
       await setSignupsEnabled(!signupsEnabled)
       setSignupsEnabledLocal(!signupsEnabled)
-      toast.success(!signupsEnabled ? "Signups opened" : "Signups closed")
+      toast.success(!signupsEnabled ? t("settings.workspace.signups.opened") : t("settings.workspace.signups.closed"))
     } catch {
-      toast.error("Failed to update signups setting")
+      toast.error(t("settings.workspace.signups.failed"))
     } finally {
       setSignupsSaving(false)
     }
@@ -197,9 +200,9 @@ export function SettingsContent() {
     try {
       const { setSessionDurationMs } = await import("@/lib/actions/server-settings-actions")
       await setSessionDurationMs(sessionMinutes * 60_000)
-      toast.success(`Sessions now last ${formatDuration(sessionMinutes)}`)
+      toast.success(t("settings.workspace.session.saved").replace("{duration}", formatDuration(sessionMinutes)))
     } catch {
-      toast.error("Failed to update session duration")
+      toast.error(t("settings.workspace.session.failed"))
     } finally {
       setSessionSaving(false)
     }
@@ -236,9 +239,9 @@ export function SettingsContent() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast.success("Export downloaded")
+      toast.success(t("settings.export.downloaded"))
     } catch {
-      toast.error("Export failed")
+      toast.error(t("settings.export.failed"))
     } finally {
       setExporting(false)
     }
@@ -264,11 +267,11 @@ export function SettingsContent() {
     return `${d} day${d === 1 ? "" : "s"}`
   }
   const SESSION_PRESETS = [
-    { label: "3 minutes", min: 3 },
-    { label: "1 hour", min: 60 },
-    { label: "1 day", min: 1440 },
-    { label: "7 days (default)", min: 7 * 1440 },
-    { label: "30 days", min: 30 * 1440 },
+    { label: t("settings.workspace.session.preset.3min"), min: 3 },
+    { label: t("settings.workspace.session.preset.1hour"), min: 60 },
+    { label: t("settings.workspace.session.preset.1day"), min: 1440 },
+    { label: t("settings.workspace.session.preset.7day"), min: 7 * 1440 },
+    { label: t("settings.workspace.session.preset.30day"), min: 30 * 1440 },
   ]
 
   // ── Top-tab groups — each tab gathers a few related sub-sections ──
@@ -279,11 +282,11 @@ export function SettingsContent() {
     | "integrations"
     | "help"
   const SETTINGS_GROUPS: { id: SettingsGroup; label: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
-    { id: "account",      label: "Account",      icon: KeyIcon,  description: "Sign-in, password, workspace administration." },
-    { id: "data",         label: "Data",         icon: Database, description: "Export your data and define custom fields." },
-    { id: "look",         label: "Look & feel",  icon: Palette,  description: "Theme, sidebar, clock, feed ticker, Gantt." },
-    { id: "integrations", label: "Integrations", icon: Sparkles, description: "Voice, AI provider, Telegram bot." },
-    { id: "help",         label: "Help",         icon: Info,     description: "Keyboard shortcuts and app info." },
+    { id: "account",      label: t("settings.group.account.label"),      icon: KeyIcon,  description: t("settings.group.account.desc") },
+    { id: "data",         label: t("settings.group.data.label"),         icon: Database, description: t("settings.group.data.desc") },
+    { id: "look",         label: t("settings.group.look.label"),         icon: Palette,  description: t("settings.group.look.desc") },
+    { id: "integrations", label: t("settings.group.integrations.label"), icon: Sparkles, description: t("settings.group.integrations.desc") },
+    { id: "help",         label: t("settings.group.help.label"),         icon: Info,     description: t("settings.group.help.desc") },
   ]
 
   // ── Settings navigation (in-page anchor links within each tab) ──
@@ -295,24 +298,24 @@ export function SettingsContent() {
     ownerOnly?: boolean
     group: SettingsGroup
   }[] = [
-    { id: "account",        label: "Account",       icon: KeyIcon,    group: "account",      description: "Your personal sign-in details. Change your password — other devices get signed out automatically." },
-    { id: "workspace",      label: "Workspace",     icon: Shield,     group: "account", ownerOnly: true, description: "Owner-only controls. Allow or block new signups, set how long user sessions stay valid." },
-    { id: "data-export",    label: "Data export",   icon: Database,   group: "data",         description: "Export everything you own — projects, pages, tasks, comments — as JSON or spreadsheet-friendly formats. For backups and migrations." },
-    { id: "custom-fields",  label: "Custom fields", icon: Settings2,  group: "data",         description: "Define your own fields (text, number, select, date, etc.) and attach them to elements or tasks. Use these to model anything your work needs." },
-    { id: "appearance",     label: "Appearance",    icon: Palette,    group: "look",         description: "Font, font size, accent color, border radius. The whole UI re-themes instantly when you change these." },
-    { id: "sidebar",        label: "Sidebar",       icon: PanelLeft,  group: "look",         description: "Show/hide and reorder the sidebar sections. Give them custom names that fit your workflow." },
-    { id: "clock",          label: "Clock",         icon: ClockIcon,  group: "look",         description: "The clock pinned in the corner. Right-click it for quick changes (color, format) or use this section for finer control." },
-    { id: "feed-ticker",    label: "Feed ticker",   icon: Rss,        group: "look",         description: "The scrolling activity bar at the top of every page. Choose top or bottom, direction, speed." },
-    { id: "gantt",          label: "Gantt chart",   icon: BarChart2,  group: "look",         description: "Which fields show in Gantt task tooltips." },
-    { id: "speech",         label: "Speech",        icon: Mic,        group: "integrations", description: "Voice input. Pick between the browser's built-in Web Speech API (Chrome/Edge, fast) or a local Whisper model (private, all browsers, downloads a model)." },
-    { id: "ai",             label: "AI features",   icon: Sparkles,   group: "integrations", description: "Hook the AI features up to a provider — local Ollama, OpenAI, Gemini, LM Studio, or any custom OpenAI-compatible endpoint. Keys stay in your browser." },
-    { id: "telegram",       label: "Telegram",      icon: Bot,        group: "integrations", description: "Connect your own Telegram bot. Text it from anywhere — ideas become real items in FlowSpace. Each user has their own bot; nothing is shared." },
-    { id: "email-in",       label: "Email IN",      icon: Mic,        group: "integrations", description: "Forward emails to a webhook so they land as pending items in your bell. Approve to add to your Inbox list." },
-    { id: "calendar-sync",  label: "Calendar sync", icon: ClockIcon,  group: "integrations", description: "Push tasks with due dates to Google Calendar as all-day events. One-way, every 5 minutes." },
-    { id: "language",          label: "Language & tour",      icon: Globe,            group: "look", description: "Pick your interface language (English / العربية, with RTL support) and replay the first-run guided tour." },
-    { id: "guides",            label: "Guides",               icon: BookOpen,         group: "help", description: "Step-by-step how-tos for every feature — Telegram, Email & Markdown, Calendar sync, custom fields, API tokens." },
-    { id: "shortcuts",         label: "Shortcuts",            icon: Keyboard,         group: "help", description: "Keyboard shortcuts reference. Saves you a lot of clicking once you remember a few." },
-    { id: "about",          label: "About",         icon: Info,       group: "help",         description: "Version info and project links." },
+    { id: "account",        label: t("settings.nav.account.label"),       icon: KeyIcon,    group: "account",      description: t("settings.nav.account.desc") },
+    { id: "workspace",      label: t("settings.nav.workspace.label"),     icon: Shield,     group: "account", ownerOnly: true, description: t("settings.nav.workspace.desc") },
+    { id: "data-export",    label: t("settings.nav.dataExport.label"),    icon: Database,   group: "data",         description: t("settings.nav.dataExport.desc") },
+    { id: "custom-fields",  label: t("settings.nav.customFields.label"),  icon: Settings2,  group: "data",         description: t("settings.nav.customFields.desc") },
+    { id: "appearance",     label: t("settings.nav.appearance.label"),    icon: Palette,    group: "look",         description: t("settings.nav.appearance.desc") },
+    { id: "sidebar",        label: t("settings.nav.sidebar.label"),       icon: PanelLeft,  group: "look",         description: t("settings.nav.sidebar.desc") },
+    { id: "clock",          label: t("settings.nav.clock.label"),         icon: ClockIcon,  group: "look",         description: t("settings.nav.clock.desc") },
+    { id: "feed-ticker",    label: t("settings.nav.feedTicker.label"),    icon: Rss,        group: "look",         description: t("settings.nav.feedTicker.desc") },
+    { id: "gantt",          label: t("settings.nav.gantt.label"),         icon: BarChart2,  group: "look",         description: t("settings.nav.gantt.desc") },
+    { id: "speech",         label: t("settings.nav.speech.label"),        icon: Mic,        group: "integrations", description: t("settings.nav.speech.desc") },
+    { id: "ai",             label: t("settings.nav.ai.label"),            icon: Sparkles,   group: "integrations", description: t("settings.nav.ai.desc") },
+    { id: "telegram",       label: t("settings.nav.telegram.label"),      icon: Bot,        group: "integrations", description: t("settings.nav.telegram.desc") },
+    { id: "email-in",       label: t("settings.nav.emailIn.label"),       icon: Mic,        group: "integrations", description: t("settings.nav.emailIn.desc") },
+    { id: "calendar-sync",  label: t("settings.nav.calendarSync.label"),  icon: ClockIcon,  group: "integrations", description: t("settings.nav.calendarSync.desc") },
+    { id: "language",       label: t("settings.nav.language.label"),      icon: Globe,      group: "look",         description: t("settings.nav.language.desc") },
+    { id: "guides",         label: t("settings.nav.guides.label"),        icon: BookOpen,   group: "help",         description: t("settings.nav.guides.desc") },
+    { id: "shortcuts",      label: t("settings.nav.shortcuts.label"),     icon: Keyboard,   group: "help",         description: t("settings.nav.shortcuts.desc") },
+    { id: "about",          label: t("settings.nav.about.label"),         icon: Info,       group: "help",         description: t("settings.nav.about.desc") },
   ]
 
   // ── Active top-tab group — controls which sub-sections render ──
@@ -486,10 +489,10 @@ export function SettingsContent() {
       <section id="account" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <KeyIcon className="size-4" />
-          Account
+          {t("settings.account.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Your personal sign-in details.
+          {t("settings.account.subtitle")}
         </p>
         <AccountSection />
       </section>
@@ -499,21 +502,19 @@ export function SettingsContent() {
         <section id="workspace" className="scroll-mt-4">
           <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
             <Shield className="size-4" />
-            Workspace administration
+            {t("settings.workspace.title")}
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Visible to workspace owners only. Controls who can join.
+            {t("settings.workspace.subtitle")}
           </p>
           {/* ── Workspace name (admin sets the bold prefix everyone sees) ── */}
           <div className="px-4 py-3 rounded-lg border bg-card mb-3">
             <div className="flex items-center gap-2 mb-1">
               <PanelLeft className="size-3.5" />
-              <span className="text-sm font-medium">Workspace name</span>
+              <span className="text-sm font-medium">{t("settings.workspace.name.label")}</span>
             </div>
             <p className="text-xs text-muted-foreground mb-3">
-              The bold name shown in the sidebar header for every member.
-              Individual users can add a personal tagline under it from their
-              own sidebar — that doesn&apos;t affect anyone else.
+              {t("settings.workspace.name.help")}
             </p>
             <div className="flex items-center gap-2">
               <input
@@ -535,7 +536,7 @@ export function SettingsContent() {
                 ) : (
                   <Check className="size-3.5 mr-1.5" />
                 )}
-                Save
+                {t("common.save")}
               </Button>
             </div>
           </div>
@@ -544,14 +545,14 @@ export function SettingsContent() {
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   {signupsEnabled ? <UserPlus className="size-3.5 text-emerald-500" /> : <Lock className="size-3.5 text-muted-foreground" />}
-                  <span className="text-sm font-medium">Allow new account signups</span>
+                  <span className="text-sm font-medium">{t("settings.workspace.signups.label")}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {signupsEnabled === null
-                    ? "Loading…"
+                    ? t("common.loading")
                     : signupsEnabled
-                      ? "Anyone visiting the login page can create their own private workspace."
-                      : "The login page only shows Sign in. New signups are blocked."}
+                      ? t("settings.workspace.signups.on")
+                      : t("settings.workspace.signups.off")}
                 </p>
               </div>
               <button
@@ -577,14 +578,22 @@ export function SettingsContent() {
           <div className="px-4 py-3 rounded-lg border bg-card mt-3">
             <div className="flex items-center gap-2 mb-1">
               <ClockIcon className="size-3.5" />
-              <span className="text-sm font-medium">Session length</span>
+              <span className="text-sm font-medium">{t("settings.workspace.session.label")}</span>
             </div>
             <p className="text-xs text-muted-foreground mb-3">
-              How long users stay signed in after logging in. Applies to new
-              logins only — existing sessions keep their original expiry.
+              {t("settings.workspace.session.help")}
               {sessionMinutes !== null && (
                 <span className="ml-1 text-foreground/80">
-                  Currently <strong>{formatDuration(sessionMinutes)}</strong>.
+                  {(() => {
+                    const [a, b] = t("settings.workspace.session.current").split("{duration}")
+                    return (
+                      <>
+                        {a}
+                        <strong>{formatDuration(sessionMinutes)}</strong>
+                        {b}
+                      </>
+                    )
+                  })()}
                 </span>
               )}
             </p>
@@ -630,17 +639,17 @@ export function SettingsContent() {
       <section id="data-export" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Database className="size-4" />
-          Data Export
+          {t("settings.export.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Export your data for backup or migration purposes.
+          {t("settings.export.subtitle")}
         </p>
         <div className="space-y-3">
           <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card">
             <div>
-              <p className="text-sm font-medium">Full Backup</p>
+              <p className="text-sm font-medium">{t("settings.export.full.title")}</p>
               <p className="text-xs text-muted-foreground">
-                Export all elements, tasks, todos, and processes as JSON
+                {t("settings.export.full.desc")}
               </p>
             </div>
             <Button
@@ -650,15 +659,15 @@ export function SettingsContent() {
               onClick={() => handleExport("all", "json")}
             >
               <Download className="size-3.5 mr-1.5" />
-              Export JSON
+              {t("settings.export.full.button")}
             </Button>
           </div>
 
           <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card">
             <div>
-              <p className="text-sm font-medium">Elements</p>
+              <p className="text-sm font-medium">{t("settings.export.elements.title")}</p>
               <p className="text-xs text-muted-foreground">
-                Export all elements (projects, pages, canvases, etc.)
+                {t("settings.export.elements.desc")}
               </p>
             </div>
             <div className="flex gap-2">
@@ -695,7 +704,7 @@ export function SettingsContent() {
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-base font-semibold flex items-center gap-2">
             <Palette className="size-4" />
-            Appearance
+            {t("settings.appearance.title")}
           </h2>
           {hasChanges && (
             <Button
@@ -704,23 +713,23 @@ export function SettingsContent() {
               className="h-7 text-xs text-muted-foreground"
               onClick={() => {
                 resetPreferences()
-                toast.success("Preferences reset to defaults")
+                toast.success(t("settings.appearance.resetToast"))
               }}
             >
               <RotateCcw className="size-3 mr-1.5" />
-              Reset all
+              {t("settings.appearance.resetAll")}
             </Button>
           )}
         </div>
         <p className="text-sm text-muted-foreground mb-6">
-          Customize the look and feel of FlowSpace. Theme (dark/light) is toggled via the sidebar footer.
+          {t("settings.appearance.subtitle")}
         </p>
 
         {/* Font Family */}
         <div className="mb-6">
           <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
             <Type className="size-3.5 text-muted-foreground" />
-            Font Family
+            {t("settings.appearance.fontFamily")}
           </h3>
           <div className="grid grid-cols-2 gap-3">
             {FONT_OPTIONS.map((font) => {
@@ -765,7 +774,7 @@ export function SettingsContent() {
 
         {/* Font Size */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium mb-3">Font Size</h3>
+          <h3 className="text-sm font-medium mb-3">{t("settings.appearance.fontSize")}</h3>
           <div className="flex gap-2">
             {FONT_SIZE_OPTIONS.map((opt) => {
               const isActive = preferences.fontSize === opt.value
@@ -789,7 +798,7 @@ export function SettingsContent() {
 
         {/* Accent Color */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium mb-3">Accent Color</h3>
+          <h3 className="text-sm font-medium mb-3">{t("settings.appearance.accentColor")}</h3>
           <div className="flex items-center gap-3 flex-wrap">
             {ACCENT_COLORS.map((color) => {
               const isActive = preferences.accentColor === color.value
@@ -825,22 +834,18 @@ export function SettingsContent() {
 
         {/* Right-click color palette */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium mb-1">Right-click menu colors</h3>
+          <h3 className="text-sm font-medium mb-1">{t("settings.appearance.rightClick.title")}</h3>
           <p className="text-xs text-muted-foreground mb-3">
-            Pick which colors appear in the right-click <strong>Color</strong>{" "}
-            submenu on sidebar items. The first color is also the default
-            for new items. Saved in your account — not your browser.
+            {t("settings.appearance.rightClick.help")}
           </p>
           <RightClickPalettePicker />
         </div>
 
         {/* Notification badge */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium mb-1">Notification badge</h3>
+          <h3 className="text-sm font-medium mb-1">{t("settings.appearance.badge.title")}</h3>
           <p className="text-xs text-muted-foreground mb-3">
-            The red number on the sidebar bell icon. Counts unread
-            notifications, pending Telegram imports, and overdue
-            tasks/reminders.
+            {t("settings.appearance.badge.help")}
           </p>
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-card">
             <button
@@ -857,13 +862,13 @@ export function SettingsContent() {
                 }`}
               />
             </button>
-            <span className="text-sm">Show the bell badge</span>
+            <span className="text-sm">{t("settings.appearance.badge.toggle")}</span>
           </div>
         </div>
 
         {/* Border Radius */}
         <div>
-          <h3 className="text-sm font-medium mb-3">Border Radius</h3>
+          <h3 className="text-sm font-medium mb-3">{t("settings.appearance.borderRadius")}</h3>
           <div className="flex items-center gap-3">
             {RADIUS_OPTIONS.map((opt) => {
               const isActive = preferences.borderRadius === opt.value
@@ -895,14 +900,13 @@ export function SettingsContent() {
       <section id="sidebar" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <PanelLeft className="size-4" />
-          Sidebar
+          {t("settings.sidebar.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Choose which categories appear in the sidebar. Drag-to-reorder is
-          available directly in the sidebar itself.
+          {t("settings.sidebar.subtitle")}
         </p>
         <div className="px-4 py-3 rounded-lg border bg-card">
-          <h3 className="text-sm font-medium mb-3">Visible categories</h3>
+          <h3 className="text-sm font-medium mb-3">{t("settings.sidebar.visible")}</h3>
           <div className="space-y-1">
             {(Object.keys(SIDEBAR_SECTION_LABELS) as SidebarSectionKey[]).map((key) => {
               const visible = preferences.sidebarVisible?.[key] !== false
@@ -943,21 +947,20 @@ export function SettingsContent() {
               onClick={() => {
                 updatePreference("sidebarVisible", DEFAULT_PREFERENCES.sidebarVisible)
                 updatePreference("sidebarOrder", DEFAULT_PREFERENCES.sidebarOrder)
-                toast.success("Sidebar layout reset")
+                toast.success(t("settings.sidebar.resetLayoutToast"))
               }}
             >
               <RotateCcw className="size-3.5 mr-1.5" />
-              Reset sidebar layout
+              {t("settings.sidebar.resetLayout")}
             </Button>
           </div>
         </div>
 
         {/* Rename labels */}
         <div className="px-4 py-3 rounded-lg border bg-card mt-3">
-          <h3 className="text-sm font-medium mb-3">Custom category names</h3>
+          <h3 className="text-sm font-medium mb-3">{t("settings.sidebar.customNames")}</h3>
           <p className="text-xs text-muted-foreground mb-3">
-            Rename a category to whatever fits your workflow. Leave blank to
-            use the default.
+            {t("settings.sidebar.customNamesHelp")}
           </p>
           <div className="space-y-2">
             {(Object.keys(SIDEBAR_SECTION_LABELS) as SidebarSectionKey[]).map((key) => {
@@ -992,11 +995,11 @@ export function SettingsContent() {
                 size="sm"
                 onClick={() => {
                   updatePreference("sidebarLabels", {})
-                  toast.success("Custom names cleared")
+                  toast.success(t("settings.sidebar.resetNamesToast"))
                 }}
               >
                 <RotateCcw className="size-3.5 mr-1.5" />
-                Reset all names
+                {t("settings.sidebar.resetNames")}
               </Button>
             </div>
           )}
@@ -1007,17 +1010,17 @@ export function SettingsContent() {
       <section id="clock" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <ClockIcon className="size-4" />
-          Clock
+          {t("settings.clock.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Customize the clock displayed in the top corner of every page.
+          {t("settings.clock.subtitle")}
         </p>
         <div className="px-4 py-3 rounded-lg border bg-card space-y-3">
           {([
-            { key: "show",        label: "Show clock in top bar" },
-            { key: "format24",    label: "Use 24-hour time" },
-            { key: "showSeconds", label: "Show seconds" },
-            { key: "showDate",    label: "Show date" },
+            { key: "show",        label: t("settings.clock.show") },
+            { key: "format24",    label: t("settings.clock.format24") },
+            { key: "showSeconds", label: t("settings.clock.showSeconds") },
+            { key: "showDate",    label: t("settings.clock.showDate") },
           ] as const).map((row) => {
             const checked = preferences.clock?.[row.key] ?? true
             return (
@@ -1048,11 +1051,11 @@ export function SettingsContent() {
           })}
           <div className="pt-3 border-t">
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Second timezone label (optional)
+              {t("settings.clock.tzLabel")}
             </label>
             <input
               type="text"
-              placeholder="e.g. UTC, America/Los_Angeles"
+              placeholder={t("settings.clock.tzPlaceholder")}
               value={preferences.clock?.secondTimezoneLabel ?? ""}
               onChange={(e) => {
                 const next = { ...(preferences.clock ?? DEFAULT_PREFERENCES.clock) }
@@ -1062,7 +1065,7 @@ export function SettingsContent() {
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Uses IANA timezone names. Leave empty to show only your local time.
+              {t("settings.clock.tzHelp")}
             </p>
           </div>
         </div>
@@ -1072,11 +1075,10 @@ export function SettingsContent() {
       <section id="feed-ticker" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Rss className="size-4" />
-          Feed Ticker
+          {t("settings.ticker.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Horizontal scrolling news bar that surfaces the latest activity across
-          your workspace.
+          {t("settings.ticker.subtitle")}
         </p>
         <div className="px-4 py-3 rounded-lg border bg-card space-y-3">
           {/* Show toggle */}
@@ -1098,7 +1100,7 @@ export function SettingsContent() {
             >
               {preferences.feedTicker?.show !== false && <Check className="size-3 text-primary-foreground" />}
             </button>
-            <span className="text-sm">Show feed ticker</span>
+            <span className="text-sm">{t("settings.ticker.show")}</span>
           </label>
 
           {/* Pinned vs floating */}
@@ -1120,15 +1122,15 @@ export function SettingsContent() {
             >
               {preferences.feedTicker?.pinned !== false && <Check className="size-3 text-primary-foreground" />}
             </button>
-            <span className="text-sm flex-1">Pinned to the edge of the page</span>
+            <span className="text-sm flex-1">{t("settings.ticker.pinned")}</span>
             <span className="text-[10px] text-muted-foreground">
-              Off = float &amp; drag
+              {t("settings.ticker.floatHint")}
             </span>
           </label>
 
           {/* Position */}
           <div className="pt-1">
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Position</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">{t("settings.ticker.position")}</label>
             <div className="flex gap-1.5">
               {(["top", "bottom"] as const).map((p) => {
                 const active = (preferences.feedTicker?.position ?? "top") === p
@@ -1145,7 +1147,7 @@ export function SettingsContent() {
                       active ? "bg-primary text-primary-foreground border-primary" : "border-input hover:bg-accent"
                     }`}
                   >
-                    {p === "top" ? "Top of page" : "Bottom of page"}
+                    {p === "top" ? t("settings.ticker.position.top") : t("settings.ticker.position.bottom")}
                   </button>
                 )
               })}
@@ -1154,11 +1156,11 @@ export function SettingsContent() {
 
           {/* Direction */}
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5">Direction</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">{t("settings.ticker.direction")}</label>
             <div className="flex gap-1.5">
               {([
-                { v: "rtl" as const, label: "Right → Left", hint: "Items enter from the right" },
-                { v: "ltr" as const, label: "Left → Right", hint: "Items enter from the left" },
+                { v: "rtl" as const, label: t("settings.ticker.direction.rtl"), hint: t("settings.ticker.direction.rtlHint") },
+                { v: "ltr" as const, label: t("settings.ticker.direction.ltr"), hint: t("settings.ticker.direction.ltrHint") },
               ]).map((d) => {
                 const active = (preferences.feedTicker?.direction ?? "rtl") === d.v
                 return (
@@ -1185,7 +1187,7 @@ export function SettingsContent() {
           {/* Speed */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Speed: one full loop in {preferences.feedTicker?.speedSec ?? 90}s
+              {t("settings.ticker.speed").replace("{sec}", String(preferences.feedTicker?.speedSec ?? 90))}
             </label>
             <input
               type="range"
@@ -1201,8 +1203,8 @@ export function SettingsContent() {
               className="w-full"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground/60 mt-0.5">
-              <span>Fast</span>
-              <span>Slow</span>
+              <span>{t("settings.ticker.speed.fast")}</span>
+              <span>{t("settings.ticker.speed.slow")}</span>
             </div>
           </div>
         </div>
@@ -1212,16 +1214,16 @@ export function SettingsContent() {
       <section id="gantt" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <BarChart2 className="size-4" />
-          Gantt Chart
+          {t("settings.gantt.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Configure what information appears in the Gantt chart hover tooltip.
+          {t("settings.gantt.subtitle")}
         </p>
 
         <div className="px-4 py-3 rounded-lg border bg-card">
-          <h3 className="text-sm font-medium mb-3">Tooltip Fields</h3>
+          <h3 className="text-sm font-medium mb-3">{t("settings.gantt.tooltipFields")}</h3>
           <p className="text-xs text-muted-foreground mb-3">
-            Select which fields to display when hovering over task bars in the Gantt view.
+            {t("settings.gantt.tooltipHelp")}
           </p>
           <div className="space-y-2">
             {GANTT_TOOLTIP_FIELDS.map((field) => {
@@ -1256,10 +1258,10 @@ export function SettingsContent() {
       <section id="speech" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Mic className="size-4" />
-          Speech Recognition
+          {t("settings.speech.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Voice input is available throughout FlowSpace. Choose your preferred speech engine.
+          {t("settings.speech.subtitle")}
         </p>
 
         <div className="space-y-3">
@@ -1270,9 +1272,9 @@ export function SettingsContent() {
           {/* Global on/off toggle */}
           <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card">
             <div>
-              <p className="text-sm font-medium">Voice Input</p>
+              <p className="text-sm font-medium">{t("settings.speech.voiceInput")}</p>
               <p className="text-xs text-muted-foreground">
-                Show microphone buttons on text inputs across the app
+                {t("settings.speech.voiceInputDesc")}
               </p>
             </div>
             <button
@@ -1295,14 +1297,11 @@ export function SettingsContent() {
           <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card">
             <div className="pr-4">
               <p className="text-sm font-medium flex items-center gap-1.5">
-                Streaming mode
-                <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">live</span>
+                {t("settings.speech.streaming")}
+                <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">{t("settings.speech.streaming.badge")}</span>
               </p>
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                Words appear as you speak instead of waiting for the recording
-                to finish. Uses the browser&apos;s Web Speech API on
-                Chrome/Edge — falls back to your selected engine on browsers
-                that don&apos;t support it.
+                {t("settings.speech.streamingDesc")}
               </p>
             </div>
             <button
@@ -1323,16 +1322,16 @@ export function SettingsContent() {
 
           {/* Engine selector */}
           <div className="px-4 py-3 rounded-lg border bg-card">
-            <h3 className="text-sm font-medium mb-3">Engine</h3>
+            <h3 className="text-sm font-medium mb-3">{t("settings.speech.engine")}</h3>
             <div className="space-y-2">
               {speech.availableEngines.map((eng) => {
                 const isActive = speech.engine === eng.engine
                 const description =
                   eng.engine === "groq"
-                    ? "Cloud Whisper via Groq. Works in every browser, including Safari, Firefox, and iOS. 2000 transcriptions/day free, no credit card. Records audio locally then POSTs to Groq."
+                    ? t("settings.speech.engine.groqDesc")
                     : eng.engine === "webai"
-                      ? "Runs entirely in your browser via WebAI.js. Private, no data leaves your device, but downloads a 27–73 MB model on first use."
-                      : "Uses your browser's built-in speech API. Fast and zero-setup. Requires Chrome or Edge — silently fails in Safari, Firefox, and iOS PWAs."
+                      ? t("settings.speech.engine.webaiDesc")
+                      : t("settings.speech.engine.webDesc")
                 const isLocal = eng.engine === "webai"
                 return (
                   <button
@@ -1360,7 +1359,7 @@ export function SettingsContent() {
                         </div>
                       )}
                       {!eng.supported && (
-                        <span className="ml-auto text-xs text-muted-foreground">Not supported</span>
+                        <span className="ml-auto text-xs text-muted-foreground">{t("settings.speech.engine.notSupported")}</span>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground pl-5.5">{description}</p>
@@ -1373,13 +1372,20 @@ export function SettingsContent() {
           {/* Groq API key — only shown when Groq engine is selected */}
           {speech.engine === "groq" && (
             <div className="px-4 py-3 rounded-lg border bg-card">
-              <h3 className="text-sm font-medium mb-1">Groq API key</h3>
+              <h3 className="text-sm font-medium mb-1">{t("settings.speech.groqKey")}</h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Get a free key at{" "}
-                <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
-                  console.groq.com/keys
-                </a>{" "}
-                — no credit card needed. Stored in your browser only; never sent to the FlowSpace server.
+                {(() => {
+                  const [a, b] = t("settings.speech.groqKey.help").split("{link}")
+                  return (
+                    <>
+                      {a}
+                      <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+                        console.groq.com/keys
+                      </a>
+                      {b}
+                    </>
+                  )
+                })()}
               </p>
               <input
                 type="password"
@@ -1391,11 +1397,11 @@ export function SettingsContent() {
               />
               {preferences.speechGroqApiKey ? (
                 <p className="text-[11px] text-emerald-500 mt-1.5 flex items-center gap-1">
-                  <Check className="size-3" /> Key set — try the mic icon on any input.
+                  <Check className="size-3" /> {t("settings.speech.groqKey.set")}
                 </p>
               ) : (
                 <p className="text-[11px] text-amber-500 mt-1.5">
-                  No key yet. Voice input won&apos;t work until you paste one.
+                  {t("settings.speech.groqKey.unset")}
                 </p>
               )}
             </div>
@@ -1404,9 +1410,9 @@ export function SettingsContent() {
           {/* Speech model selector (WebAI only) */}
           {speech.engine === "webai" && (
             <div className="px-4 py-3 rounded-lg border bg-card">
-              <h3 className="text-sm font-medium mb-3">Speech Model</h3>
+              <h3 className="text-sm font-medium mb-3">{t("settings.speech.model")}</h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Choose a speech recognition model. Smaller models are faster; larger models are more accurate.
+                {t("settings.speech.modelHelp")}
               </p>
               <div className="space-y-2">
                 {WEBAI_SPEECH_MODELS.map((model) => {
@@ -1441,7 +1447,7 @@ export function SettingsContent() {
 
           {/* Model status */}
           <div className="px-4 py-3 rounded-lg border bg-card">
-            <h3 className="text-sm font-medium mb-2">Status</h3>
+            <h3 className="text-sm font-medium mb-2">{t("settings.speech.status")}</h3>
             <div className="flex items-center gap-2">
               <div
                 className={`size-2.5 rounded-full ${
@@ -1458,9 +1464,9 @@ export function SettingsContent() {
               />
               <span className="text-sm text-muted-foreground capitalize">
                 {speech.status === "idle"
-                  ? "Not initialized"
+                  ? t("settings.speech.status.notInit")
                   : speech.status === "loading"
-                    ? "Downloading model..."
+                    ? t("settings.speech.status.downloading")
                     : speech.status}
               </span>
             </div>
@@ -1473,9 +1479,9 @@ export function SettingsContent() {
                 onClick={async () => {
                   try {
                     await speech.init()
-                    toast.success("Speech model loaded")
+                    toast.success(t("settings.speech.loaded"))
                   } catch {
-                    toast.error("Failed to load speech model")
+                    toast.error(t("settings.speech.loadFailed"))
                   }
                 }}
               >
@@ -1484,7 +1490,7 @@ export function SettingsContent() {
                 ) : (
                   <Mic className="size-3 mr-1.5" />
                 )}
-                {speech.status === "loading" ? "Loading..." : "Pre-load Model"}
+                {speech.status === "loading" ? t("settings.speech.loading") : t("settings.speech.preload")}
               </Button>
             )}
             {speech.error && (
@@ -1498,11 +1504,10 @@ export function SettingsContent() {
       <section id="telegram" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Bot className="size-4" />
-          Telegram
+          {t("settings.telegram.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Wire up your own Telegram bot. Walking down the street with an
-          idea? Text the bot — it lands as a real item in FlowSpace.
+          {t("settings.telegram.subtitle")}
         </p>
         <TelegramSection featureEnabled={telegramFeatureEnabled} />
       </section>
@@ -1511,11 +1516,10 @@ export function SettingsContent() {
       <section id="email-in" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Mic className="size-4" />
-          Email IN
+          {t("settings.emailIn.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Forward incoming email into FlowSpace via a webhook. Approve
-          each piece from your bell, or dismiss.
+          {t("settings.emailIn.subtitle")}
         </p>
         <EmailInSection />
       </section>
@@ -1524,11 +1528,10 @@ export function SettingsContent() {
       <section id="calendar-sync" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <ClockIcon className="size-4" />
-          Google Calendar sync
+          {t("settings.calendar.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Push tasks with a due date into your Google Calendar as
-          all-day events. One-way sync; runs every 5 minutes.
+          {t("settings.calendar.subtitle")}
         </p>
         <CalendarSyncSection />
       </section>
@@ -1537,19 +1540,19 @@ export function SettingsContent() {
       <section id="ai" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Sparkles className="size-4" />
-          AI Features
+          {t("settings.ai.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Local AI powered by Ollama. Models run on your machine — no data leaves your network.
+          {t("settings.ai.subtitle")}
         </p>
 
         <div className="space-y-3">
           {/* Global AI toggle */}
           <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card">
             <div>
-              <p className="text-sm font-medium">Enable AI Features</p>
+              <p className="text-sm font-medium">{t("settings.ai.enable")}</p>
               <p className="text-xs text-muted-foreground">
-                Text generation, semantic search, and more via Ollama
+                {t("settings.ai.enableDesc")}
               </p>
             </div>
             <button
@@ -1577,10 +1580,10 @@ export function SettingsContent() {
               <div className="px-4 py-3 rounded-lg border bg-card">
                 <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
                   <Globe className="size-3.5 text-muted-foreground" />
-                  Ollama Server
+                  {t("settings.ai.ollamaServer")}
                 </h3>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Connect to your Ollama instance. Install from ollama.com if not yet installed.
+                  {t("settings.ai.ollamaServerHelp")}
                 </p>
 
                 <div className="flex items-center gap-2 mb-3">
@@ -1598,13 +1601,13 @@ export function SettingsContent() {
                     onClick={async () => {
                       try {
                         await ai.refreshConnection()
-                        toast.success(ai.connected ? "Connected to Ollama" : "Cannot reach Ollama")
+                        toast.success(ai.connected ? t("settings.ai.connected") : t("settings.ai.cannotReach"))
                       } catch {
-                        toast.error("Connection failed")
+                        toast.error(t("settings.ai.connectionFailed"))
                       }
                     }}
                   >
-                    Test
+                    {t("settings.ai.test")}
                   </Button>
                 </div>
 
@@ -1617,8 +1620,9 @@ export function SettingsContent() {
                   />
                   <span className="text-sm text-muted-foreground">
                     {ai.connected
-                      ? `Connected — ${ai.installedModels.length} model${ai.installedModels.length !== 1 ? "s" : ""} available`
-                      : "Disconnected — start Ollama with: ollama serve"}
+                      ? t(ai.installedModels.length === 1 ? "settings.ai.connectedModel" : "settings.ai.connectedModels")
+                          .replace("{count}", String(ai.installedModels.length))
+                      : t("settings.ai.disconnected")}
                   </span>
                 </div>
               </div>
@@ -1627,16 +1631,16 @@ export function SettingsContent() {
               <div className="px-4 py-3 rounded-lg border bg-card">
                 <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
                   <Brain className="size-3.5 text-muted-foreground" />
-                  Text Generation (LLM)
+                  {t("settings.ai.llm.title")}
                 </h3>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Powers summarization, text expansion, grammar fixing, and writing assistance.
+                  {t("settings.ai.llm.help")}
                 </p>
 
                 {/* Installed models */}
                 {ai.installedModels.filter(m => !m.name.includes("embed")).length > 0 && (
                   <div className="mb-3">
-                    <h4 className="text-xs font-medium mb-2 text-muted-foreground">Installed Models</h4>
+                    <h4 className="text-xs font-medium mb-2 text-muted-foreground">{t("settings.ai.installedModels")}</h4>
                     <div className="space-y-1.5">
                       {ai.installedModels
                         .filter(m => !m.name.includes("embed") && !m.name.includes("minilm"))
@@ -1679,7 +1683,7 @@ export function SettingsContent() {
                 )}
 
                 {/* Recommended models to pull */}
-                <h4 className="text-xs font-medium mb-2 text-muted-foreground">Recommended Models</h4>
+                <h4 className="text-xs font-medium mb-2 text-muted-foreground">{t("settings.ai.recommendedModels")}</h4>
                 <div className="space-y-1.5">
                   {AI_LLM_MODELS.map((model) => {
                     const installed = ai.installedModels.some(
@@ -1699,7 +1703,7 @@ export function SettingsContent() {
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">{model.size}</span>
                           {installed ? (
-                            <div className="size-2 rounded-full bg-green-500" title="Installed" />
+                            <div className="size-2 rounded-full bg-green-500" title={t("settings.ai.installed")} />
                           ) : (
                             <Button
                               variant="outline"
@@ -1709,9 +1713,9 @@ export function SettingsContent() {
                               onClick={async () => {
                                 try {
                                   await ai.pullModel(model.id)
-                                  toast.success(`${model.name} pulled successfully`)
+                                  toast.success(t("settings.ai.pulled").replace("{name}", model.name))
                                 } catch {
-                                  toast.error(`Failed to pull ${model.name}`)
+                                  toast.error(t("settings.ai.pullFailed").replace("{name}", model.name))
                                 }
                               }}
                             >
@@ -1733,10 +1737,10 @@ export function SettingsContent() {
               <div className="px-4 py-3 rounded-lg border bg-card">
                 <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
                   <Search className="size-3.5 text-muted-foreground" />
-                  Semantic Search (Embeddings)
+                  {t("settings.ai.embeddings.title")}
                 </h3>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Find content by meaning, not just keywords.
+                  {t("settings.ai.embeddings.help")}
                 </p>
                 <div className="space-y-1.5">
                   {AI_EMBEDDINGS_MODELS.map((model) => {
@@ -1765,7 +1769,7 @@ export function SettingsContent() {
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">{model.size}</span>
                           {installed ? (
-                            <div className="size-2 rounded-full bg-green-500" title="Installed" />
+                            <div className="size-2 rounded-full bg-green-500" title={t("settings.ai.installed")} />
                           ) : (
                             <Button
                               variant="outline"
@@ -1775,9 +1779,9 @@ export function SettingsContent() {
                               onClick={async () => {
                                 try {
                                   await ai.pullModel(model.id)
-                                  toast.success(`${model.name} pulled successfully`)
+                                  toast.success(t("settings.ai.pulled").replace("{name}", model.name))
                                 } catch {
-                                  toast.error(`Failed to pull ${model.name}`)
+                                  toast.error(t("settings.ai.pullFailed").replace("{name}", model.name))
                                 }
                               }}
                             >
@@ -1799,16 +1803,16 @@ export function SettingsContent() {
               <div className="px-4 py-3 rounded-lg border bg-card">
                 <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
                   <ScanEye className="size-3.5 text-muted-foreground" />
-                  Vision (Image Understanding)
+                  {t("settings.ai.vision.title")}
                 </h3>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Analyze and describe images using multimodal models like LLaVA.
+                  {t("settings.ai.vision.help")}
                 </p>
 
                 {/* Installed vision-capable models */}
                 {ai.installedModels.filter(m => m.name.includes("llava")).length > 0 && (
                   <div className="mb-3">
-                    <h4 className="text-xs font-medium mb-2 text-muted-foreground">Installed Models</h4>
+                    <h4 className="text-xs font-medium mb-2 text-muted-foreground">{t("settings.ai.installedModels")}</h4>
                     <div className="space-y-1.5">
                       {ai.installedModels
                         .filter(m => m.name.includes("llava"))
@@ -1851,7 +1855,7 @@ export function SettingsContent() {
                 )}
 
                 {/* Recommended vision models to pull */}
-                <h4 className="text-xs font-medium mb-2 text-muted-foreground">Recommended Models</h4>
+                <h4 className="text-xs font-medium mb-2 text-muted-foreground">{t("settings.ai.recommendedModels")}</h4>
                 <div className="space-y-1.5">
                   {AI_VISION_MODELS.map((model) => {
                     const installed = ai.installedModels.some(
@@ -1871,7 +1875,7 @@ export function SettingsContent() {
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">{model.size}</span>
                           {installed ? (
-                            <div className="size-2 rounded-full bg-green-500" title="Installed" />
+                            <div className="size-2 rounded-full bg-green-500" title={t("settings.ai.installed")} />
                           ) : (
                             <Button
                               variant="outline"
@@ -1881,9 +1885,9 @@ export function SettingsContent() {
                               onClick={async () => {
                                 try {
                                   await ai.pullModel(model.id)
-                                  toast.success(`${model.name} pulled successfully`)
+                                  toast.success(t("settings.ai.pulled").replace("{name}", model.name))
                                 } catch {
-                                  toast.error(`Failed to pull ${model.name}`)
+                                  toast.error(t("settings.ai.pullFailed").replace("{name}", model.name))
                                 }
                               }}
                             >
@@ -1910,9 +1914,9 @@ export function SettingsContent() {
                 <div className="flex items-center gap-3">
                   <Settings2 className="size-4 text-muted-foreground shrink-0" />
                   <div>
-                    <p className="text-sm font-medium">AI Prompts</p>
+                    <p className="text-sm font-medium">{t("settings.ai.prompts")}</p>
                     <p className="text-xs text-muted-foreground">
-                      Customize system prompts for each AI action
+                      {t("settings.ai.promptsDesc")}
                     </p>
                   </div>
                 </div>
@@ -1924,20 +1928,19 @@ export function SettingsContent() {
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-sm font-medium flex items-center gap-2">
                     <Settings2 className="size-3.5 text-muted-foreground" />
-                    Response length
+                    {t("settings.ai.responseLength")}
                   </h3>
                   <SectionHelp guideId="aiResponseLength" className="ml-auto" />
                 </div>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Max tokens per AI action — how long answers can get (~1 token ≈ ¾ of a word).
-                  Higher leaves room for &ldquo;thinking&rdquo; models so summaries aren&apos;t cut off.
+                  {t("settings.ai.responseLengthHelp")}
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   {([
-                    ["one_line", "Summarize · One line"],
-                    ["short", "Summarize · Short"],
-                    ["detailed", "Summarize · Detailed"],
-                    ["other", "Other actions"],
+                    ["one_line", t("settings.ai.budget.oneLine")],
+                    ["short", t("settings.ai.budget.short")],
+                    ["detailed", t("settings.ai.budget.detailed")],
+                    ["other", t("settings.ai.budget.other")],
                   ] as const).map(([key, label]) => {
                     const budgets = preferences.aiTokenBudgets ?? DEFAULT_PREFERENCES.aiTokenBudgets
                     return (
@@ -1965,17 +1968,17 @@ export function SettingsContent() {
               <div className="px-4 py-3 rounded-lg border bg-card">
                 <h3 className="text-sm font-medium mb-1 flex items-center gap-2">
                   <Volume2 className="size-3.5 text-muted-foreground" />
-                  Text-to-Speech
+                  {t("settings.ai.tts.title")}
                 </h3>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Uses your browser&apos;s built-in speech synthesis. Choose a voice below.
+                  {t("settings.ai.tts.help")}
                 </p>
 
                 {ttsVoices.length > 0 ? (
                   <div className="space-y-3">
                     <div>
                       <label htmlFor="tts-voice-select" className="text-xs font-medium text-muted-foreground mb-1 block">
-                        Voice
+                        {t("settings.ai.tts.voice")}
                       </label>
                       <select
                         id="tts-voice-select"
@@ -1983,7 +1986,7 @@ export function SettingsContent() {
                         onChange={(e) => updatePreference("aiTTSVoice", e.target.value)}
                         className="w-full h-9 px-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       >
-                        <option value="">System Default</option>
+                        <option value="">{t("settings.ai.tts.systemDefault")}</option>
                         {ttsVoices.map((voice) => (
                           <option key={voice.voiceURI} value={voice.name}>
                             {voice.name} ({voice.lang})
@@ -2001,23 +2004,23 @@ export function SettingsContent() {
                         setTtsTesting(true)
                         try {
                           await ai.speak({
-                            text: "Hello! This is a test of FlowSpace text-to-speech.",
+                            text: t("settings.ai.tts.testText"),
                             voice: preferences.aiTTSVoice || undefined,
                           })
                         } catch (err) {
-                          toast.error("TTS test failed: " + (err instanceof Error ? err.message : "Unknown error"))
+                          toast.error(t("settings.ai.tts.testFailed").replace("{error}", err instanceof Error ? err.message : t("settings.ai.tts.unknownError")))
                         } finally {
                           setTtsTesting(false)
                         }
                       }}
                     >
                       <Play className="size-3 mr-1.5" />
-                      {ttsTesting ? "Speaking..." : "Test Voice"}
+                      {ttsTesting ? t("settings.ai.tts.speaking") : t("settings.ai.tts.test")}
                     </Button>
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground italic">
-                    No voices available. Your browser may not support speech synthesis.
+                    {t("settings.ai.tts.noVoices")}
                   </p>
                 )}
               </div>
@@ -2027,10 +2030,10 @@ export function SettingsContent() {
                 <div className="px-4 py-3 rounded-lg border bg-card">
                   <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
                     <Database className="size-3.5 text-muted-foreground" />
-                    Manage Models
+                    {t("settings.ai.manageModels")}
                   </h3>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Models stored by Ollama on your machine.
+                    {t("settings.ai.manageModelsHelp")}
                   </p>
                   <div className="space-y-1.5">
                     {ai.installedModels.map((model) => (
@@ -2051,9 +2054,9 @@ export function SettingsContent() {
                           onClick={async () => {
                             try {
                               await ai.deleteOllamaModel(model.name)
-                              toast.success(`${model.name} deleted`)
+                              toast.success(t("settings.ai.modelDeleted").replace("{name}", model.name))
                             } catch {
-                              toast.error(`Failed to delete ${model.name}`)
+                              toast.error(t("settings.ai.modelDeleteFailed").replace("{name}", model.name))
                             }
                           }}
                         >
@@ -2073,10 +2076,10 @@ export function SettingsContent() {
       <section id="language" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Globe className="size-4" />
-          Language & onboarding
+          {t("settings.language.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Pick your interface language. Replay the welcome tour any time.
+          {t("settings.language.subtitle")}
         </p>
         <LocaleSwitcher />
       </section>
@@ -2085,11 +2088,10 @@ export function SettingsContent() {
       <section id="guides" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <BookOpen className="size-4" />
-          Guides
+          {t("settings.guides.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Step-by-step how-tos for every feature. Each one also appears as a
-          &ldquo;How do I use this?&rdquo; link next to the feature itself.
+          {t("settings.guides.subtitle")}
         </p>
         <GuidesHub />
       </section>
@@ -2098,10 +2100,10 @@ export function SettingsContent() {
       <section id="shortcuts" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Keyboard className="size-4" />
-          Keyboard Shortcuts
+          {t("settings.shortcuts.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Press{" "}
+          {t("settings.shortcuts.subtitlePrefix")}{" "}
           <kbd className="px-1.5 py-0.5 rounded border bg-muted text-xs font-mono">
             Shift
           </kbd>{" "}
@@ -2109,7 +2111,7 @@ export function SettingsContent() {
           <kbd className="px-1.5 py-0.5 rounded border bg-muted text-xs font-mono">
             ?
           </kbd>{" "}
-          anywhere to view all available shortcuts.
+          {t("settings.shortcuts.subtitleSuffix")}
         </p>
       </section>
 
@@ -2117,17 +2119,15 @@ export function SettingsContent() {
       <section id="about" className="scroll-mt-4">
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Info className="size-4" />
-          About
+          {t("settings.about.title")}
         </h2>
         <div className="px-4 py-3 rounded-lg border bg-card space-y-1">
-          <p className="text-sm font-medium">FlowSpace v1.0</p>
+          <p className="text-sm font-medium">{t("settings.about.version")}</p>
           <p className="text-xs text-muted-foreground">
-            Personal productivity workspace combining project management,
-            notes, canvases, todos, and process workflows.
+            {t("settings.about.desc1")}
           </p>
           <p className="text-xs text-muted-foreground">
-            Built with Next.js, SQLite, and React Flow. All data is stored
-            locally.
+            {t("settings.about.desc2")}
           </p>
         </div>
       </section>
@@ -2136,9 +2136,9 @@ export function SettingsContent() {
       <Dialog open={promptsDialogOpen} onOpenChange={setPromptsDialogOpen}>
         <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>AI Prompts</DialogTitle>
+            <DialogTitle>{t("settings.ai.promptsDialog.title")}</DialogTitle>
             <DialogDescription>
-              Customize the system prompt for each AI action. Changes apply immediately.
+              {t("settings.ai.promptsDialog.desc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
@@ -2161,11 +2161,11 @@ export function SettingsContent() {
                           const updated = { ...(preferences.aiSystemPrompts ?? DEFAULT_PREFERENCES.aiSystemPrompts) }
                           updated[key] = defaultPrompt
                           updatePreference("aiSystemPrompts", updated)
-                          toast.success(`"${label}" reset to default`)
+                          toast.success(t("settings.ai.promptReset").replace("{label}", label))
                         }}
                       >
                         <RotateCcw className="size-3 mr-1" />
-                        Reset
+                        {t("settings.bot.reset")}
                       </Button>
                     )}
                   </div>
@@ -2207,6 +2207,7 @@ export function SettingsContent() {
  *    plenty to choose from. Toggling a swatch adds/removes it from the
  *    palette; clicking the "default" radio sets `rightClickDefaultColor`. */
 function RightClickPalettePicker() {
+  const { t } = useT()
   const { preferences, updatePreference } = usePreferences()
   const palette = preferences.rightClickPalette
   const defaultColor = preferences.rightClickDefaultColor
@@ -2264,7 +2265,7 @@ function RightClickPalettePicker() {
               type="button"
               onClick={() => toggle(s.hex)}
               onDoubleClick={() => setDefault(s.hex)}
-              title={`${s.name} — single-click to toggle, double-click to set as default`}
+              title={t("settings.palette.tooltip").replace("{name}", s.name)}
               className={`group relative flex flex-col items-center gap-1 p-1.5 rounded-md transition-all ${
                 enabled ? "bg-accent/40" : "opacity-30 hover:opacity-60"
               }`}
@@ -2284,9 +2285,7 @@ function RightClickPalettePicker() {
         })}
       </div>
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        Single-click to add/remove from your right-click menu. Double-click
-        to set as the default color (marked ★). Currently {palette.length}{" "}
-        color{palette.length === 1 ? "" : "s"} in your palette.
+        {t("settings.palette.help").replace("{count}", String(palette.length))}
       </p>
     </div>
   )

@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { changeMyPassword } from "@/lib/actions/user-actions"
 import { TwoFactorSection } from "@/components/settings/two-factor-section"
 import { ApiTokensSection } from "@/components/settings/api-tokens-section"
+import { useT } from "@/lib/hooks/use-i18n"
 
 /**
  * Change-password form. Verifies the current password before accepting a
@@ -13,6 +14,7 @@ import { ApiTokensSection } from "@/components/settings/api-tokens-section"
  * stolen/compromised device can't keep its existing session.
  */
 export function AccountSection() {
+  const { t } = useT()
   const [current, setCurrent] = useState("")
   const [next, setNext] = useState("")
   const [confirm, setConfirm] = useState("")
@@ -23,9 +25,9 @@ export function AccountSection() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
-    if (next.length < 8) { setError("New password must be at least 8 characters"); return }
-    if (next !== confirm) { setError("New passwords don't match"); return }
-    if (next === current) { setError("Pick a different password than your current one"); return }
+    if (next.length < 8) { setError(t("settings.password.minLength")); return }
+    if (next !== confirm) { setError(t("settings.password.mismatch")); return }
+    if (next === current) { setError(t("settings.password.same")); return }
 
     setLoading(true)
     try {
@@ -33,13 +35,13 @@ export function AccountSection() {
       if (!res.ok) {
         setError(res.error)
       } else {
-        toast.success("Password changed. Other devices will need to sign in again.")
+        toast.success(t("settings.password.success"))
         setCurrent("")
         setNext("")
         setConfirm("")
       }
     } catch {
-      setError("Something went wrong. Try again.")
+      setError(t("settings.password.error"))
     } finally {
       setLoading(false)
     }
@@ -50,11 +52,10 @@ export function AccountSection() {
     <div className="px-4 py-3 rounded-lg border bg-card">
       <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
         <KeyRound className="size-3.5 text-muted-foreground" />
-        Change password
+        {t("settings.password.title")}
       </h3>
       <p className="text-xs text-muted-foreground mb-3">
-        After changing, you'll stay signed in on this device. Other devices
-        will be signed out and need the new password.
+        {t("settings.password.help")}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-2.5">
@@ -67,7 +68,7 @@ export function AccountSection() {
             type={showPw ? "text" : "password"}
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
-            placeholder="Current password"
+            placeholder={t("settings.password.current")}
             autoComplete="current-password"
             required
             className="w-full h-9 rounded-md border border-input bg-background px-2.5 pr-9 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -86,7 +87,7 @@ export function AccountSection() {
           type={showPw ? "text" : "password"}
           value={next}
           onChange={(e) => setNext(e.target.value)}
-          placeholder="New password (8+ characters)"
+          placeholder={t("settings.password.new")}
           autoComplete="new-password"
           required
           minLength={8}
@@ -96,7 +97,7 @@ export function AccountSection() {
           type={showPw ? "text" : "password"}
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
-          placeholder="Confirm new password"
+          placeholder={t("settings.password.confirm")}
           autoComplete="new-password"
           required
           className="w-full h-9 rounded-md border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -114,7 +115,7 @@ export function AccountSection() {
           className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
-          {loading ? "Updating…" : "Change password"}
+          {loading ? t("settings.password.updating") : t("settings.password.submit")}
         </button>
       </form>
     </div>

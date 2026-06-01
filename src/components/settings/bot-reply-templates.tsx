@@ -21,6 +21,7 @@ import { Bot, Sparkles, RotateCcw, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { usePreferences } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 
 // Mirror of the defaults from src/lib/telegram/replies.ts. We duplicate
 // here so the editor is fully client-side — no extra round-trip to fetch
@@ -33,8 +34,9 @@ interface ReplyTemplate {
     | "todo_done"
     | "voice_received"
     | "unknown"
-  label: string
-  description: string
+  /** Translation keys for the human-facing label + description. */
+  labelKey: string
+  descKey: string
   variables: { name: string; description: string; example: string }[]
   default: string
 }
@@ -42,17 +44,16 @@ interface ReplyTemplate {
 const TEMPLATES: ReplyTemplate[] = [
   {
     slug: "greeting",
-    label: "Greeting (/start)",
-    description: "Shown when the user first connects, or types /start.",
+    labelKey: "settings.bot.tpl.greeting.label",
+    descKey: "settings.bot.tpl.greeting.desc",
     variables: [],
     default:
       "👋 You're connected to FlowSpace.\n\nSend me text and I'll capture it as a todo item.\nSlash commands let you do more — try /help.",
   },
   {
     slug: "capture_added",
-    label: "Captured to default list",
-    description:
-      "Confirmation after a freeform message gets added to the default todo list.",
+    labelKey: "settings.bot.tpl.captureAdded.label",
+    descKey: "settings.bot.tpl.captureAdded.desc",
     variables: [
       { name: "list", description: "List name", example: "Inbox" },
       {
@@ -65,35 +66,36 @@ const TEMPLATES: ReplyTemplate[] = [
   },
   {
     slug: "task_done",
-    label: "Task marked done",
-    description: "After /done <id-prefix> completes a project task.",
+    labelKey: "settings.bot.tpl.taskDone.label",
+    descKey: "settings.bot.tpl.taskDone.desc",
     variables: [{ name: "title", description: "Task title", example: "Ship v1" }],
     default: "✅ Marked task done: *{{title}}*",
   },
   {
     slug: "todo_done",
-    label: "Todo item marked done",
-    description: "After /done completes a todo-list item.",
+    labelKey: "settings.bot.tpl.todoDone.label",
+    descKey: "settings.bot.tpl.todoDone.desc",
     variables: [{ name: "title", description: "Item title", example: "Buy milk" }],
     default: "✅ Marked done: *{{title}}*",
   },
   {
     slug: "voice_received",
-    label: "Voice received",
-    description: "Sent before transcribing a voice note.",
+    labelKey: "settings.bot.tpl.voiceReceived.label",
+    descKey: "settings.bot.tpl.voiceReceived.desc",
     variables: [],
     default: "🎙 Got your voice note. Transcribing…",
   },
   {
     slug: "unknown",
-    label: "Unknown command",
-    description: "When the user sends a slash command we don't recognise.",
+    labelKey: "settings.bot.tpl.unknown.label",
+    descKey: "settings.bot.tpl.unknown.desc",
     variables: [{ name: "command", description: "What they typed", example: "/foo" }],
     default: "Unknown command `{{command}}`. Try /help.",
   },
 ]
 
 export function BotReplyTemplatesPanel() {
+  const { t } = useT()
   const { preferences, updatePreference } = usePreferences()
   const overrides = preferences.botReplies ?? {}
 
@@ -112,10 +114,7 @@ export function BotReplyTemplatesPanel() {
       <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-violet-500/30 bg-violet-500/5">
         <Sparkles className="size-3.5 text-violet-400 shrink-0 mt-0.5" />
         <div className="text-xs text-violet-200/90 leading-relaxed">
-          Make the bot sound like <em>you</em>. Replace any reply below
-          with your own — keep it short, use the variables shown to weave
-          in real data. Telegram MarkdownV2 formatting (<code className="px-0.5">*bold*</code>,{" "}
-          <code className="px-0.5">`code`</code>) works.
+          {t("settings.bot.intro")}
         </div>
       </div>
 
@@ -133,13 +132,13 @@ export function BotReplyTemplatesPanel() {
                 setOverride(tpl.slug, body)
                 toast.success(
                   body.trim().length === 0
-                    ? `Reset "${tpl.label}" to default`
-                    : `Saved "${tpl.label}"`,
+                    ? t("settings.bot.resetToast").replace("{label}", t(tpl.labelKey))
+                    : t("settings.bot.savedToast").replace("{label}", t(tpl.labelKey)),
                 )
               }}
               onReset={() => {
                 setOverride(tpl.slug, "")
-                toast.success(`Reset "${tpl.label}" to default`)
+                toast.success(t("settings.bot.resetToast").replace("{label}", t(tpl.labelKey)))
               }}
             />
           )
@@ -162,6 +161,7 @@ function ReplyEditor({
   onSave: (body: string) => void
   onReset: () => void
 }) {
+  const { t } = useT()
   // Local state lets the user type freely before committing.
   const [draft, setDraft] = useState<string>(value || template.default)
   const [touched, setTouched] = useState(false)
@@ -172,10 +172,10 @@ function ReplyEditor({
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <Bot className="size-3.5 text-muted-foreground" />
-          <p className="text-sm font-medium">{template.label}</p>
+          <p className="text-sm font-medium">{t(template.labelKey)}</p>
           {isOverridden && (
             <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-violet-500/15 text-violet-300">
-              Custom
+              {t("settings.bot.custom")}
             </span>
           )}
         </div>
@@ -191,17 +191,17 @@ function ReplyEditor({
             }}
           >
             <RotateCcw className="size-3" />
-            Reset
+            {t("settings.bot.reset")}
           </Button>
         )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground leading-relaxed">{template.description}</p>
+      <p className="text-[11px] text-muted-foreground leading-relaxed">{t(template.descKey)}</p>
 
       {template.variables.length > 0 && (
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mr-1">
-            Variables:
+            {t("settings.bot.variables")}
           </span>
           {template.variables.map((v) => (
             <button
@@ -236,10 +236,10 @@ function ReplyEditor({
       <div className="flex items-center justify-between gap-2">
         <p className="text-[10px] text-muted-foreground/70">
           {dirty
-            ? "Unsaved changes"
+            ? t("settings.bot.unsaved")
             : isOverridden
-            ? "Using your custom reply"
-            : "Using the default"}
+            ? t("settings.bot.usingCustom")
+            : t("settings.bot.usingDefault")}
         </p>
         <Button
           variant={dirty ? "default" : "secondary"}
@@ -254,7 +254,7 @@ function ReplyEditor({
           }}
         >
           <Check className="size-3" />
-          Save
+          {t("settings.bot.save")}
         </Button>
       </div>
     </div>

@@ -22,11 +22,13 @@ import { useState } from "react"
 import { Copy, Check, ChevronDown, FileCode, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 
 interface Template {
   slug: string
-  title: string
-  description: string
+  /** Translation keys for the card title + "when to use" blurb. */
+  titleKey: string
+  descKey: string
   body: string
 }
 
@@ -39,9 +41,8 @@ interface Template {
 const TEMPLATES: Template[] = [
   {
     slug: "sprint-kickoff",
-    title: "Sprint kickoff",
-    description:
-      "Two-week sprint with goals + the first slate of tasks. Paste into the importer to spin up a fresh project board.",
+    titleKey: "settings.md.tpl.sprint.title",
+    descKey: "settings.md.tpl.sprint.desc",
     body: `# Project: Sprint kickoff
 Status: active
 Tags: sprint, planning
@@ -67,9 +68,8 @@ Goals:
   },
   {
     slug: "content-calendar",
-    title: "Content calendar (weekly)",
-    description:
-      "Plan a week of content — blog, social, email — as a project board.",
+    titleKey: "settings.md.tpl.content.title",
+    descKey: "settings.md.tpl.content.desc",
     body: `# Project: Content calendar (weekly)
 Status: active
 Tags: content, marketing
@@ -91,9 +91,8 @@ Plan a week of content. Goals: 1 long-form post, 5 social posts
   },
   {
     slug: "okr-review",
-    title: "Quarterly OKR review",
-    description:
-      "Structured review of last quarter's OKRs + drafting next quarter's, as a project so each step is a task.",
+    titleKey: "settings.md.tpl.okr.title",
+    descKey: "settings.md.tpl.okr.desc",
     body: `# Project: Quarterly OKR review
 Status: active
 Tags: okr, review
@@ -116,9 +115,8 @@ learning per objective, draft next quarter's objectives.
   },
   {
     slug: "weekly-1on1",
-    title: "Weekly 1:1 agenda",
-    description:
-      "Recurring agenda for a 1:1 with a teammate. Reuse weekly.",
+    titleKey: "settings.md.tpl.oneOnOne.title",
+    descKey: "settings.md.tpl.oneOnOne.desc",
     body: `# Project: Weekly 1:1 agenda
 Status: active
 Tags: 1on1
@@ -139,9 +137,8 @@ Recurring 1:1 agenda. Reuse weekly — copy and adjust.
   },
   {
     slug: "design-review",
-    title: "Design review",
-    description:
-      "Pre-review prep + the review itself + post-review action items.",
+    titleKey: "settings.md.tpl.design.title",
+    descKey: "settings.md.tpl.design.desc",
     body: `# Project: Design review
 Status: active
 Tags: design, review
@@ -166,20 +163,21 @@ Pre-review prep + the review session itself + post-review action items.
 ]
 
 export function MarkdownTemplatesPanel() {
+  const { t } = useT()
+  // The intro carries a {link} token; split around it so the /templates link
+  // renders as a real anchor.
+  const intro = t("settings.md.intro")
+  const [introBefore, introAfter] = intro.split("{link}")
   return (
     <div className="space-y-3">
       <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-primary/30 bg-primary/5">
         <FileCode className="size-3.5 text-primary shrink-0 mt-0.5" />
         <div className="text-xs text-primary/90 leading-relaxed">
-          Ready-to-paste blueprints. Copy one, paste it into the
-          home-page <strong>Paste markdown to import</strong> composer
-          (or text it to your Telegram bot), and FlowSpace turns it into
-          a project board with tasks, priorities, due dates, and tags.
-          See{" "}
+          {introBefore}
           <a href="/templates" className="underline underline-offset-2 hover:text-foreground">
             /templates
-          </a>{" "}
-          for saved templates.
+          </a>
+          {introAfter}
         </div>
       </div>
 
@@ -193,6 +191,7 @@ export function MarkdownTemplatesPanel() {
 }
 
 function TemplateCard({ template }: { template: Template }) {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -202,9 +201,9 @@ function TemplateCard({ template }: { template: Template }) {
       .then(() => {
         setCopied(true)
         setTimeout(() => setCopied(false), 1500)
-        toast.success(`Copied "${template.title}" markdown`)
+        toast.success(t("settings.md.copiedToast").replace("{title}", t(template.titleKey)))
       })
-      .catch(() => toast.error("Couldn't copy. Try the textarea below."))
+      .catch(() => toast.error(t("settings.md.copyFailed")))
   }
 
   return (
@@ -225,9 +224,9 @@ function TemplateCard({ template }: { template: Template }) {
             }`}
           />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">{template.title}</p>
+            <p className="text-sm font-medium">{t(template.titleKey)}</p>
             <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">
-              {template.description}
+              {t(template.descKey)}
             </p>
           </div>
         </button>
@@ -238,7 +237,7 @@ function TemplateCard({ template }: { template: Template }) {
           onClick={handleCopy}
         >
           {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-          {copied ? "Copied" : "Copy"}
+          {copied ? t("settings.md.copied") : t("settings.md.copy")}
         </Button>
       </div>
 
@@ -253,7 +252,7 @@ function TemplateCard({ template }: { template: Template }) {
               className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
               <ExternalLink className="size-3" />
-              Browse saved templates
+              {t("settings.md.browseSaved")}
             </a>
             <Button
               variant="outline"
@@ -262,7 +261,7 @@ function TemplateCard({ template }: { template: Template }) {
               onClick={handleCopy}
             >
               {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-              {copied ? "Copied" : "Copy markdown"}
+              {copied ? t("settings.md.copied") : t("settings.md.copyMarkdown")}
             </Button>
           </div>
         </div>

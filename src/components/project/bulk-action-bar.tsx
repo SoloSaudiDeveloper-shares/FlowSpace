@@ -45,6 +45,7 @@ import {
 import { sendTasksDigestEmail, isTaskEmailReady } from "@/lib/actions/task-email-actions"
 import type { taskStatuses, taskLabels } from "@/lib/db/schema"
 import { PRIORITIES } from "@/lib/priority"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type TaskStatus = typeof taskStatuses.$inferSelect
 type TaskLabel = typeof taskLabels.$inferSelect
@@ -68,6 +69,7 @@ export function BulkActionBar({
   onClear: () => void
   onExit: () => void
 }) {
+  const { t } = useT()
   const taskIds = [...ids]
   const n = taskIds.length
   const [commenting, setCommenting] = useState(false)
@@ -92,7 +94,12 @@ export function BulkActionBar({
     try {
       const res = await sendTasksDigestEmail({ taskIds, projectId, to, customMessage: emailNote.trim() || undefined })
       if (res.ok) {
-        toast.success(`Emailed ${res.count} task${res.count === 1 ? "" : "s"} to ${to}`)
+        toast.success(
+          t("task.bulk.emailed")
+            .replace("{n}", String(res.count))
+            .replace("{s}", res.count === 1 ? "" : "s")
+            .replace("{to}", to),
+        )
         setEmailing(false)
         setEmailTo("")
         setEmailNote("")
@@ -100,7 +107,7 @@ export function BulkActionBar({
         toast.error(res.error)
       }
     } catch {
-      toast.error("Couldn't send the email")
+      toast.error(t("task.bulk.emailFailed"))
     } finally {
       setBusy(false)
     }
@@ -112,7 +119,7 @@ export function BulkActionBar({
       await fn()
       if (msg) toast.success(msg)
     } catch {
-      toast.error("Bulk action failed")
+      toast.error(t("task.bulk.actionFailed"))
     } finally {
       setBusy(false)
     }
@@ -120,7 +127,10 @@ export function BulkActionBar({
 
   async function sendComment() {
     if (!comment.trim()) return
-    await run(() => bulkAddComment(taskIds, projectId, comment), `Comment added to ${n} task${n === 1 ? "" : "s"}`)
+    await run(
+      () => bulkAddComment(taskIds, projectId, comment),
+      t("task.bulk.commentAdded").replace("{n}", String(n)).replace("{s}", n === 1 ? "" : "s"),
+    )
     setComment("")
     setCommenting(false)
   }
@@ -136,13 +146,13 @@ export function BulkActionBar({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") sendComment(); if (e.key === "Escape") setCommenting(false) }}
-            placeholder={`Comment on ${n} task${n === 1 ? "" : "s"}…`}
+            placeholder={t("task.bulk.commentPlaceholder").replace("{n}", String(n)).replace("{s}", n === 1 ? "" : "s")}
             className="h-8 w-64 text-sm"
           />
           <Button size="sm" className={btn} disabled={busy || !comment.trim()} onClick={sendComment}>
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
           </Button>
-          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setCommenting(false)}>Cancel</Button>
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setCommenting(false)}>{t("task.bulk.cancel")}</Button>
         </div>
       ) : emailing ? (
         <div className="flex items-center gap-1.5">
@@ -153,46 +163,46 @@ export function BulkActionBar({
             value={emailTo}
             onChange={(e) => setEmailTo(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") sendDigest(); if (e.key === "Escape") setEmailing(false) }}
-            placeholder={`Email ${n} task${n === 1 ? "" : "s"} to…`}
+            placeholder={t("task.bulk.emailToPlaceholder").replace("{n}", String(n)).replace("{s}", n === 1 ? "" : "s")}
             className="h-8 w-56 text-sm"
           />
           <Input
             value={emailNote}
             onChange={(e) => setEmailNote(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") sendDigest(); if (e.key === "Escape") setEmailing(false) }}
-            placeholder="Note (optional)"
+            placeholder={t("task.bulk.notePlaceholder")}
             className="h-8 w-44 text-sm"
           />
           <Button size="sm" className={btn} disabled={busy || !emailTo.trim()} onClick={sendDigest}>
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
           </Button>
-          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setEmailing(false)}>Cancel</Button>
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setEmailing(false)}>{t("task.bulk.cancel")}</Button>
         </div>
       ) : (
         <>
-          <span className="px-1.5 text-xs font-medium whitespace-nowrap">{n} selected</span>
+          <span className="px-1.5 text-xs font-medium whitespace-nowrap">{t("task.bulk.selected").replace("{n}", String(n))}</span>
           <div className="mx-0.5 h-5 w-px bg-border" />
 
           <Button size="sm" variant="ghost" className={btn} disabled={busy} onClick={() => setCommenting(true)}>
-            <MessageCircle className="size-3.5" /> Comment
+            <MessageCircle className="size-3.5" /> {t("task.bulk.comment")}
           </Button>
           <Button size="sm" variant="ghost" className={btn} disabled={busy}
-            onClick={() => run(() => bulkSetTimer(taskIds, projectId, true), `Timer started on ${n}`)}>
-            <Play className="size-3.5" /> Start
+            onClick={() => run(() => bulkSetTimer(taskIds, projectId, true), t("task.bulk.timerStarted").replace("{n}", String(n)))}>
+            <Play className="size-3.5" /> {t("task.bulk.start")}
           </Button>
           <Button size="sm" variant="ghost" className={btn} disabled={busy}
-            onClick={() => run(() => bulkSetTimer(taskIds, projectId, false), `Timer stopped on ${n}`)}>
-            <Pause className="size-3.5" /> Stop
+            onClick={() => run(() => bulkSetTimer(taskIds, projectId, false), t("task.bulk.timerStopped").replace("{n}", String(n)))}>
+            <Pause className="size-3.5" /> {t("task.bulk.stop")}
           </Button>
 
           {/* Priority */}
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs hover:bg-accent" disabled={busy}>
-              <Flag className="size-3.5" /> Priority <ChevronDown className="size-3" />
+              <Flag className="size-3.5" /> {t("task.bulk.priority")} <ChevronDown className="size-3" />
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {PRIORITIES.map((p) => (
-                <DropdownMenuItem key={p.value} onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { priority: p.value }), `Priority set on ${n}`)}>
+                <DropdownMenuItem key={p.value} onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { priority: p.value }), t("task.bulk.prioritySet").replace("{n}", String(n)))}>
                   <Flag className="size-3 mr-2" style={{ color: p.color }} /> {p.label}
                 </DropdownMenuItem>
               ))}
@@ -202,11 +212,11 @@ export function BulkActionBar({
           {/* Move to status */}
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs hover:bg-accent" disabled={busy}>
-              Move <ChevronDown className="size-3" />
+              {t("task.bulk.move")} <ChevronDown className="size-3" />
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {statuses.map((s) => (
-                <DropdownMenuItem key={s.id} onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { statusId: s.id, isCompleted: !!s.isDoneState }), `Moved ${n} to ${s.name}`)}>
+                <DropdownMenuItem key={s.id} onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { statusId: s.id, isCompleted: !!s.isDoneState }), t("task.bulk.movedTo").replace("{n}", String(n)).replace("{status}", s.name))}>
                   <span className="size-2.5 rounded-full mr-2" style={{ backgroundColor: s.color }} /> {s.name}
                 </DropdownMenuItem>
               ))}
@@ -216,13 +226,13 @@ export function BulkActionBar({
           {/* Due */}
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs hover:bg-accent" disabled={busy}>
-              <Calendar className="size-3.5" /> Due <ChevronDown className="size-3" />
+              <Calendar className="size-3.5" /> {t("task.bulk.due")} <ChevronDown className="size-3" />
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { dueDate: isoDate(0) }), `Due date set on ${n}`)}>Today</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { dueDate: isoDate(1) }), `Due date set on ${n}`)}>Tomorrow</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { dueDate: isoDate(7) }), `Due date set on ${n}`)}>Next week</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { dueDate: null }), `Due date cleared on ${n}`)}>Clear</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { dueDate: isoDate(0) }), t("task.bulk.dueSet").replace("{n}", String(n)))}>{t("task.bulk.dueToday")}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { dueDate: isoDate(1) }), t("task.bulk.dueSet").replace("{n}", String(n)))}>{t("task.bulk.dueTomorrow")}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { dueDate: isoDate(7) }), t("task.bulk.dueSet").replace("{n}", String(n)))}>{t("task.bulk.dueNextWeek")}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { dueDate: null }), t("task.bulk.dueCleared").replace("{n}", String(n)))}>{t("task.bulk.dueClear")}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -230,11 +240,11 @@ export function BulkActionBar({
           {labels.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs hover:bg-accent disabled:opacity-50" disabled={busy}>
-                <Tag className="size-3.5" /> Label <ChevronDown className="size-3" />
+                <Tag className="size-3.5" /> {t("task.bulk.label")} <ChevronDown className="size-3" />
               </DropdownMenuTrigger>
               <DropdownMenuContent className="max-h-72 overflow-auto">
                 {labels.map((l) => (
-                  <DropdownMenuItem key={l.id} onClick={() => run(() => bulkAddLabel(taskIds, projectId, l.id), `Label added to ${n}`)}>
+                  <DropdownMenuItem key={l.id} onClick={() => run(() => bulkAddLabel(taskIds, projectId, l.id), t("task.bulk.labelAdded").replace("{n}", String(n)))}>
                     <span className="size-2.5 rounded-full mr-2" style={{ backgroundColor: l.color }} /> {l.name}
                   </DropdownMenuItem>
                 ))}
@@ -244,20 +254,20 @@ export function BulkActionBar({
 
           {/* Post to feed */}
           <Button size="sm" variant="ghost" className={btn} disabled={busy}
-            onClick={() => run(() => bulkAddToFeed(taskIds, projectId), `Posted ${n} to feed`)}>
-            <Rss className="size-3.5" /> Feed
+            onClick={() => run(() => bulkAddToFeed(taskIds, projectId), t("task.bulk.postedToFeed").replace("{n}", String(n)))}>
+            <Rss className="size-3.5" /> {t("task.bulk.feed")}
           </Button>
 
           {/* Email as one combined digest */}
           {emailReady && (
             <Button size="sm" variant="ghost" className={btn} disabled={busy} onClick={() => setEmailing(true)}>
-              <Mail className="size-3.5" /> Email
+              <Mail className="size-3.5" /> {t("task.bulk.email")}
             </Button>
           )}
 
           <Button size="sm" variant="ghost" className={btn} disabled={busy}
-            onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { isCompleted: true }), `Completed ${n}`)}>
-            <CheckCircle2 className="size-3.5" /> Done
+            onClick={() => run(() => bulkUpdateTasks(taskIds, projectId, { isCompleted: true }), t("task.bulk.completed").replace("{n}", String(n)))}>
+            <CheckCircle2 className="size-3.5" /> {t("task.bulk.done")}
           </Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive hover:text-destructive gap-1.5" disabled={busy}
             onClick={async () => {
@@ -265,11 +275,11 @@ export function BulkActionBar({
               try {
                 const snaps = await bulkDeleteTasks(taskIds, projectId)
                 onClear()
-                toast.success(`Deleted ${n} task${n === 1 ? "" : "s"}`, {
-                  action: { label: "Undo", onClick: () => restoreTasks(snaps, projectId) },
+                toast.success(t("task.bulk.deleted").replace("{n}", String(n)).replace("{s}", n === 1 ? "" : "s"), {
+                  action: { label: t("task.bulk.undo"), onClick: () => restoreTasks(snaps, projectId) },
                 })
               } catch {
-                toast.error("Bulk delete failed")
+                toast.error(t("task.bulk.deleteFailed"))
               } finally {
                 setBusy(false)
               }
@@ -278,7 +288,7 @@ export function BulkActionBar({
           </Button>
 
           <div className="mx-0.5 h-5 w-px bg-border" />
-          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onExit} title="Exit select mode">
+          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onExit} title={t("task.bulk.exitSelect")}>
             <X className="size-4" />
           </Button>
         </>

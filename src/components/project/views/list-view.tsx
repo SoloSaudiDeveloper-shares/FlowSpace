@@ -25,6 +25,7 @@ import {
   Repeat,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { useT } from "@/lib/hooks/use-i18n"
 import { SpeechButton } from "@/components/shared/speech-button"
 import {
   createTask,
@@ -152,6 +153,7 @@ interface ListViewProps {
 }
 
 export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, selectMode, selectedIds, onToggleSelect }: ListViewProps) {
+  const { t } = useT()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetTab, setSheetTab] = useState<"details" | "comments">("details")
@@ -284,13 +286,13 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
     const set = (data: Parameters<typeof updateTask>[2]) => updateTask(task.id, task.projectId, data)
     const items: ContextMenuEntry[] = [
       { header: true, title: task.title },
-      { label: "Open", icon: ExternalLink, onClick: () => openTask(task) },
-      { label: "Add comment", icon: MessageCircle, onClick: () => openTask(task, "comments") },
+      { label: t("proj.menu.open"), icon: ExternalLink, onClick: () => openTask(task) },
+      { label: t("proj.menu.addComment"), icon: MessageCircle, onClick: () => openTask(task, "comments") },
       running
-        ? { label: "Stop timer", icon: Pause, onClick: () => stopTaskTimer(task.id, task.projectId) }
-        : { label: "Start timer", icon: Play, onClick: () => startTaskTimer(task.id, task.projectId) },
+        ? { label: t("proj.menu.stopTimer"), icon: Pause, onClick: () => stopTaskTimer(task.id, task.projectId) }
+        : { label: t("proj.menu.startTimer"), icon: Play, onClick: () => startTaskTimer(task.id, task.projectId) },
       { separator: true },
-      { header: true, title: "Priority" },
+      { header: true, title: t("proj.menu.priority") },
       {
         colors: true,
         options: PRIORITY_PICKER.map((p) => ({ value: p.color, label: p.label })),
@@ -298,19 +300,19 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
         onPick: (color) => set({ priority: colorToPriority(color) }),
       },
       { separator: true },
-      { header: true, title: "Move to" },
+      { header: true, title: t("proj.menu.moveTo") },
       ...statuses.map((s) => ({
         label: s.name,
         swatchColor: s.color,
         onClick: () => set({ statusId: s.id, isCompleted: !!s.isDoneState }),
       })),
       { separator: true },
-      { header: true, title: "Due date" },
-      { label: "Today", icon: Calendar, onClick: () => set({ dueDate: isoDate(0) }) },
-      { label: "Tomorrow", icon: Calendar, onClick: () => set({ dueDate: isoDate(1) }) },
-      { label: "Next week", icon: Calendar, onClick: () => set({ dueDate: isoDate(7) }) },
+      { header: true, title: t("proj.menu.dueDate") },
+      { label: t("proj.menu.today"), icon: Calendar, onClick: () => set({ dueDate: isoDate(0) }) },
+      { label: t("proj.menu.tomorrow"), icon: Calendar, onClick: () => set({ dueDate: isoDate(1) }) },
+      { label: t("proj.menu.nextWeek"), icon: Calendar, onClick: () => set({ dueDate: isoDate(7) }) },
       {
-        label: "Custom date…",
+        label: t("proj.menu.customDate"),
         icon: CalendarClock,
         onClick: () => {
           pendingDateTask.current = task
@@ -322,21 +324,21 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
           }
         },
       },
-      { label: "Clear due date", icon: Calendar, onClick: () => set({ dueDate: null }) },
+      { label: t("proj.menu.clearDueDate"), icon: Calendar, onClick: () => set({ dueDate: null }) },
       { separator: true },
       {
-        label: task.isCompleted ? "Mark incomplete" : "Mark complete",
+        label: task.isCompleted ? t("proj.menu.markIncomplete") : t("proj.menu.markComplete"),
         icon: task.isCompleted ? Circle : CheckCircle2,
         onClick: () => set({ isCompleted: !task.isCompleted }),
       },
       {
-        label: "Delete task",
+        label: t("proj.menu.deleteTask"),
         icon: Trash2,
         variant: "destructive",
         onClick: async () => {
           const snap = await deleteTask(task.id, task.projectId)
-          toast.success("Task deleted", {
-            action: snap ? { label: "Undo", onClick: () => restoreTasks([snap], task.projectId) } : undefined,
+          toast.success(t("proj.toast.taskDeleted"), {
+            action: snap ? { label: t("proj.toast.undo"), onClick: () => restoreTasks([snap], task.projectId) } : undefined,
           })
         },
       },
@@ -348,15 +350,15 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
     <div className="flex flex-col">
       {/* Column headers */}
       <div className="flex items-center gap-2 px-4 py-2 border-b text-xs font-medium text-muted-foreground sticky top-0 bg-background z-10">
-        <div className="flex-1 pl-10 min-w-0">Name</div>
-        {cols.time && <div className="w-24 text-center shrink-0">Time</div>}
-        {cols.subtasks && <div className="w-14 text-center shrink-0">Subs</div>}
-        {cols.checklists && <div className="w-14 text-center shrink-0">Checks</div>}
-        {cols.labels && <div className="w-40 shrink-0">Labels</div>}
-        {cols.start && <div className="w-24 text-center shrink-0">Start</div>}
-        {cols.due && <div className="w-24 text-center shrink-0">Due</div>}
-        {cols.priority && <div className="w-16 text-center shrink-0">Prio</div>}
-        {cols.description && <div className="w-10 text-center shrink-0">Desc</div>}
+        <div className="flex-1 pl-10 min-w-0">{t("proj.col.name")}</div>
+        {cols.time && <div className="w-24 text-center shrink-0">{t("proj.col.time")}</div>}
+        {cols.subtasks && <div className="w-14 text-center shrink-0">{t("proj.col.subs")}</div>}
+        {cols.checklists && <div className="w-14 text-center shrink-0">{t("proj.col.checks")}</div>}
+        {cols.labels && <div className="w-40 shrink-0">{t("proj.col.labels")}</div>}
+        {cols.start && <div className="w-24 text-center shrink-0">{t("proj.col.start")}</div>}
+        {cols.due && <div className="w-24 text-center shrink-0">{t("proj.col.due")}</div>}
+        {cols.priority && <div className="w-16 text-center shrink-0">{t("proj.col.prio")}</div>}
+        {cols.description && <div className="w-10 text-center shrink-0">{t("proj.col.desc")}</div>}
       </div>
 
       {statuses.map((status) => {
@@ -455,6 +457,7 @@ function StatusGroup({
   onToggleSelect?: (id: string, opts?: { range?: boolean }) => void
   cursorId?: string | null
 }) {
+  const { t } = useT()
   const [isAdding, setIsAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
 
@@ -507,7 +510,7 @@ function StatusGroup({
               <div className="relative flex-1">
                 <Input
                   autoFocus
-                  placeholder={'Task name…  (try "fri #high")'}
+                  placeholder={t("proj.addTask.placeholder")}
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   onKeyDown={(e) => {
@@ -517,18 +520,18 @@ function StatusGroup({
                   className="h-7 text-sm pr-8"
                 />
                 <div className="absolute right-1 top-1/2 -translate-y-1/2">
-                  <SpeechButton onTranscript={(text) => setNewTitle((prev) => prev ? `${prev} ${text}` : text)} size="sm" showPulse={false} tooltip="Dictate task" />
+                  <SpeechButton onTranscript={(text) => setNewTitle((prev) => prev ? `${prev} ${text}` : text)} size="sm" showPulse={false} tooltip={t("proj.dictate")} />
                 </div>
               </div>
-              <button onClick={handleAdd} className="text-xs text-primary font-medium px-2">Save</button>
-              <button onClick={() => { setIsAdding(false); setNewTitle("") }} className="text-xs text-muted-foreground">Cancel</button>
+              <button onClick={handleAdd} className="text-xs text-primary font-medium px-2">{t("proj.addTask.save")}</button>
+              <button onClick={() => { setIsAdding(false); setNewTitle("") }} className="text-xs text-muted-foreground">{t("proj.addTask.cancel")}</button>
             </div>
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); setIsAdding(true) }}
               className="flex items-center gap-2 px-4 py-1.5 w-full text-xs text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors border-b pl-10"
             >
-              <Plus className="size-3" /> Add task
+              <Plus className="size-3" /> {t("proj.addTask")}
             </button>
           )}
         </>
@@ -568,6 +571,7 @@ function TaskRow({
   onToggleSelect?: (id: string, opts?: { range?: boolean }) => void
   isCursor?: boolean
 }) {
+  const { t } = useT()
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.none
   const barColor = PRIORITY_BAR[task.priority] ?? PRIORITY_BAR.none
   const dueDate = task.dueDate ? new Date(task.dueDate) : null
@@ -596,7 +600,7 @@ function TaskRow({
         <button
           className="shrink-0"
           onClick={(e) => { e.stopPropagation(); onToggleSelect?.(task.id, { range: e.shiftKey }) }}
-          aria-label={selected ? "Deselect" : "Select"}
+          aria-label={selected ? t("proj.row.deselect") : t("proj.row.select")}
         >
           {selected ? (
             <CheckSquare className="size-4 text-primary" />
@@ -617,7 +621,7 @@ function TaskRow({
         <button
           className="shrink-0 p-0.5 rounded hover:bg-accent text-muted-foreground"
           onClick={(e) => { e.stopPropagation(); onToggleExpand(task.id) }}
-          aria-label={isExpanded ? "Collapse subtasks" : "Expand subtasks"}
+          aria-label={isExpanded ? t("proj.row.collapseSubtasks") : t("proj.row.expandSubtasks")}
         >
           {isExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
         </button>
@@ -645,7 +649,7 @@ function TaskRow({
         }`}>
           {task.title}
         </span>
-        {task.repeatRule && <Repeat className="size-3 text-muted-foreground shrink-0" aria-label="Repeats" />}
+        {task.repeatRule && <Repeat className="size-3 text-muted-foreground shrink-0" aria-label={t("proj.row.repeats")} />}
       </div>
 
       {/* Time */}

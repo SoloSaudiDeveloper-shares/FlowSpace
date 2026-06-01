@@ -19,15 +19,17 @@ import {
   type ApiTokenRow,
 } from "@/lib/actions/api-token-actions"
 import { SectionHelp } from "@/components/shared/section-help"
+import { useT } from "@/lib/hooks/use-i18n"
 
 const EXPIRY_PRESETS = [
-  { label: "30 days", days: 30 },
-  { label: "90 days", days: 90 },
-  { label: "1 year", days: 365 },
-  { label: "Never", days: 0 },
+  { key: "settings.tokens.expiry.30d", days: 30 },
+  { key: "settings.tokens.expiry.90d", days: 90 },
+  { key: "settings.tokens.expiry.1y", days: 365 },
+  { key: "settings.tokens.expiry.never", days: 0 },
 ]
 
 export function ApiTokensSection() {
+  const { t } = useT()
   const [tokens, setTokens] = useState<ApiTokenRow[]>([])
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState("")
@@ -68,11 +70,11 @@ export function ApiTokensSection() {
   }
 
   async function handleRevoke(id: string, name: string) {
-    if (!confirm(`Revoke "${name}"? Any script using it stops working immediately.`)) return
+    if (!confirm(t("settings.tokens.revokeConfirm").replace("{name}", name))) return
     const r = await revokeApiToken(id)
     if (r.ok) {
-      toast.success(`Revoked "${name}"`)
-      setTokens((t) => t.filter((row) => row.id !== id))
+      toast.success(t("settings.tokens.revoked").replace("{name}", name))
+      setTokens((rows) => rows.filter((row) => row.id !== id))
     } else {
       toast.error(r.error)
     }
@@ -82,13 +84,13 @@ export function ApiTokensSection() {
     <div className="px-4 py-3 rounded-lg border bg-card space-y-3">
       <div className="flex items-center gap-2">
         <KeyRound className="size-4 text-muted-foreground" />
-        <h3 className="text-sm font-medium">API tokens</h3>
+        <h3 className="text-sm font-medium">{t("settings.tokens.title")}</h3>
         <SectionHelp guideId="apiTokens" className="ml-auto" />
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Long-lived bearer tokens for scripts and integrations. Send as
+        {t("settings.tokens.help")}
         <code className="px-1 py-0.5 mx-1 text-[10px] bg-muted/50 rounded">Authorization: Bearer flws_…</code>
-        on API routes that support it.
+        {t("settings.tokens.helpSuffix")}
       </p>
 
       {justIssued && (
@@ -96,12 +98,11 @@ export function ApiTokensSection() {
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="size-3.5 text-emerald-400" />
             <p className="text-xs font-medium text-emerald-200">
-              Token issued — copy it now
+              {t("settings.tokens.issued")}
             </p>
           </div>
           <p className="text-[11px] text-emerald-200/80 leading-relaxed">
-            This is the only time you'll see the full value. Store it in
-            your password manager or your script's secrets.
+            {t("settings.tokens.issuedHelp")}
           </p>
           <div className="flex items-center gap-1.5">
             <code className="flex-1 font-mono text-xs px-2 py-1.5 rounded bg-background/60 break-all">
@@ -126,7 +127,7 @@ export function ApiTokensSection() {
             className="h-7 text-[11px] w-full"
             onClick={() => setJustIssued(null)}
           >
-            I've saved it — close
+            {t("settings.tokens.saved")}
           </Button>
         </div>
       )}
@@ -135,7 +136,7 @@ export function ApiTokensSection() {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="What's this token for? (e.g. cron-importer)"
+          placeholder={t("settings.tokens.placeholder")}
           maxLength={100}
           className="flex-1 min-w-[160px] h-8 rounded-md border border-input bg-background px-2.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
@@ -146,7 +147,7 @@ export function ApiTokensSection() {
         >
           {EXPIRY_PRESETS.map((p) => (
             <option key={p.days} value={p.days}>
-              {p.label}
+              {t(p.key)}
             </option>
           ))}
         </select>
@@ -156,7 +157,7 @@ export function ApiTokensSection() {
           ) : (
             <Plus className="size-3" />
           )}
-          Issue
+          {t("settings.tokens.issue")}
         </Button>
       </form>
 
@@ -165,24 +166,24 @@ export function ApiTokensSection() {
           <Loader2 className="size-3 animate-spin text-muted-foreground" />
         ) : tokens.length === 0 ? (
           <p className="text-[11px] text-muted-foreground italic py-1">
-            No tokens yet.
+            {t("settings.tokens.empty")}
           </p>
         ) : (
-          tokens.map((t) => (
+          tokens.map((row) => (
             <div
-              key={t.id}
+              key={row.id}
               className="flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-accent/30 group"
             >
               <KeyRound className="size-3 text-muted-foreground/70 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate">{t.name}</p>
+                <p className="text-xs font-medium truncate">{row.name}</p>
                 <p className="text-[10px] text-muted-foreground/80">
-                  Created {relativeDate(t.createdAt)}
-                  {t.lastUsedAt
-                    ? ` · last used ${relativeDate(t.lastUsedAt)}`
-                    : " · never used"}
-                  {t.expiresAt
-                    ? ` · expires ${shortDate(t.expiresAt)}`
+                  {t("settings.tokens.created").replace("{when}", relativeDate(row.createdAt, t))}
+                  {row.lastUsedAt
+                    ? t("settings.tokens.lastUsed").replace("{when}", relativeDate(row.lastUsedAt, t))
+                    : t("settings.tokens.neverUsed")}
+                  {row.expiresAt
+                    ? t("settings.tokens.expires").replace("{when}", shortDate(row.expiresAt))
                     : ""}
                 </p>
               </div>
@@ -190,7 +191,7 @@ export function ApiTokensSection() {
                 size="sm"
                 variant="ghost"
                 className="h-6 w-6 p-0 text-destructive opacity-0 group-hover:opacity-100"
-                onClick={() => handleRevoke(t.id, t.name)}
+                onClick={() => handleRevoke(row.id, row.name)}
               >
                 <Trash2 className="size-3" />
               </Button>
@@ -202,18 +203,18 @@ export function ApiTokensSection() {
   )
 }
 
-function relativeDate(iso: string): string {
+function relativeDate(iso: string, t: (key: string) => string): string {
   const then = new Date(iso).getTime()
   const diffSec = Math.max(0, (Date.now() - then) / 1000)
-  if (diffSec < 60) return "just now"
+  if (diffSec < 60) return t("settings.tokens.justNow")
   const m = Math.floor(diffSec / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return t("settings.tokens.minutesAgo").replace("{n}", String(m))
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return t("settings.tokens.hoursAgo").replace("{n}", String(h))
   const d = Math.floor(h / 24)
-  if (d < 30) return `${d}d ago`
+  if (d < 30) return t("settings.tokens.daysAgo").replace("{n}", String(d))
   const mo = Math.floor(d / 30)
-  return `${mo}mo ago`
+  return t("settings.tokens.monthsAgo").replace("{n}", String(mo))
 }
 
 function shortDate(iso: string): string {

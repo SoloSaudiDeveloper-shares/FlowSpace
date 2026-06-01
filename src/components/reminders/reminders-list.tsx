@@ -8,6 +8,7 @@ import { updateReminder } from "@/lib/actions/reminder-actions"
 import { deleteElement } from "@/lib/actions/element-actions"
 import type { reminders, elements } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type Reminder = typeof reminders.$inferSelect
 type Element = typeof elements.$inferSelect
@@ -33,19 +34,20 @@ function formatRemindDate(dateStr: string) {
 }
 
 function ActiveReminderRow({ reminder, element }: { reminder: Reminder; element: Element }) {
+  const { t } = useT()
   const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
   const { text, isPast } = formatRemindDate(reminder.remindAt)
 
   function handleContextMenu(e: React.MouseEvent) {
     const items: ContextMenuEntry[] = [
       {
-        label: "Dismiss",
+        label: t("misc.reminders.dismiss"),
         icon: BellOff,
         onClick: () => updateReminder(reminder.id, { isDismissed: true }),
       },
       { separator: true },
       {
-        label: "Delete",
+        label: t("misc.reminders.delete"),
         icon: Trash2,
         variant: "destructive",
         onClick: () => deleteElement(reminder.id),
@@ -74,7 +76,7 @@ function ActiveReminderRow({ reminder, element }: { reminder: Reminder; element:
             </span>
             {isPast && (
               <Badge variant="destructive" className="text-xs px-1.5 py-0">
-                Overdue
+                {t("misc.reminders.overdue")}
               </Badge>
             )}
           </div>
@@ -124,18 +126,19 @@ function ActiveReminderRow({ reminder, element }: { reminder: Reminder; element:
 }
 
 function DismissedReminderRow({ reminder, element }: { reminder: Reminder; element: Element }) {
+  const { t } = useT()
   const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
 
   function handleContextMenu(e: React.MouseEvent) {
     const items: ContextMenuEntry[] = [
       {
-        label: "Restore",
+        label: t("misc.reminders.restore"),
         icon: Bell,
         onClick: () => updateReminder(reminder.id, { isDismissed: false }),
       },
       { separator: true },
       {
-        label: "Delete",
+        label: t("misc.reminders.delete"),
         icon: Trash2,
         variant: "destructive",
         onClick: () => deleteElement(reminder.id),
@@ -158,7 +161,7 @@ function DismissedReminderRow({ reminder, element }: { reminder: Reminder; eleme
           className="text-xs"
           onClick={() => updateReminder(reminder.id, { isDismissed: false })}
         >
-          Restore
+          {t("misc.reminders.restore")}
         </Button>
       </div>
 
@@ -175,6 +178,7 @@ function DismissedReminderRow({ reminder, element }: { reminder: Reminder; eleme
 }
 
 export function RemindersList({ reminders }: RemindersListProps) {
+  const { t } = useT()
   const active = reminders.filter((r) => !r.reminder.isDismissed)
   const dismissed = reminders.filter((r) => r.reminder.isDismissed)
 
@@ -184,11 +188,11 @@ export function RemindersList({ reminders }: RemindersListProps) {
       <div>
         <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
           <Bell className="size-4" />
-          Active ({active.length})
+          {t("misc.reminders.active").replace("{count}", String(active.length))}
         </h2>
         {active.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8 border rounded-lg border-dashed">
-            No active reminders
+            {t("misc.reminders.empty")}
           </p>
         ) : (
           <div className="space-y-2">
@@ -204,7 +208,7 @@ export function RemindersList({ reminders }: RemindersListProps) {
         <div>
           <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
             <BellOff className="size-4" />
-            Dismissed ({dismissed.length})
+            {t("misc.reminders.dismissed").replace("{count}", String(dismissed.length))}
           </h2>
           <div className="space-y-2 opacity-60">
             {dismissed.map(({ reminder, element }) => (

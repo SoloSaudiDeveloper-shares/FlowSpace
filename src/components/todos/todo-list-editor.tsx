@@ -16,6 +16,7 @@ import {
 import type { todoItems } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type TodoItem = typeof todoItems.$inferSelect & {
   priority?: "urgent" | "high" | "medium" | "low" | null
@@ -29,6 +30,7 @@ interface TodoListEditorProps {
 import { PRIORITY_COLOR as PRIORITY_COLORS, PRIORITY_LABEL } from "@/lib/priority"
 
 export function TodoListEditor({ listId, items }: TodoListEditorProps) {
+  const { t } = useT()
   const [newTitle, setNewTitle] = useState("")
   // Items hidden optimistically while their delete is in flight, so removal is
   // instant on screen instead of waiting for the server revalidation round-trip.
@@ -51,7 +53,7 @@ export function TodoListEditor({ listId, items }: TodoListEditorProps) {
         next.delete(id)
         return next
       })
-      toast.error("Couldn't delete that item")
+      toast.error(t("misc.todo.deleteError"))
     }
   }
 
@@ -81,7 +83,7 @@ export function TodoListEditor({ listId, items }: TodoListEditorProps) {
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Input
-            placeholder="Add a new item..."
+            placeholder={t("misc.todo.addPlaceholder")}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => {
@@ -94,7 +96,7 @@ export function TodoListEditor({ listId, items }: TodoListEditorProps) {
               onTranscript={(text) => setNewTitle((prev) => prev ? `${prev} ${text}` : text)}
               size="sm"
               showPulse={false}
-              tooltip="Dictate item"
+              tooltip={t("misc.todo.dictate")}
               preferAccuracy
             />
           </div>
@@ -111,7 +113,7 @@ export function TodoListEditor({ listId, items }: TodoListEditorProps) {
         ))}
         {visibleItems.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No items yet. Add one above.
+            {t("misc.todo.empty")}
           </p>
         )}
       </div>
@@ -120,6 +122,7 @@ export function TodoListEditor({ listId, items }: TodoListEditorProps) {
 }
 
 function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: string; onDelete: (id: string) => void }) {
+  const { t } = useT()
   const [title, setTitle] = useState(item.title)
   const [isEditing, setIsEditing] = useState(false)
   /** "priority" | "date" | null — which inline popover is open. */
@@ -129,29 +132,29 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
   function handleContextMenu(e: React.MouseEvent) {
     const entries: ContextMenuEntry[] = [
       {
-        label: "Rename",
+        label: t("misc.todo.rename"),
         icon: Pencil,
         onClick: () => setIsEditing(true),
       },
       {
-        label: item.isCompleted ? "Mark incomplete" : "Mark complete",
+        label: item.isCompleted ? t("misc.todo.markIncomplete") : t("misc.todo.markComplete"),
         icon: item.isCompleted ? Square : CheckSquare,
         onClick: () => updateTodoItem(item.id, listId, { isCompleted: !item.isCompleted }),
       },
       { separator: true },
       {
-        label: item.priority ? `Priority: ${PRIORITY_LABEL[item.priority]}` : "Set priority…",
+        label: item.priority ? t("misc.todo.priorityNamed").replace("{priority}", PRIORITY_LABEL[item.priority]) : t("misc.todo.setPriority"),
         icon: Flag,
         onClick: () => setActivePopover("priority"),
       },
       {
-        label: item.dueDate ? `Due ${new Date(item.dueDate).toLocaleDateString()}` : "Set due date…",
+        label: item.dueDate ? t("misc.todo.due").replace("{date}", new Date(item.dueDate).toLocaleDateString()) : t("misc.todo.setDueDate"),
         icon: Calendar,
         onClick: () => setActivePopover("date"),
       },
       { separator: true },
       {
-        label: "Delete",
+        label: t("misc.todo.delete"),
         icon: Trash2,
         variant: "destructive",
         onClick: () => onDelete(item.id),
@@ -181,7 +184,7 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
                 ? "bg-green-500 border-green-500"
                 : "border-muted-foreground/30 hover:border-green-500"
             }`}
-            aria-label={item.isCompleted ? "Mark incomplete" : "Mark complete"}
+            aria-label={item.isCompleted ? t("misc.todo.markIncomplete") : t("misc.todo.markComplete")}
           >
             {item.isCompleted && (
               <svg className="size-3 text-white" viewBox="0 0 12 12" fill="none">
@@ -199,7 +202,7 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
               onBlur={() => {
                 setIsEditing(false)
                 if (title !== item.title) {
-                  updateTodoItem(item.id, listId, { title: title || "Untitled" })
+                  updateTodoItem(item.id, listId, { title: title || t("misc.todo.untitled") })
                 }
               }}
               onKeyDown={(e) => {
@@ -230,8 +233,8 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
               className={`size-7 rounded-md flex items-center justify-center transition-colors ${
                 priorityColor ? "" : "text-muted-foreground/40 hover:text-foreground"
               } hover:bg-accent`}
-              aria-label="Set priority"
-              title={item.priority ? `Priority: ${PRIORITY_LABEL[item.priority]}` : "Set priority"}
+              aria-label={t("misc.todo.setPriorityShort")}
+              title={item.priority ? t("misc.todo.priorityNamed").replace("{priority}", PRIORITY_LABEL[item.priority]) : t("misc.todo.setPriorityShort")}
               style={priorityColor ? { color: priorityColor } : undefined}
             >
               <Flag className={item.priority ? "size-3.5 fill-current" : "size-3.5"} />
@@ -242,7 +245,7 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
               className={`h-7 px-1.5 rounded-md flex items-center gap-1 text-[11px] transition-colors hover:bg-accent ${
                 item.dueDate ? "text-foreground" : "text-muted-foreground/40 hover:text-foreground"
               }`}
-              aria-label={item.dueDate ? `Due ${new Date(item.dueDate).toLocaleDateString()}` : "Set due date"}
+              aria-label={item.dueDate ? t("misc.todo.due").replace("{date}", new Date(item.dueDate).toLocaleDateString()) : t("misc.todo.setDueDateShort")}
             >
               <Calendar className="size-3.5" />
               {item.dueDate && (
@@ -256,7 +259,7 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
               size="icon"
               className="size-7 text-muted-foreground/40 hover:text-foreground"
               onClick={(e) => handleContextMenu(e as unknown as React.MouseEvent)}
-              aria-label="More actions"
+              aria-label={t("misc.todo.moreActions")}
             >
               <MoreVertical className="size-3.5" />
             </Button>
@@ -265,8 +268,8 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
               size="icon"
               className="size-7 text-muted-foreground/40 hover:text-destructive"
               onClick={() => onDelete(item.id)}
-              aria-label="Delete item"
-              title="Delete"
+              aria-label={t("misc.todo.deleteItem")}
+              title={t("misc.todo.delete")}
             >
               <Trash2 className="size-3.5" />
             </Button>
@@ -277,7 +280,7 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
         {activePopover === "priority" && (
           <div className="border-t bg-background/95 backdrop-blur-sm px-2 sm:px-3 py-2 flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mr-1">
-              Priority
+              {t("misc.todo.priorityLabel")}
             </span>
             {(["urgent", "high", "medium", "low"] as const).map((p) => (
               <button
@@ -304,14 +307,14 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
                 }}
                 className="px-2 py-1 rounded-full text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
-                <X className="size-3" /> Clear
+                <X className="size-3" /> {t("misc.todo.clear")}
               </button>
             )}
             <button
               type="button"
               onClick={() => setActivePopover(null)}
               className="ml-auto size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center"
-              aria-label="Close"
+              aria-label={t("misc.todo.close")}
             >
               <X className="size-3" />
             </button>
@@ -322,15 +325,15 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
         {activePopover === "date" && (
           <div className="border-t bg-background/95 backdrop-blur-sm px-2 sm:px-3 py-2 flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mr-1">
-              Due
+              {t("misc.todo.dueLabel")}
             </span>
             {[
-              { label: "Today",     fn: () => isoDate(0) },
-              { label: "Tomorrow",  fn: () => isoDate(1) },
-              { label: "Next week", fn: () => isoDate(7) },
+              { key: "today",    label: t("misc.todo.today"),    fn: () => isoDate(0) },
+              { key: "tomorrow", label: t("misc.todo.tomorrow"), fn: () => isoDate(1) },
+              { key: "nextWeek", label: t("misc.todo.nextWeek"), fn: () => isoDate(7) },
             ].map((preset) => (
               <button
-                key={preset.label}
+                key={preset.key}
                 type="button"
                 onClick={() => {
                   updateTodoItem(item.id, listId, { dueDate: preset.fn() })
@@ -358,14 +361,14 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
                 }}
                 className="px-2 py-1 rounded-full text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
-                <X className="size-3" /> Clear
+                <X className="size-3" /> {t("misc.todo.clear")}
               </button>
             )}
             <button
               type="button"
               onClick={() => setActivePopover(null)}
               className="ml-auto size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center"
-              aria-label="Close"
+              aria-label={t("misc.todo.close")}
             >
               <X className="size-3" />
             </button>

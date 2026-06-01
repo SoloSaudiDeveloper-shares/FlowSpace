@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Plus, Flag, ChevronDown, ChevronRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { useT } from "@/lib/hooks/use-i18n"
 import { SpeechButton } from "@/components/shared/speech-button"
 import { createTask, updateTask } from "@/lib/actions/task-actions"
 import { PRIORITY_TEXT_CLASS as PRIORITY_COLORS } from "@/lib/priority"
@@ -13,12 +14,12 @@ type Task = typeof tasks.$inferSelect
 type TaskStatus = typeof taskStatuses.$inferSelect
 
 // This view shows an em-dash for "none" in the Priority column \u2014 kept local.
-const PRIORITY_LABELS: Record<string, string> = {
-  urgent: "Urgent",
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-  none: "\u2014",
+// Maps each priority value to its display translation key (none stays an em-dash).
+const PRIORITY_LABEL_KEYS: Record<string, string> = {
+  urgent: "proj.val.urgent",
+  high: "proj.val.high",
+  medium: "proj.val.medium",
+  low: "proj.val.low",
 }
 
 const INDENT_PX = 20
@@ -72,6 +73,7 @@ interface TableViewProps {
 }
 
 export function TableView({ projectId, statuses, tasks }: TableViewProps) {
+  const { t } = useT()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
@@ -116,10 +118,10 @@ export function TableView({ projectId, statuses, tasks }: TableViewProps) {
         <thead>
           <tr className="border-b bg-muted/30 sticky top-0 z-10">
             <th className="w-8 px-3 py-2 text-left text-xs font-medium text-muted-foreground">#</th>
-            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
-            <th className="w-36 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
-            <th className="w-32 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Due Date</th>
-            <th className="w-28 px-3 py-2 text-left text-xs font-medium text-muted-foreground">Priority</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">{t("proj.col.name")}</th>
+            <th className="w-36 px-3 py-2 text-left text-xs font-medium text-muted-foreground">{t("proj.col.status")}</th>
+            <th className="w-32 px-3 py-2 text-left text-xs font-medium text-muted-foreground">{t("proj.col.dueDate")}</th>
+            <th className="w-28 px-3 py-2 text-left text-xs font-medium text-muted-foreground">{t("proj.col.priority")}</th>
           </tr>
         </thead>
         <tbody>
@@ -160,7 +162,7 @@ export function TableView({ projectId, statuses, tasks }: TableViewProps) {
                           e.stopPropagation()
                           toggleExpanded(task.id)
                         }}
-                        aria-label={isExpanded ? "Collapse" : "Expand"}
+                        aria-label={isExpanded ? t("proj.row.collapse") : t("proj.row.expand")}
                       >
                         {isExpanded ? (
                           <ChevronDown className="size-3" />
@@ -223,7 +225,7 @@ export function TableView({ projectId, statuses, tasks }: TableViewProps) {
                 <td className="px-3 py-2">
                   <span className={`flex items-center gap-1 text-xs ${priorityColor}`}>
                     {task.priority !== "none" && <Flag className="size-3" />}
-                    {PRIORITY_LABELS[task.priority] ?? "\u2014"}
+                    {PRIORITY_LABEL_KEYS[task.priority] ? t(PRIORITY_LABEL_KEYS[task.priority]) : "\u2014"}
                   </span>
                 </td>
               </tr>
@@ -239,7 +241,7 @@ export function TableView({ projectId, statuses, tasks }: TableViewProps) {
                   <div className="relative max-w-xs flex-1">
                     <Input
                       autoFocus
-                      placeholder="Task name..."
+                      placeholder={t("proj.addTask.placeholderPlain")}
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
                       onKeyDown={(e) => {
@@ -249,11 +251,11 @@ export function TableView({ projectId, statuses, tasks }: TableViewProps) {
                       className="h-7 text-sm pr-8"
                     />
                     <div className="absolute right-1 top-1/2 -translate-y-1/2">
-                      <SpeechButton onTranscript={(text) => setNewTitle((prev) => prev ? `${prev} ${text}` : text)} size="sm" showPulse={false} tooltip="Dictate task" />
+                      <SpeechButton onTranscript={(text) => setNewTitle((prev) => prev ? `${prev} ${text}` : text)} size="sm" showPulse={false} tooltip={t("proj.dictate")} />
                     </div>
                   </div>
-                  <button onClick={handleAdd} className="text-xs text-primary font-medium">Save</button>
-                  <button onClick={() => { setIsAdding(false); setNewTitle("") }} className="text-xs text-muted-foreground">Cancel</button>
+                  <button onClick={handleAdd} className="text-xs text-primary font-medium">{t("proj.addTask.save")}</button>
+                  <button onClick={() => { setIsAdding(false); setNewTitle("") }} className="text-xs text-muted-foreground">{t("proj.addTask.cancel")}</button>
                 </div>
               </td>
             </tr>
@@ -268,7 +270,7 @@ export function TableView({ projectId, statuses, tasks }: TableViewProps) {
           className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors border-b w-full"
         >
           <Plus className="size-3" />
-          Add task
+          {t("proj.addTask")}
         </button>
       )}
 

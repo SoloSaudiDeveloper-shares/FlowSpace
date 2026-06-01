@@ -88,6 +88,7 @@ import {
   deleteComment,
 } from "@/lib/actions/comment-actions"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import type { tasks, taskStatuses, taskLabels as taskLabelsTable } from "@/lib/db/schema"
 
 type Task = typeof tasks.$inferSelect
@@ -110,9 +111,9 @@ const LABEL_COLORS = [
 ]
 
 const DEP_TYPES = [
-  { value: "blocks" as const, label: "Blocks" },
-  { value: "blocked_by" as const, label: "Blocked by" },
-  { value: "relates_to" as const, label: "Relates to" },
+  { value: "blocks" as const, labelKey: "task.depType.blocks" },
+  { value: "blocked_by" as const, labelKey: "task.depType.blocked_by" },
+  { value: "relates_to" as const, labelKey: "task.depType.relates_to" },
 ]
 
 interface TaskDetailSheetProps {
@@ -216,6 +217,7 @@ export function TaskDetailSheet({
   initialTab,
   autoStartTimer,
 }: TaskDetailSheetProps) {
+  const { t } = useT()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
 
@@ -387,7 +389,7 @@ export function TaskDetailSheet({
 
   function handleTitleBlur() {
     if (task && title !== task.title) {
-      updateTask(task.id, task.projectId, { title: title || "Untitled" })
+      updateTask(task.id, task.projectId, { title: title || t("task.sheet.untitled") })
     }
   }
 
@@ -505,10 +507,10 @@ export function TaskDetailSheet({
       formData.append("projectId", task.projectId)
       const res = await fetch("/api/attachments", { method: "POST", body: formData })
       if (!res.ok) throw new Error("Upload failed")
-      toast.success("File attached")
+      toast.success(t("task.toast.fileAttached"))
       setAttachments(await getTaskAttachments(task.id))
     } catch {
-      toast.error("Upload failed")
+      toast.error(t("task.toast.uploadFailed"))
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
@@ -523,10 +525,10 @@ export function TaskDetailSheet({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, projectId: task.projectId }),
       })
-      toast.success("Attachment removed")
+      toast.success(t("task.toast.attachmentRemoved"))
       setAttachments(await getTaskAttachments(task.id))
     } catch {
-      toast.error("Failed to remove attachment")
+      toast.error(t("task.toast.attachmentRemoveFailed"))
     }
   }
 
@@ -539,7 +541,7 @@ export function TaskDetailSheet({
   async function handleDuplicate() {
     if (!task) return
     await duplicateTask(task.id, task.projectId)
-    toast.success("Task duplicated")
+    toast.success(t("task.toast.duplicated"))
     onOpenChange(false)
   }
 
@@ -547,7 +549,7 @@ export function TaskDetailSheet({
     if (!task) return
     navigator.clipboard.writeText(task.id)
     setCopied(true)
-    toast.success("Task ID copied")
+    toast.success(t("task.toast.idCopied"))
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -560,11 +562,11 @@ export function TaskDetailSheet({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-5xl max-h-[85vh] p-0 overflow-hidden" showCloseButton={false}>
         <DialogHeader className="sr-only">
-          <DialogTitle>Edit Task</DialogTitle>
-          <DialogDescription>Edit task details</DialogDescription>
+          <DialogTitle>{t("task.sheet.editTask")}</DialogTitle>
+          <DialogDescription>{t("task.sheet.editTaskDesc")}</DialogDescription>
         </DialogHeader>
 
-        <div className="flex h-[75vh]" role="dialog" aria-label={`Task: ${task.title}`}>
+        <div className="flex h-[75vh]" role="dialog" aria-label={t("task.sheet.taskAria").replace("{title}", task.title)}>
           {/* ── Left sidebar: subtask tree ── */}
           <div className="w-56 shrink-0 border-r bg-muted/20 flex flex-col overflow-y-auto">
             <div className="px-3 py-3 border-b">
@@ -574,9 +576,9 @@ export function TaskDetailSheet({
               </div>
             </div>
 
-            <div className="flex-1 px-3 py-2" role="list" aria-label="Subtasks">
+            <div className="flex-1 px-3 py-2" role="list" aria-label={t("task.subtasks.aria")}>
               {subtasks.length === 0 && (
-                <p className="text-xs text-muted-foreground/50 px-2 py-4 text-center">No subtasks</p>
+                <p className="text-xs text-muted-foreground/50 px-2 py-4 text-center">{t("task.subtasks.empty")}</p>
               )}
               {subtasks.map((sub) => (
                 <div
@@ -589,7 +591,7 @@ export function TaskDetailSheet({
                     tabIndex={0}
                     onClick={() => handleToggleSubtask(sub)}
                     onKeyDown={(e) => { if (e.key === "Enter") handleToggleSubtask(sub) }}
-                    aria-label={sub.isCompleted ? "Mark incomplete" : "Mark complete"}
+                    aria-label={sub.isCompleted ? t("task.subtasks.markIncomplete") : t("task.subtasks.markComplete")}
                   >
                     {sub.isCompleted ? (
                       <CheckSquare className="size-3 text-primary" />
@@ -614,7 +616,7 @@ export function TaskDetailSheet({
                       }
                     }}
                     className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive cursor-pointer"
-                    aria-label="Delete subtask"
+                    aria-label={t("task.subtasks.delete")}
                   >
                     <X className="size-3" />
                   </div>
@@ -630,7 +632,7 @@ export function TaskDetailSheet({
                       autoFocus
                       value={newSubtaskTitle}
                       onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                      placeholder="Subtask name..."
+                      placeholder={t("task.subtasks.namePlaceholder")}
                       className="h-7 text-xs pr-8"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleAddSubtask()
@@ -645,13 +647,13 @@ export function TaskDetailSheet({
                         onTranscript={(text) => setNewSubtaskTitle((prev) => prev ? `${prev} ${text}` : text)}
                         size="sm"
                         showPulse={false}
-                        tooltip="Dictate subtask"
+                        tooltip={t("task.subtasks.dictate")}
                       />
                     </div>
                   </div>
                   <div className="flex gap-1">
-                    <Button size="sm" className="h-6 text-xs" onClick={handleAddSubtask}>Add</Button>
-                    <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setIsAddingSubtask(false); setNewSubtaskTitle("") }}>Cancel</Button>
+                    <Button size="sm" className="h-6 text-xs" onClick={handleAddSubtask}>{t("task.checklists.add")}</Button>
+                    <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => { setIsAddingSubtask(false); setNewSubtaskTitle("") }}>{t("task.checklists.cancel")}</Button>
                   </div>
                 </div>
               ) : (
@@ -663,7 +665,7 @@ export function TaskDetailSheet({
                   className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer rounded-md hover:bg-accent/50"
                 >
                   <GitBranch className="size-3" />
-                  Add Subtask
+                  {t("task.subtasks.add")}
                 </div>
               )}
             </div>
@@ -679,47 +681,47 @@ export function TaskDetailSheet({
                 onBlur={handleTitleBlur}
                 onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur() }}
                 className="w-full text-2xl font-bold bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
-                placeholder="Task title"
-                aria-label="Task title"
+                placeholder={t("task.sheet.titlePlaceholder")}
+                aria-label={t("task.sheet.titleAria")}
               />
               {/* Settings menu (per ClickUp spec: task settings menu) */}
               <DropdownMenu>
-                <DropdownMenuTrigger className="shrink-0 p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground" aria-label="Task actions">
+                <DropdownMenuTrigger className="shrink-0 p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground" aria-label={t("task.actions.aria")}>
                   <MoreHorizontal className="size-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={handleDuplicate}>
                     <Copy className="size-3.5 mr-2" />
-                    Duplicate task
+                    {t("task.actions.duplicate")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleCopyId}>
                     <ClipboardCopy className="size-3.5 mr-2" />
-                    {copied ? "Copied!" : "Copy task ID"}
+                    {copied ? t("task.actions.copied") : t("task.actions.copyId")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setEmailDialogOpen(true)}>
                     <Mail className="size-3.5 mr-2" />
-                    Send as email…
+                    {t("task.actions.sendAsEmail")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
-                    onClick={() => { deleteTask(task.id, task.projectId); toast.success("Task deleted"); onOpenChange(false) }}
+                    onClick={() => { deleteTask(task.id, task.projectId); toast.success(t("task.toast.deleted")); onOpenChange(false) }}
                   >
                     <Trash2 className="size-3.5 mr-2" />
-                    Delete task
+                    {t("task.actions.delete")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
 
             {/* ── Properties section (collapsible) ── */}
-            <Section title="Properties" icon={CircleDot} defaultOpen={true}>
+            <Section title={t("task.props.title")} icon={CircleDot} defaultOpen={true}>
               <div className="px-6 space-y-1">
                 {/* Status */}
                 <div className="flex items-center h-9">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground w-36 shrink-0">
                     <CircleDot className="size-3.5" />
-                    Status
+                    {t("task.props.status")}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-accent">
@@ -742,12 +744,12 @@ export function TaskDetailSheet({
                 <div className="flex items-center h-9">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground w-36 shrink-0">
                     <Flag className="size-3.5" />
-                    Priority
+                    {t("task.props.priority")}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-accent">
                       <Flag className="size-3" style={{ color: currentPriority?.color }} />
-                      <span className="font-medium">{currentPriority?.label ?? "None"}</span>
+                      <span className="font-medium">{currentPriority?.label ?? t("task.props.priorityNone")}</span>
                       <ChevronDown className="size-3 text-muted-foreground" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
@@ -765,7 +767,7 @@ export function TaskDetailSheet({
                 <div className="flex items-center h-9">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground w-36 shrink-0">
                     <Calendar className="size-3.5" />
-                    Dates
+                    {t("task.props.dates")}
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -773,7 +775,7 @@ export function TaskDetailSheet({
                       value={startDate}
                       onChange={(e) => { setStartDate(e.target.value); updateTask(task.id, task.projectId, { startDate: e.target.value || null }) }}
                       className="bg-transparent text-sm border rounded px-1.5 py-0.5 w-[120px]"
-                      aria-label="Start date"
+                      aria-label={t("task.props.startDate")}
                     />
                     <ArrowRight className="size-3 text-muted-foreground" />
                     <input
@@ -781,7 +783,7 @@ export function TaskDetailSheet({
                       value={dueDate}
                       onChange={(e) => { setDueDate(e.target.value); updateTask(task.id, task.projectId, { dueDate: e.target.value || null }) }}
                       className="bg-transparent text-sm border rounded px-1.5 py-0.5 w-[120px]"
-                      aria-label="Due date"
+                      aria-label={t("task.props.dueDate")}
                     />
                   </div>
                 </div>
@@ -790,7 +792,7 @@ export function TaskDetailSheet({
                 <div className="flex items-center h-9">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground w-36 shrink-0">
                     <Repeat className="size-3.5" />
-                    Repeat
+                    {t("task.props.repeat")}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger className="inline-flex items-center gap-1.5 text-sm rounded px-2 py-1 hover:bg-accent">
@@ -812,7 +814,7 @@ export function TaskDetailSheet({
                     </DropdownMenuContent>
                   </DropdownMenu>
                   {repeatRule && !dueDate && (
-                    <span className="ml-2 text-[11px] text-amber-500">Set a due date so it can repeat</span>
+                    <span className="ml-2 text-[11px] text-amber-500">{t("task.props.repeatNeedsDue")}</span>
                   )}
                 </div>
 
@@ -820,7 +822,7 @@ export function TaskDetailSheet({
                 <div className="flex items-center min-h-[36px]">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground w-36 shrink-0">
                     <Tag className="size-3.5" />
-                    Tags
+                    {t("task.props.tags")}
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {taskLabelsList.map((label) => (
@@ -837,7 +839,7 @@ export function TaskDetailSheet({
                           onClick={() => handleRemoveLabel(label.id)}
                           onKeyDown={(e) => { if (e.key === "Enter") handleRemoveLabel(label.id) }}
                           className="ml-0.5 hover:opacity-70 cursor-pointer"
-                          aria-label={`Remove tag ${label.name}`}
+                          aria-label={t("task.props.removeTag").replace("{name}", label.name)}
                         >
                           <X className="size-2.5" />
                         </span>
@@ -846,7 +848,7 @@ export function TaskDetailSheet({
                     <DropdownMenu open={showLabelPicker} onOpenChange={setShowLabelPicker}>
                       <DropdownMenuTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-accent">
                         <Plus className="size-3" />
-                        {taskLabelsList.length === 0 ? "Add tag" : ""}
+                        {taskLabelsList.length === 0 ? t("task.props.addTag") : ""}
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-56">
                         {unassignedLabels.map((label) => (
@@ -857,12 +859,12 @@ export function TaskDetailSheet({
                         ))}
                         {unassignedLabels.length > 0 && <DropdownMenuSeparator />}
                         <div className="px-2 py-1.5">
-                          <p className="text-xs text-muted-foreground mb-1.5">Create new tag</p>
+                          <p className="text-xs text-muted-foreground mb-1.5">{t("task.props.createNewTag")}</p>
                           <div className="flex gap-1.5">
                             <Input
                               value={newLabelName}
                               onChange={(e) => setNewLabelName(e.target.value)}
-                              placeholder="Tag name"
+                              placeholder={t("task.props.tagNamePlaceholder")}
                               className="h-7 text-xs"
                               onKeyDown={(e) => { if (e.key === "Enter") handleCreateLabel(); e.stopPropagation() }}
                             />
@@ -887,7 +889,7 @@ export function TaskDetailSheet({
                           </div>
                           {newLabelName.trim() && (
                             <Button size="sm" className="mt-1.5 h-6 text-xs w-full" onClick={handleCreateLabel}>
-                              Create
+                              {t("task.props.create")}
                             </Button>
                           )}
                         </div>
@@ -899,7 +901,7 @@ export function TaskDetailSheet({
             </Section>
 
             {/* ── Time tracking section ── */}
-            <Section title="Time Tracking" icon={Timer}>
+            <Section title={t("task.time.title")} icon={Timer}>
               <div className="px-6 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -909,7 +911,7 @@ export function TaskDetailSheet({
                       onClick={() => isTracking ? stopTracking() : startTracking()}
                       onKeyDown={(e) => { if (e.key === "Enter") isTracking ? stopTracking() : startTracking() }}
                       className="flex items-center gap-2 cursor-pointer select-none"
-                      aria-label={isTracking ? "Stop timer" : "Start timer"}
+                      aria-label={isTracking ? t("task.time.stopTimer") : t("task.time.startTimer")}
                     >
                       {isTracking ? (
                         <span className="size-6 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -926,7 +928,7 @@ export function TaskDetailSheet({
                         </span>
                         {elapsed >= 60 && (
                           <span className="text-[10px] text-muted-foreground">
-                            {humanDuration(elapsed)} tracked
+                            {t("task.time.tracked").replace("{duration}", humanDuration(elapsed))}
                           </span>
                         )}
                       </span>
@@ -935,12 +937,12 @@ export function TaskDetailSheet({
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Clock className="size-3.5" />
-                      Estimate:
+                      {t("task.time.estimate")}
                     </div>
                     <input
                       type="number"
                       min={0}
-                      placeholder="min"
+                      placeholder={t("task.time.estimatePlaceholder")}
                       value={timeEstimate ?? ""}
                       onChange={(e) => {
                         const val = e.target.value ? parseInt(e.target.value) : null
@@ -948,7 +950,7 @@ export function TaskDetailSheet({
                         updateTask(task.id, task.projectId, { timeEstimate: val })
                       }}
                       className="bg-transparent text-sm border rounded px-2 py-0.5 w-16"
-                      aria-label="Time estimate in minutes"
+                      aria-label={t("task.time.estimateAria")}
                     />
                     <span className="text-xs text-muted-foreground">
                       {timeEstimate ? (timeEstimate >= 60 ? `${Math.floor(timeEstimate / 60)}h ${timeEstimate % 60}m` : `${timeEstimate}m`) : ""}
@@ -958,7 +960,7 @@ export function TaskDetailSheet({
                 {timeEstimate && timeEstimate > 0 && (
                   <div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                      <span>Progress</span>
+                      <span>{t("task.time.progress")}</span>
                       <span>{Math.min(100, Math.round((elapsed / (timeEstimate * 60)) * 100))}%</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
@@ -973,16 +975,16 @@ export function TaskDetailSheet({
             </Section>
 
             {/* ── Description section ── */}
-            <Section title="Description" icon={FileText}>
+            <Section title={t("task.desc.title")} icon={FileText}>
               <div className="px-6">
                 <div className="relative">
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     onBlur={handleDescBlur}
-                    placeholder="Add a detailed description..."
+                    placeholder={t("task.desc.placeholder")}
                     className="w-full min-h-[80px] bg-transparent text-sm resize-none outline-none placeholder:text-muted-foreground/50 leading-relaxed pr-9"
-                    aria-label="Task description"
+                    aria-label={t("task.desc.aria")}
                   />
                   <div className="absolute top-1 right-1 flex gap-0.5">
                     <AIActionButton
@@ -997,11 +999,11 @@ export function TaskDetailSheet({
                       actions={["summarize", "expand", "fix_grammar", "improve", "continue"]}
                       size="sm"
                     />
-                    <TTSButton text={description} size="sm" tooltip="Read description" />
+                    <TTSButton text={description} size="sm" tooltip={t("task.desc.readAloud")} />
                     <SpeechButton
                       onTranscript={(text) => setDescription((prev) => prev ? `${prev} ${text}` : text)}
                       size="sm"
-                      tooltip="Dictate description"
+                      tooltip={t("task.desc.dictate")}
                     />
                   </div>
                 </div>
@@ -1020,7 +1022,7 @@ export function TaskDetailSheet({
             )}
 
             {/* ── Checklists section ── */}
-            <Section title="Checklists" icon={ListChecks} count={checklists.length}>
+            <Section title={t("task.checklists.title")} icon={ListChecks} count={checklists.length}>
               <div className="px-6">
                 {checklists.map((cl) => {
                   const completed = cl.items.filter((i) => i.isCompleted).length
@@ -1036,10 +1038,10 @@ export function TaskDetailSheet({
                           {total > 0 && <span className="text-[10px] text-muted-foreground">{completed}/{total}</span>}
                         </div>
                         <div className="flex items-center gap-1">
-                          <div role="button" tabIndex={0} onClick={() => { setAddingItemTo(cl.id); setNewItemTitle("") }} onKeyDown={(e) => { if (e.key === "Enter") { setAddingItemTo(cl.id); setNewItemTitle("") } }} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer p-0.5" aria-label="Add item">
+                          <div role="button" tabIndex={0} onClick={() => { setAddingItemTo(cl.id); setNewItemTitle("") }} onKeyDown={(e) => { if (e.key === "Enter") { setAddingItemTo(cl.id); setNewItemTitle("") } }} className="text-xs text-muted-foreground hover:text-foreground cursor-pointer p-0.5" aria-label={t("task.checklists.addItem")}>
                             <Plus className="size-3" />
                           </div>
-                          <div role="button" tabIndex={0} onClick={() => handleDeleteChecklist(cl.id)} onKeyDown={(e) => { if (e.key === "Enter") handleDeleteChecklist(cl.id) }} className="text-xs text-muted-foreground hover:text-destructive cursor-pointer p-0.5" aria-label="Delete checklist">
+                          <div role="button" tabIndex={0} onClick={() => handleDeleteChecklist(cl.id)} onKeyDown={(e) => { if (e.key === "Enter") handleDeleteChecklist(cl.id) }} className="text-xs text-muted-foreground hover:text-destructive cursor-pointer p-0.5" aria-label={t("task.checklists.deleteChecklist")}>
                             <Trash2 className="size-3" />
                           </div>
                         </div>
@@ -1052,11 +1054,11 @@ export function TaskDetailSheet({
                       <div className="space-y-0.5" role="list">
                         {cl.items.map((item) => (
                           <div key={item.id} className="flex items-center gap-2 py-1 px-2 rounded hover:bg-accent/50 group" role="listitem">
-                            <div role="button" tabIndex={0} onClick={() => handleToggleChecklistItem(item.id, item.isCompleted)} onKeyDown={(e) => { if (e.key === "Enter") handleToggleChecklistItem(item.id, item.isCompleted) }} className="cursor-pointer" aria-label={item.isCompleted ? "Mark incomplete" : "Mark complete"}>
+                            <div role="button" tabIndex={0} onClick={() => handleToggleChecklistItem(item.id, item.isCompleted)} onKeyDown={(e) => { if (e.key === "Enter") handleToggleChecklistItem(item.id, item.isCompleted) }} className="cursor-pointer" aria-label={item.isCompleted ? t("task.checklists.markIncomplete") : t("task.checklists.markComplete")}>
                               {item.isCompleted ? <CheckSquare className="size-3.5 text-primary" /> : <Square className="size-3.5 text-muted-foreground" />}
                             </div>
                             <span className={`text-sm flex-1 ${item.isCompleted ? "line-through text-muted-foreground" : ""}`}>{item.title}</span>
-                            <div role="button" tabIndex={0} onClick={() => handleDeleteChecklistItem(item.id)} onKeyDown={(e) => { if (e.key === "Enter") handleDeleteChecklistItem(item.id) }} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive cursor-pointer" aria-label="Delete item">
+                            <div role="button" tabIndex={0} onClick={() => handleDeleteChecklistItem(item.id)} onKeyDown={(e) => { if (e.key === "Enter") handleDeleteChecklistItem(item.id) }} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive cursor-pointer" aria-label={t("task.checklists.deleteItem")}>
                               <X className="size-3" />
                             </div>
                           </div>
@@ -1065,12 +1067,12 @@ export function TaskDetailSheet({
                       {addingItemTo === cl.id && (
                         <div className="flex items-center gap-2 mt-1.5">
                           <div className="relative flex-1">
-                            <Input autoFocus value={newItemTitle} onChange={(e) => setNewItemTitle(e.target.value)} placeholder="Item name..." className="h-7 text-sm pr-8" onKeyDown={(e) => { if (e.key === "Enter") handleAddChecklistItem(cl.id); if (e.key === "Escape") setAddingItemTo(null) }} />
+                            <Input autoFocus value={newItemTitle} onChange={(e) => setNewItemTitle(e.target.value)} placeholder={t("task.checklists.itemPlaceholder")} className="h-7 text-sm pr-8" onKeyDown={(e) => { if (e.key === "Enter") handleAddChecklistItem(cl.id); if (e.key === "Escape") setAddingItemTo(null) }} />
                             <div className="absolute right-1 top-1/2 -translate-y-1/2">
-                              <SpeechButton onTranscript={(text) => setNewItemTitle((prev) => prev ? `${prev} ${text}` : text)} size="sm" showPulse={false} tooltip="Dictate item" />
+                              <SpeechButton onTranscript={(text) => setNewItemTitle((prev) => prev ? `${prev} ${text}` : text)} size="sm" showPulse={false} tooltip={t("task.checklists.dictateItem")} />
                             </div>
                           </div>
-                          <Button size="sm" className="h-7 text-xs" onClick={() => handleAddChecklistItem(cl.id)}>Add</Button>
+                          <Button size="sm" className="h-7 text-xs" onClick={() => handleAddChecklistItem(cl.id)}>{t("task.checklists.add")}</Button>
                         </div>
                       )}
                     </div>
@@ -1081,13 +1083,13 @@ export function TaskDetailSheet({
                 {isAddingChecklist ? (
                   <div className="flex items-center gap-2 mt-2">
                     <div className="relative flex-1">
-                      <Input autoFocus value={newChecklistTitle} onChange={(e) => setNewChecklistTitle(e.target.value)} placeholder="Checklist name..." className="h-8 text-sm pr-8" onKeyDown={(e) => { if (e.key === "Enter") handleCreateChecklist(); if (e.key === "Escape") { setIsAddingChecklist(false); setNewChecklistTitle("") } }} />
+                      <Input autoFocus value={newChecklistTitle} onChange={(e) => setNewChecklistTitle(e.target.value)} placeholder={t("task.checklists.namePlaceholder")} className="h-8 text-sm pr-8" onKeyDown={(e) => { if (e.key === "Enter") handleCreateChecklist(); if (e.key === "Escape") { setIsAddingChecklist(false); setNewChecklistTitle("") } }} />
                       <div className="absolute right-1 top-1/2 -translate-y-1/2">
-                        <SpeechButton onTranscript={(text) => setNewChecklistTitle((prev) => prev ? `${prev} ${text}` : text)} size="sm" showPulse={false} tooltip="Dictate name" />
+                        <SpeechButton onTranscript={(text) => setNewChecklistTitle((prev) => prev ? `${prev} ${text}` : text)} size="sm" showPulse={false} tooltip={t("task.checklists.dictateName")} />
                       </div>
                     </div>
-                    <Button size="sm" className="h-8" onClick={handleCreateChecklist}>Add</Button>
-                    <Button size="sm" variant="ghost" className="h-8" onClick={() => { setIsAddingChecklist(false); setNewChecklistTitle("") }}>Cancel</Button>
+                    <Button size="sm" className="h-8" onClick={handleCreateChecklist}>{t("task.checklists.add")}</Button>
+                    <Button size="sm" variant="ghost" className="h-8" onClick={() => { setIsAddingChecklist(false); setNewChecklistTitle("") }}>{t("task.checklists.cancel")}</Button>
                   </div>
                 ) : (
                   <div
@@ -1098,14 +1100,14 @@ export function TaskDetailSheet({
                     className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer py-1.5 mt-1"
                   >
                     <Plus className="size-3" />
-                    Add checklist
+                    {t("task.checklists.addChecklist")}
                   </div>
                 )}
               </div>
             </Section>
 
             {/* ── Attachments section ── */}
-            <Section title="Attachments" icon={Paperclip} count={attachments.length}>
+            <Section title={t("task.attachments.title")} icon={Paperclip} count={attachments.length}>
               <div className="px-6">
                 <input
                   ref={fileInputRef}
@@ -1133,7 +1135,7 @@ export function TaskDetailSheet({
                       href={`/api/attachments/${att.id}`}
                       download={att.fileName}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 p-1"
-                      aria-label="Download"
+                      aria-label={t("task.attachments.download")}
                     >
                       <Download className="size-3.5" />
                     </a>
@@ -1145,7 +1147,7 @@ export function TaskDetailSheet({
                         if (e.key === "Enter") handleDeleteAttachment(att.id)
                       }}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive cursor-pointer shrink-0 p-1"
-                      aria-label="Remove attachment"
+                      aria-label={t("task.attachments.remove")}
                     >
                       <Trash2 className="size-3.5" />
                     </div>
@@ -1157,7 +1159,7 @@ export function TaskDetailSheet({
                   className="flex items-center gap-2 w-full px-3 py-2 rounded-md border border-dashed text-xs text-muted-foreground hover:text-foreground hover:border-foreground/20 cursor-pointer transition-colors mt-1"
                 >
                   <Upload className="size-3" />
-                  {uploading ? "Uploading..." : "Attach file"}
+                  {uploading ? t("task.attachments.uploading") : t("task.attachments.attachFile")}
                 </button>
               </div>
             </Section>
@@ -1174,7 +1176,7 @@ export function TaskDetailSheet({
                 }`}
               >
                 <Link2 className="size-3" />
-                Details
+                {t("task.tabs.details")}
               </button>
               <button
                 onClick={() => setRightTab("comments")}
@@ -1183,7 +1185,7 @@ export function TaskDetailSheet({
                 }`}
               >
                 <MessageCircle className="size-3" />
-                Comments
+                {t("task.tabs.comments")}
                 {comments.length > 0 && (
                   <span className="text-[10px] bg-muted rounded-full px-1.5">{comments.length}</span>
                 )}
@@ -1193,18 +1195,19 @@ export function TaskDetailSheet({
             <div className="flex-1 overflow-y-auto">
               {rightTab === "details" && (
                 <div className="px-4 py-4">
-                  <h3 className="text-sm font-medium mb-3">Dependencies</h3>
+                  <h3 className="text-sm font-medium mb-3">{t("task.deps.title")}</h3>
 
                   {dependencies.length > 0 && (
                     <div className="space-y-1.5 mb-3">
                       {dependencies.map((dep) => {
-                        const depTask = projectTasks.find((t) => t.id === dep.dependsOnTaskId)
-                        const typeLabel = DEP_TYPES.find((d) => d.value === dep.type)?.label ?? dep.type
+                        const depTask = projectTasks.find((pt) => pt.id === dep.dependsOnTaskId)
+                        const depTypeEntry = DEP_TYPES.find((d) => d.value === dep.type)
+                        const typeLabel = depTypeEntry ? t(depTypeEntry.labelKey) : dep.type
                         return (
                           <div key={dep.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-accent/30 text-sm group">
                             <Link2 className="size-3 text-muted-foreground shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="truncate text-xs">{depTask?.title ?? "Unknown"}</p>
+                              <p className="truncate text-xs">{depTask?.title ?? t("task.deps.unknown")}</p>
                               <p className="text-[10px] text-muted-foreground">{typeLabel}</p>
                             </div>
                             <div
@@ -1213,7 +1216,7 @@ export function TaskDetailSheet({
                               onClick={() => handleRemoveDependency(dep.id)}
                               onKeyDown={(e) => { if (e.key === "Enter") handleRemoveDependency(dep.id) }}
                               className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive cursor-pointer shrink-0"
-                              aria-label="Remove dependency"
+                              aria-label={t("task.deps.remove")}
                             >
                               <X className="size-3" />
                             </div>
@@ -1232,13 +1235,13 @@ export function TaskDetailSheet({
                             onClick={() => setDepType(dt.value)}
                             className={`text-[10px] px-2 py-0.5 rounded-full border ${depType === dt.value ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground hover:bg-accent"}`}
                           >
-                            {dt.label}
+                            {t(dt.labelKey)}
                           </button>
                         ))}
                       </div>
                       <div className="max-h-32 overflow-y-auto border rounded-md">
                         {availableDepTasks.length === 0 && (
-                          <p className="text-xs text-muted-foreground p-2 text-center">No tasks available</p>
+                          <p className="text-xs text-muted-foreground p-2 text-center">{t("task.deps.noTasks")}</p>
                         )}
                         {availableDepTasks.map((pt) => (
                           <button
@@ -1250,7 +1253,7 @@ export function TaskDetailSheet({
                           </button>
                         ))}
                       </div>
-                      <Button size="sm" variant="ghost" className="h-6 text-xs w-full" onClick={() => setShowDepPicker(false)}>Cancel</Button>
+                      <Button size="sm" variant="ghost" className="h-6 text-xs w-full" onClick={() => setShowDepPicker(false)}>{t("task.deps.cancel")}</Button>
                     </div>
                   ) : (
                     <button
@@ -1258,29 +1261,29 @@ export function TaskDetailSheet({
                       className="flex items-center gap-2 w-full px-3 py-2 rounded-md border border-dashed text-xs text-muted-foreground hover:text-foreground hover:border-foreground/20 cursor-pointer transition-colors"
                     >
                       <Plus className="size-3" />
-                      Add dependency
+                      {t("task.deps.add")}
                     </button>
                   )}
 
                   {/* Metadata */}
                   <div className="mt-8 space-y-2.5 text-xs text-muted-foreground">
-                    <h4 className="text-sm font-medium text-foreground mb-2">Info</h4>
+                    <h4 className="text-sm font-medium text-foreground mb-2">{t("task.info.title")}</h4>
                     <div className="flex justify-between">
-                      <span>Created</span>
+                      <span>{t("task.info.created")}</span>
                       <span>{new Date(task.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Updated</span>
+                      <span>{t("task.info.updated")}</span>
                       <span>{new Date(task.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
                     </div>
                     {task.completedAt && (
                       <div className="flex justify-between text-green-500">
-                        <span>Completed</span>
+                        <span>{t("task.info.completed")}</span>
                         <span>{new Date(task.completedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span>Task ID</span>
+                      <span>{t("task.info.taskId")}</span>
                       <span className="font-mono text-[10px]">{task.id.slice(0, 8)}...</span>
                     </div>
                   </div>
@@ -1291,7 +1294,7 @@ export function TaskDetailSheet({
                 <div className="flex flex-col h-full">
                   <div className="flex-1 px-3 py-3 space-y-3 overflow-y-auto">
                     {comments.length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-8">No comments yet</p>
+                      <p className="text-xs text-muted-foreground text-center py-8">{t("task.comments.empty")}</p>
                     )}
                     {comments.map((cmt) => (
                       <div key={cmt.id} className="group">
@@ -1306,7 +1309,7 @@ export function TaskDetailSheet({
                             onClick={() => handleDeleteComment(cmt.id)}
                             onKeyDown={(e) => { if (e.key === "Enter") handleDeleteComment(cmt.id) }}
                             className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive cursor-pointer shrink-0"
-                            aria-label="Delete comment"
+                            aria-label={t("task.comments.delete")}
                           >
                             <X className="size-3" />
                           </div>
@@ -1322,7 +1325,7 @@ export function TaskDetailSheet({
                         <Input
                           value={newComment}
                           onChange={(e) => setNewComment(e.target.value)}
-                          placeholder="Add a comment..."
+                          placeholder={t("task.comments.placeholder")}
                           className="h-8 text-xs pr-8"
                           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddComment() } }}
                         />
@@ -1331,7 +1334,7 @@ export function TaskDetailSheet({
                             onTranscript={(text) => setNewComment((prev) => prev ? `${prev} ${text}` : text)}
                             size="sm"
                             showPulse={false}
-                            tooltip="Dictate comment"
+                            tooltip={t("task.comments.dictate")}
                           />
                         </div>
                       </div>

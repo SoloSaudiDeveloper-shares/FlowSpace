@@ -35,6 +35,7 @@ import type { ElementType } from "@/lib/db/schema"
 import { usePreferences } from "@/lib/hooks/use-preferences"
 import { useAI } from "@/lib/hooks/use-ai"
 import { embeddingsIndex } from "@/lib/ai/embeddings-index"
+import { useT } from "@/lib/hooks/use-i18n"
 
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   project: FolderKanban,
@@ -45,13 +46,13 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   process: GitBranch,
 }
 
-const CREATE_ITEMS: { type: ElementType; label: string }[] = [
-  { type: "project", label: "New Project" },
-  { type: "page", label: "New Page" },
-  { type: "canvas", label: "New Canvas" },
-  { type: "todo_list", label: "New Todo List" },
-  { type: "reminder", label: "New Reminder" },
-  { type: "process", label: "New Process" },
+const CREATE_ITEMS: { type: ElementType; labelKey: string }[] = [
+  { type: "project", labelKey: "misc.cmdk.create.project" },
+  { type: "page", labelKey: "misc.cmdk.create.page" },
+  { type: "canvas", labelKey: "misc.cmdk.create.canvas" },
+  { type: "todo_list", labelKey: "misc.cmdk.create.todo" },
+  { type: "reminder", labelKey: "misc.cmdk.create.reminder" },
+  { type: "process", labelKey: "misc.cmdk.create.process" },
 ]
 
 function getElementHref(el: { id: string; type: string }): string {
@@ -72,6 +73,7 @@ export function openCommandPalette() {
 }
 
 export function CommandPalette() {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
@@ -194,15 +196,15 @@ export function CommandPalette() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="overflow-hidden p-0 shadow-lg sm:max-w-lg [&>button]:hidden">
-        <DialogTitle className="sr-only">Command Palette</DialogTitle>
+        <DialogTitle className="sr-only">{t("misc.cmdk.title")}</DialogTitle>
         <DialogDescription className="sr-only">
-          Search elements and tasks, navigate, or create new items
+          {t("misc.cmdk.srDescription")}
         </DialogDescription>
         <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-2.5">
           <div className="flex items-center border-b px-3">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <Command.Input
-              placeholder="Search everything... elements, tasks, pages"
+              placeholder={t("misc.cmdk.placeholder")}
               value={query}
               onValueChange={setQuery}
               className="flex h-12 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
@@ -214,10 +216,10 @@ export function CommandPalette() {
                 disabled={indexStatus === "indexing"}
                 title={
                   indexStatus === "indexing"
-                    ? "Indexing elements..."
+                    ? t("misc.cmdk.indexing")
                     : useSemanticSearch
-                      ? "Semantic search ON"
-                      : "Semantic search OFF — click to enable AI search"
+                      ? t("misc.cmdk.semanticOn")
+                      : t("misc.cmdk.semanticOff")
                 }
                 className={`inline-flex items-center gap-1 h-6 px-2 rounded text-[10px] font-medium transition-colors shrink-0 ml-2 ${
                   indexStatus === "indexing"
@@ -228,7 +230,7 @@ export function CommandPalette() {
                 }`}
               >
                 <Sparkles className="size-3" />
-                {indexStatus === "indexing" ? "Indexing..." : "AI"}
+                {indexStatus === "indexing" ? t("misc.cmdk.indexingShort") : "AI"}
               </button>
             )}
             <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 ml-2 shrink-0">
@@ -238,17 +240,17 @@ export function CommandPalette() {
           <Command.List className="max-h-[400px] overflow-y-auto p-2">
             {isSearching ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
-                Searching...
+                {t("misc.cmdk.searching")}
               </div>
             ) : (
               <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
-                No results found.
+                {t("misc.cmdk.noResults")}
               </Command.Empty>
             )}
 
             {/* Element search results */}
             {elementResults.length > 0 && (
-              <Command.Group heading="Elements">
+              <Command.Group heading={t("misc.cmdk.group.elements")}>
                 {elementResults.map((r) => {
                   const Icon = TYPE_ICONS[r.elementType!] ?? FileText
                   return (
@@ -275,7 +277,7 @@ export function CommandPalette() {
 
             {/* Task search results */}
             {taskResults.length > 0 && (
-              <Command.Group heading="Tasks">
+              <Command.Group heading={t("misc.cmdk.group.tasks")}>
                 {taskResults.map((r) => (
                   <Command.Item
                     key={r.id}
@@ -289,7 +291,7 @@ export function CommandPalette() {
                     <div className="flex-1 min-w-0">
                       <span className="truncate block">{r.title}</span>
                       <span className="text-xs text-muted-foreground truncate block">
-                        in {r.projectTitle}
+                        {t("misc.cmdk.taskIn").replace("{project}", r.projectTitle ?? "")}
                       </span>
                     </div>
                   </Command.Item>
@@ -299,7 +301,7 @@ export function CommandPalette() {
 
             {/* Comment search results */}
             {commentResults.length > 0 && (
-              <Command.Group heading="Comments">
+              <Command.Group heading={t("misc.cmdk.group.comments")}>
                 {commentResults.map((r) => (
                   <Command.Item
                     key={r.id}
@@ -320,7 +322,7 @@ export function CommandPalette() {
 
             {/* Feed search results */}
             {feedResults.length > 0 && (
-              <Command.Group heading="Feed">
+              <Command.Group heading={t("misc.cmdk.group.feed")}>
                 {feedResults.map((r) => (
                   <Command.Item
                     key={r.id}
@@ -338,7 +340,7 @@ export function CommandPalette() {
 
             {/* Semantic search results */}
             {semanticResults.length > 0 && (
-              <Command.Group heading="Semantic Matches">
+              <Command.Group heading={t("misc.cmdk.group.semantic")}>
                 {semanticResults.map((r) => {
                   const type = r.metadata?.type ?? "element"
                   const Icon = TYPE_ICONS[type] ?? FileText
@@ -364,14 +366,14 @@ export function CommandPalette() {
             )}
 
             {/* Navigation */}
-            <Command.Group heading="Navigation">
+            <Command.Group heading={t("misc.cmdk.group.navigation")}>
               <Command.Item
                 value="home-dashboard"
                 onSelect={() => handleSelect("/")}
                 className="flex items-center gap-2 rounded-md px-2 py-2 text-sm cursor-pointer aria-selected:bg-accent"
               >
                 <Home className="size-4 text-muted-foreground" />
-                Home
+                {t("misc.cmdk.nav.home")}
               </Command.Item>
               <Command.Item
                 value="reminders-page"
@@ -379,7 +381,7 @@ export function CommandPalette() {
                 className="flex items-center gap-2 rounded-md px-2 py-2 text-sm cursor-pointer aria-selected:bg-accent"
               >
                 <Bell className="size-4 text-muted-foreground" />
-                Reminders
+                {t("misc.cmdk.nav.reminders")}
               </Command.Item>
               <Command.Item
                 value="trash-archive"
@@ -387,7 +389,7 @@ export function CommandPalette() {
                 className="flex items-center gap-2 rounded-md px-2 py-2 text-sm cursor-pointer aria-selected:bg-accent"
               >
                 <Trash2 className="size-4 text-muted-foreground" />
-                Trash & Archive
+                {t("misc.cmdk.nav.trash")}
               </Command.Item>
               <Command.Item
                 value="settings-page"
@@ -395,7 +397,7 @@ export function CommandPalette() {
                 className="flex items-center gap-2 rounded-md px-2 py-2 text-sm cursor-pointer aria-selected:bg-accent"
               >
                 <Settings className="size-4 text-muted-foreground" />
-                Settings
+                {t("misc.cmdk.nav.settings")}
               </Command.Item>
               <Command.Item
                 value="feed-page"
@@ -403,7 +405,7 @@ export function CommandPalette() {
                 className="flex items-center gap-2 rounded-md px-2 py-2 text-sm cursor-pointer aria-selected:bg-accent"
               >
                 <Rss className="size-4 text-muted-foreground" />
-                Feed
+                {t("misc.cmdk.nav.feed")}
               </Command.Item>
               <Command.Item
                 value="approvals-page"
@@ -411,7 +413,7 @@ export function CommandPalette() {
                 className="flex items-center gap-2 rounded-md px-2 py-2 text-sm cursor-pointer aria-selected:bg-accent"
               >
                 <ShieldCheck className="size-4 text-muted-foreground" />
-                Approvals
+                {t("misc.cmdk.nav.approvals")}
               </Command.Item>
               <Command.Item
                 value="templates-page"
@@ -419,7 +421,7 @@ export function CommandPalette() {
                 className="flex items-center gap-2 rounded-md px-2 py-2 text-sm cursor-pointer aria-selected:bg-accent"
               >
                 <BookTemplate className="size-4 text-muted-foreground" />
-                Templates
+                {t("misc.cmdk.nav.templates")}
               </Command.Item>
               <Command.Item
                 value="people-page"
@@ -427,12 +429,12 @@ export function CommandPalette() {
                 className="flex items-center gap-2 rounded-md px-2 py-2 text-sm cursor-pointer aria-selected:bg-accent"
               >
                 <Users className="size-4 text-muted-foreground" />
-                People
+                {t("misc.cmdk.nav.people")}
               </Command.Item>
             </Command.Group>
 
             {/* Create */}
-            <Command.Group heading="Create">
+            <Command.Group heading={t("misc.cmdk.group.create")}>
               {CREATE_ITEMS.map((item) => {
                 const Icon = TYPE_ICONS[item.type]
                 return (
@@ -444,7 +446,7 @@ export function CommandPalette() {
                   >
                     <Plus className="size-4 text-muted-foreground" />
                     <Icon className="size-4 text-muted-foreground" />
-                    {item.label}
+                    {t(item.labelKey)}
                   </Command.Item>
                 )
               })}

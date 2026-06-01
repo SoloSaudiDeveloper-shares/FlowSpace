@@ -5,6 +5,7 @@ import { CloudCog, Server, Check, X, Loader2, Eye, EyeOff, ExternalLink } from "
 import { usePreferences } from "@/lib/hooks/use-preferences"
 import { openaiPing, OPENAI_COMPAT_PRESETS } from "@/lib/ai/openai-client"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 
 /**
  * Configures which AI backend the app talks to.
@@ -17,6 +18,7 @@ import { toast } from "sonner"
  * could read them. For shared machines, sign out.
  */
 export function AIProviderSection() {
+  const { t } = useT()
   const { preferences, updatePreference } = usePreferences()
   const provider = preferences.aiProvider ?? "ollama"
   const baseUrl = preferences.aiOpenAIBaseUrl ?? ""
@@ -46,14 +48,21 @@ export function AIProviderSection() {
         setPingResult("ok")
         setPingMessage(
           res.models && res.models.length
-            ? `Connected. Saw ${res.models.length} models${model && res.models.includes(model) ? ` (including "${model}")` : ""}.`
-            : "Connected. Endpoint reachable."
+            ? t("settings.provider.connectedModels")
+                .replace("{count}", String(res.models.length))
+                .replace(
+                  "{extra}",
+                  model && res.models.includes(model)
+                    ? t("settings.provider.includingModel").replace("{model}", model)
+                    : "",
+                )
+            : t("settings.provider.connectedReachable")
         )
-        toast.success("AI connection OK")
+        toast.success(t("settings.provider.connectionOk"))
       } else {
         setPingResult("fail")
         setPingMessage(res.error)
-        toast.error("AI connection failed")
+        toast.error(t("settings.provider.connectionFailed"))
       }
     } finally {
       setTesting(false)
@@ -64,14 +73,10 @@ export function AIProviderSection() {
     <div className="px-4 py-3 rounded-lg border bg-card space-y-3">
       <h3 className="text-sm font-medium flex items-center gap-2">
         <CloudCog className="size-3.5 text-muted-foreground" />
-        AI Provider
+        {t("settings.provider.title")}
       </h3>
       <p className="text-xs text-muted-foreground">
-        Pick a transport. Local-only (Ollama) keeps every prompt on your
-        machine. The OpenAI-compatible option talks to any endpoint that
-        speaks the OpenAI Chat Completions wire format — works with OpenAI,
-        Gemini (compat layer), LM Studio, your own llama.cpp / vLLM
-        server, and Ollama's own /v1 shim.
+        {t("settings.provider.help")}
       </p>
 
       {/* Provider switch */}
@@ -88,7 +93,7 @@ export function AIProviderSection() {
             }`}
           >
             {p === "ollama" ? <Server className="size-3.5" /> : <CloudCog className="size-3.5" />}
-            {p === "ollama" ? "Local Ollama" : "OpenAI-compatible"}
+            {p === "ollama" ? t("settings.provider.localOllama") : t("settings.provider.openaiCompat")}
           </button>
         ))}
       </div>
@@ -98,7 +103,7 @@ export function AIProviderSection() {
           {/* Preset picker */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Quick presets
+              {t("settings.provider.quickPresets")}
             </label>
             <div className="flex flex-wrap gap-1.5">
               {OPENAI_COMPAT_PRESETS.map((p) => (
@@ -118,7 +123,7 @@ export function AIProviderSection() {
           {/* Base URL */}
           <div className="space-y-1.5">
             <label className="block text-xs font-medium text-muted-foreground">
-              Base URL
+              {t("settings.provider.baseUrl")}
             </label>
             <input
               type="text"
@@ -129,15 +134,15 @@ export function AIProviderSection() {
               className="w-full h-9 rounded-md border border-input bg-background px-2.5 text-xs font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <p className="text-[10px] text-muted-foreground">
-              Either with or without trailing /v1 — both work.
+              {t("settings.provider.baseUrlHelp")}
             </p>
           </div>
 
           {/* API key */}
           <div className="space-y-1.5">
             <label className="block text-xs font-medium text-muted-foreground">
-              API key
-              <span className="ml-1.5 text-muted-foreground/60">(blank for local endpoints)</span>
+              {t("settings.provider.apiKey")}
+              <span className="ml-1.5 text-muted-foreground/60">{t("settings.provider.apiKeyHint")}</span>
             </label>
             <div className="relative">
               <input
@@ -158,15 +163,14 @@ export function AIProviderSection() {
               </button>
             </div>
             <p className="text-[10px] text-amber-300/90">
-              ⚠️ Stored in your browser. Anyone with access to this device can read it.
-              For shared machines: sign out when you're done.
+              {t("settings.provider.apiKeyWarn")}
             </p>
           </div>
 
           {/* Model */}
           <div className="space-y-1.5">
             <label className="block text-xs font-medium text-muted-foreground">
-              Model
+              {t("settings.provider.model")}
             </label>
             <input
               type="text"
@@ -187,7 +191,7 @@ export function AIProviderSection() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input text-xs hover:bg-accent disabled:opacity-50"
             >
               {testing ? <Loader2 className="size-3.5 animate-spin" /> : <CloudCog className="size-3.5" />}
-              {testing ? "Testing…" : "Test connection"}
+              {testing ? t("settings.provider.testing") : t("settings.provider.testConnection")}
             </button>
             {pingResult === "ok" && (
               <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
@@ -206,16 +210,16 @@ export function AIProviderSection() {
           {/* Provider-specific help link */}
           <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 pt-1">
             <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
-              <ExternalLink className="size-3" /> OpenAI key
+              <ExternalLink className="size-3" /> {t("settings.provider.link.openai")}
             </a>
             <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
-              <ExternalLink className="size-3" /> Gemini key (free tier)
+              <ExternalLink className="size-3" /> {t("settings.provider.link.gemini")}
             </a>
             <a href="https://ollama.com/download" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
-              <ExternalLink className="size-3" /> Install Ollama
+              <ExternalLink className="size-3" /> {t("settings.provider.link.ollama")}
             </a>
             <a href="https://lmstudio.ai" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
-              <ExternalLink className="size-3" /> LM Studio
+              <ExternalLink className="size-3" /> {t("settings.provider.link.lmstudio")}
             </a>
           </div>
         </div>

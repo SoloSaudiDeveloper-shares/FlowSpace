@@ -23,6 +23,7 @@ import {
   disableTwoFactor,
   regenerateRecoveryCodes,
 } from "@/lib/actions/two-factor-actions"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type Stage =
   | { name: "loading" }
@@ -33,6 +34,7 @@ type Stage =
   | { name: "regenerating"; code: string; error?: string }
 
 export function TwoFactorSection() {
+  const { t } = useT()
   const [stage, setStage] = useState<Stage>({ name: "loading" })
 
   useEffect(() => {
@@ -60,7 +62,7 @@ export function TwoFactorSection() {
       return
     }
     setStage({ name: "on", recoveryShown: r.recoveryCodes })
-    toast.success("Two-factor enabled — keep your recovery codes safe.")
+    toast.success(t("settings.twofa.enabled"))
   }
 
   async function handleDisable() {
@@ -71,7 +73,7 @@ export function TwoFactorSection() {
       return
     }
     setStage({ name: "off" })
-    toast.success("Two-factor disabled.")
+    toast.success(t("settings.twofa.disabled"))
   }
 
   async function handleRegenerate() {
@@ -82,7 +84,7 @@ export function TwoFactorSection() {
       return
     }
     setStage({ name: "on", recoveryShown: r.recoveryCodes })
-    toast.success("New recovery codes generated — old ones won't work anymore.")
+    toast.success(t("settings.twofa.regenerated"))
   }
 
   if (stage.name === "loading") {
@@ -101,10 +103,10 @@ export function TwoFactorSection() {
         ) : (
           <ShieldOff className="size-4 text-muted-foreground" />
         )}
-        <h3 className="text-sm font-medium">Two-factor authentication</h3>
+        <h3 className="text-sm font-medium">{t("settings.twofa.title")}</h3>
         {stage.name === "on" && (
           <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/15 text-emerald-300">
-            On
+            {t("settings.twofa.on")}
           </span>
         )}
       </div>
@@ -112,14 +114,11 @@ export function TwoFactorSection() {
       {stage.name === "off" && (
         <>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Add an extra step at sign-in: a 6-digit code from your phone's
-            authenticator app (Google Authenticator, 1Password, Bitwarden,
-            Authy, …). Even if your password leaks, the attacker still
-            needs the code on your device.
+            {t("settings.twofa.offHelp")}
           </p>
           <Button size="sm" className="h-8 text-xs gap-1.5" onClick={handleEnable}>
             <ShieldCheck className="size-3.5" />
-            Enable 2FA
+            {t("settings.twofa.enable")}
           </Button>
         </>
       )}
@@ -139,7 +138,7 @@ export function TwoFactorSection() {
       {stage.name === "on" && (
         <>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            2FA is active — next sign-in will prompt for a code.
+            {t("settings.twofa.activeHelp")}
           </p>
           {stage.recoveryShown && (
             <RecoveryCodesBlock codes={stage.recoveryShown} />
@@ -152,7 +151,7 @@ export function TwoFactorSection() {
               onClick={() => setStage({ name: "regenerating", code: "" })}
             >
               <RotateCw className="size-3.5" />
-              New recovery codes
+              {t("settings.twofa.newRecovery")}
             </Button>
             <Button
               size="sm"
@@ -161,7 +160,7 @@ export function TwoFactorSection() {
               onClick={() => setStage({ name: "disabling", code: "" })}
             >
               <ShieldOff className="size-3.5" />
-              Disable 2FA
+              {t("settings.twofa.disable")}
             </Button>
           </div>
         </>
@@ -171,17 +170,17 @@ export function TwoFactorSection() {
         <CodeGate
           title={
             stage.name === "disabling"
-              ? "Confirm disable"
-              : "Confirm new recovery codes"
+              ? t("settings.twofa.confirmDisable")
+              : t("settings.twofa.confirmRegen")
           }
           description={
             stage.name === "disabling"
-              ? "Enter a current 6-digit code (or a recovery code) to disable 2FA."
-              : "Enter a current 6-digit code to invalidate the old recovery codes and generate new ones."
+              ? t("settings.twofa.confirmDisableDesc")
+              : t("settings.twofa.confirmRegenDesc")
           }
           code={stage.code}
           error={stage.error}
-          submitLabel={stage.name === "disabling" ? "Disable" : "Regenerate"}
+          submitLabel={stage.name === "disabling" ? t("settings.twofa.disableLabel") : t("settings.twofa.regenerateLabel")}
           onChangeCode={(c) => setStage({ ...stage, code: c, error: undefined })}
           onCancel={() => setStage({ name: "on" })}
           onSubmit={stage.name === "disabling" ? handleDisable : handleRegenerate}
@@ -208,15 +207,14 @@ function Enrollment({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const { t } = useT()
   const [copied, setCopied] = useState(false)
   return (
     <div className="space-y-3">
       <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-amber-500/30 bg-amber-500/5">
         <AlertTriangle className="size-3.5 text-amber-400 shrink-0 mt-0.5" />
         <div className="text-xs text-amber-200/90 leading-relaxed">
-          Open your authenticator app and add a new account using either
-          the QR code below or by pasting the secret into the manual-entry
-          flow.
+          {t("settings.twofa.enroll.warn")}
         </div>
       </div>
 
@@ -227,7 +225,7 @@ function Enrollment({
         <div className="space-y-2">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mb-1">
-              Manual entry key
+              {t("settings.twofa.enroll.manualKey")}
             </p>
             <div className="flex items-center gap-1.5">
               <code className="flex-1 font-mono text-xs px-2 py-1.5 rounded bg-muted/60 break-all">
@@ -251,7 +249,7 @@ function Enrollment({
       </div>
 
       <div>
-        <p className="text-xs font-medium mb-1.5">Enter the 6-digit code from your app</p>
+        <p className="text-xs font-medium mb-1.5">{t("settings.twofa.enroll.codePrompt")}</p>
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -264,10 +262,10 @@ function Enrollment({
             autoFocus
           />
           <Button size="sm" className="h-9 text-xs" onClick={onConfirm} disabled={code.length !== 6}>
-            Confirm
+            {t("settings.twofa.confirm")}
           </Button>
           <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={onCancel}>
-            Cancel
+            {t("settings.twofa.cancel")}
           </Button>
         </div>
         {error && <p className="text-[11px] text-destructive mt-1.5">{error}</p>}
@@ -295,6 +293,7 @@ function CodeGate({
   onCancel: () => void
   onSubmit: () => void
 }) {
+  const { t } = useT()
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">{title}</p>
@@ -314,7 +313,7 @@ function CodeGate({
           {submitLabel}
         </Button>
         <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={onCancel}>
-          Cancel
+          {t("settings.twofa.cancel")}
         </Button>
       </div>
       {error && <p className="text-[11px] text-destructive">{error}</p>}
@@ -323,18 +322,17 @@ function CodeGate({
 }
 
 function RecoveryCodesBlock({ codes }: { codes: string[] }) {
+  const { t } = useT()
   return (
     <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
       <div className="flex items-center gap-1.5">
         <AlertTriangle className="size-3.5 text-amber-400" />
         <p className="text-xs font-medium text-amber-200">
-          Save these recovery codes
+          {t("settings.twofa.recovery.title")}
         </p>
       </div>
       <p className="text-[11px] text-amber-200/80 leading-relaxed">
-        Each can be used once if you lose access to your authenticator. Store
-        them somewhere safe (password manager, printed in a drawer). They
-        won't be shown again.
+        {t("settings.twofa.recovery.help")}
       </p>
       <div className="grid grid-cols-2 gap-1.5">
         {codes.map((c) => (
@@ -352,10 +350,10 @@ function RecoveryCodesBlock({ codes }: { codes: string[] }) {
         className="h-7 text-[11px] gap-1.5 w-full"
         onClick={() => {
           navigator.clipboard.writeText(codes.join("\n")).catch(() => undefined)
-          toast.success("Recovery codes copied")
+          toast.success(t("settings.twofa.recovery.copied"))
         }}
       >
-        <Copy className="size-3" /> Copy all
+        <Copy className="size-3" /> {t("settings.twofa.recovery.copyAll")}
       </Button>
     </div>
   )
@@ -364,6 +362,7 @@ function RecoveryCodesBlock({ codes }: { codes: string[] }) {
 // ─── QR code (uses `qrcode` npm) ──────────────────────────────────────
 
 function QRCode({ value, size }: { value: string; size: number }) {
+  const { t } = useT()
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -398,5 +397,5 @@ function QRCode({ value, size }: { value: string; size: number }) {
     )
   }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={dataUrl} alt="2FA QR code" width={size} height={size} />
+  return <img src={dataUrl} alt={t("settings.twofa.qrAlt")} width={size} height={size} />
 }

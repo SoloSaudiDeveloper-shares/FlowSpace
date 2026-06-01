@@ -21,12 +21,14 @@ import {
   dismissInboundEmail,
   type PendingInboundEmail,
 } from "@/lib/actions/inbound-email-actions"
+import { useT } from "@/lib/hooks/use-i18n"
 
 export function PendingEmailsSection({
   emails: initial,
 }: {
   emails: PendingInboundEmail[]
 }) {
+  const { t } = useT()
   const router = useRouter()
   const [emails, setEmails] = useState(initial)
   const [busy, setBusy] = useState<string | null>(null)
@@ -46,11 +48,11 @@ export function PendingEmailsSection({
       }
       setEmails((prev) => prev.filter((e) => e.id !== id))
       toast.success(
-        action === "approve" ? "Added to your Inbox list" : "Dismissed",
+        action === "approve" ? t("misc.email.added") : t("misc.email.dismissed"),
       )
       router.refresh()
     } catch {
-      toast.error("Something went wrong")
+      toast.error(t("misc.email.error"))
     } finally {
       setBusy(null)
     }
@@ -60,9 +62,9 @@ export function PendingEmailsSection({
     <div className="mb-5">
       <div className="flex items-center gap-2 mb-2">
         <Mail className="size-4 text-primary" />
-        <h2 className="text-sm font-semibold">Incoming email</h2>
+        <h2 className="text-sm font-semibold">{t("misc.email.heading")}</h2>
         <span className="text-xs text-muted-foreground">
-          {emails.length} waiting
+          {t("misc.email.waiting").replace("{count}", String(emails.length))}
         </span>
       </div>
       <div className="space-y-2">
@@ -74,10 +76,10 @@ export function PendingEmailsSection({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">
-                  {e.subject || "(no subject)"}
+                  {e.subject || t("misc.email.noSubject")}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
-                  from {e.fromName ? `${e.fromName} <${e.from}>` : e.from}
+                  {t("misc.email.from").replace("{sender}", e.fromName ? `${e.fromName} <${e.from}>` : e.from)}
                 </p>
                 {e.preview && (
                   <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-2">
@@ -97,7 +99,7 @@ export function PendingEmailsSection({
                   ) : (
                     <Check className="size-3" />
                   )}
-                  Approve
+                  {t("misc.email.approve")}
                 </Button>
                 <Button
                   size="sm"
@@ -107,7 +109,7 @@ export function PendingEmailsSection({
                   onClick={() => handle(e.id, "dismiss")}
                 >
                   <X className="size-3" />
-                  Dismiss
+                  {t("misc.email.dismiss")}
                 </Button>
               </div>
             </div>

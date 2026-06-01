@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { TTSButton } from "@/components/shared/tts-button"
 import { AIActionButton } from "@/components/shared/ai-action-button"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,13 +44,13 @@ const TYPE_ICONS: Record<ElementType, React.ComponentType<{ className?: string }
   process: GitBranch,
 }
 
-const TYPE_LABELS: Record<ElementType, string> = {
-  project: "Project",
-  page: "Page",
-  canvas: "Canvas",
-  todo_list: "Todo List",
-  reminder: "Reminder",
-  process: "Process",
+const TYPE_LABEL_KEYS: Record<ElementType, string> = {
+  project: "home.elementType.project",
+  page: "home.elementType.page",
+  canvas: "home.elementType.canvas",
+  todo_list: "home.elementType.todoList",
+  reminder: "home.elementType.reminder",
+  process: "home.elementType.process",
 }
 
 function getElementHref(element: Element): string {
@@ -71,7 +72,11 @@ function getElementHref(element: Element): string {
   }
 }
 
-function formatDate(dateStr: string) {
+/**
+ * Returns a {key, n} the caller resolves via t(). For dates older than a week
+ * we fall back to a locale date string (returned in `literal`).
+ */
+function formatDate(dateStr: string): { key: string; n?: number; literal?: string } {
   const date = new Date(dateStr)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
@@ -79,20 +84,20 @@ function formatDate(dateStr: string) {
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
 
-  if (minutes < 1) return "Just now"
-  if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  if (days < 7) return `${days}d ago`
-  return date.toLocaleDateString()
+  if (minutes < 1) return { key: "home.time.justNow" }
+  if (minutes < 60) return { key: "home.time.minutesAgo", n: minutes }
+  if (hours < 24) return { key: "home.time.hoursAgo", n: hours }
+  if (days < 7) return { key: "home.time.daysAgo", n: days }
+  return { key: "", literal: date.toLocaleDateString() }
 }
 
-const CREATE_OPTIONS: { type: ElementType; label: string; description: string }[] = [
-  { type: "project", label: "Project", description: "Kanban board with tasks" },
-  { type: "page", label: "Page", description: "Rich text document" },
-  { type: "canvas", label: "Canvas", description: "Infinite visual canvas" },
-  { type: "todo_list", label: "Todo List", description: "Simple checklist" },
-  { type: "reminder", label: "Reminder", description: "Time-based reminder" },
-  { type: "process", label: "Process", description: "Flowchart & steps" },
+const CREATE_OPTIONS: { type: ElementType; labelKey: string; descKey: string }[] = [
+  { type: "project", labelKey: "home.elementType.project", descKey: "home.createOpt.project.desc" },
+  { type: "page", labelKey: "home.elementType.page", descKey: "home.createOpt.page.desc" },
+  { type: "canvas", labelKey: "home.elementType.canvas", descKey: "home.createOpt.canvas.desc" },
+  { type: "todo_list", labelKey: "home.elementType.todoList", descKey: "home.createOpt.todoList.desc" },
+  { type: "reminder", labelKey: "home.elementType.reminder", descKey: "home.createOpt.reminder.desc" },
+  { type: "process", labelKey: "home.elementType.process", descKey: "home.createOpt.process.desc" },
 ]
 
 interface HomeContentProps {
@@ -102,6 +107,7 @@ interface HomeContentProps {
 
 export function HomeContent({ recentElements, favorites }: HomeContentProps) {
   const router = useRouter()
+  const { t } = useT()
 
   async function handleCreate(type: ElementType) {
     const result = await createElement(type)
@@ -113,16 +119,16 @@ export function HomeContent({ recentElements, favorites }: HomeContentProps) {
     <div className="space-y-8">
       {/* Quick Create */}
       <div>
-            <h2 className="text-3xl font-bold tracking-tight">Welcome to FlowSpace</h2>
+            <h2 className="text-3xl font-bold tracking-tight">{t("home.welcome.title")}</h2>
             <p className="text-muted-foreground mt-1">
-              Your personal workspace for organizing everything.
+              {t("home.welcome.subtitle")}
             </p>
           </div>
 
           {/* Quick Create Grid */}
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">
-              Quick Create
+              {t("home.quickCreate.title")}
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {CREATE_OPTIONS.map((option) => {
@@ -137,9 +143,9 @@ export function HomeContent({ recentElements, favorites }: HomeContentProps) {
                       <Icon className="size-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{option.label}</p>
+                      <p className="text-sm font-medium">{t(option.labelKey)}</p>
                       <p className="text-xs text-muted-foreground hidden sm:block">
-                        {option.description}
+                        {t(option.descKey)}
                       </p>
                     </div>
                   </button>
@@ -153,7 +159,7 @@ export function HomeContent({ recentElements, favorites }: HomeContentProps) {
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                 <Star className="size-4" />
-                Favorites
+                {t("home.section.favorites")}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {favorites.map((el) => (
@@ -171,14 +177,14 @@ export function HomeContent({ recentElements, favorites }: HomeContentProps) {
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
               <Clock className="size-4" />
-              Recent
+              {t("home.section.recent")}
             </h3>
             {recentElements.length === 0 ? (
               <div className="rounded-lg border border-dashed p-12 text-center">
                 <Plus className="mx-auto size-8 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">No elements yet</h3>
+                <h3 className="mt-4 text-lg font-semibold">{t("home.empty.title")}</h3>
                 <p className="text-muted-foreground mt-1">
-                  Create your first project, page, or canvas to get started.
+                  {t("home.empty.desc")}
                 </p>
               </div>
             ) : (
@@ -204,28 +210,30 @@ function ElementCard({
   element: Element
   onClick: () => void
 }) {
+  const { t } = useT()
   const Icon = TYPE_ICONS[element.type]
   const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
+  const dateLabel = formatDate(element.updatedAt)
 
   function handleContextMenu(e: React.MouseEvent) {
     const items: ContextMenuEntry[] = [
       {
-        label: "Open",
+        label: t("home.card.open"),
         onClick,
       },
       {
-        label: element.isFavorite ? "Remove from Favorites" : "Add to Favorites",
+        label: element.isFavorite ? t("home.card.removeFavorite") : t("home.card.addFavorite"),
         icon: Star,
         onClick: () => toggleFavorite(element.id),
       },
       {
-        label: "Archive",
+        label: t("home.card.archive"),
         icon: Archive,
         onClick: () => archiveElement(element.id),
       },
       { separator: true },
       {
-        label: "Delete",
+        label: t("home.card.delete"),
         icon: Trash2,
         variant: "destructive",
         onClick: () => deleteElement(element.id),
@@ -250,9 +258,12 @@ function ElementCard({
       <div className="flex-1 min-w-0">
         <p className="font-medium truncate">{element.title}</p>
         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-          <span>{TYPE_LABELS[element.type]}</span>
+          <span>{t(TYPE_LABEL_KEYS[element.type])}</span>
           <span>·</span>
-          <span>{formatDate(element.updatedAt)}</span>
+          <span>
+            {dateLabel.literal ??
+              t(dateLabel.key).replace("{n}", String(dateLabel.n ?? ""))}
+          </span>
         </p>
       </div>
 
@@ -264,7 +275,7 @@ function ElementCard({
         <TTSButton
           text={element.title + (element.description ? `. ${element.description}` : "")}
           size="sm"
-          tooltip="Read aloud"
+          tooltip={t("home.card.readAloud")}
         />
         <AIActionButton
           text={element.title + (element.description ? `. ${element.description}` : "")}
@@ -292,7 +303,7 @@ function ElementCard({
             }}
           >
             <Star className="mr-2 size-4" />
-            {element.isFavorite ? "Remove from favorites" : "Add to favorites"}
+            {element.isFavorite ? t("home.card.removeFavoriteLower") : t("home.card.addFavoriteLower")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={(e) => {
@@ -301,7 +312,7 @@ function ElementCard({
             }}
           >
             <Archive className="mr-2 size-4" />
-            Archive
+            {t("home.card.archive")}
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-destructive"
@@ -311,7 +322,7 @@ function ElementCard({
             }}
           >
             <Trash2 className="mr-2 size-4" />
-            Delete
+            {t("home.card.delete")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

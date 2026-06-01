@@ -15,23 +15,24 @@ import {
   getTasksByProject,
 } from "@/lib/actions/task-actions"
 import { getTaskComments } from "@/lib/actions/comment-actions"
+import { useT } from "@/lib/hooks/use-i18n"
 
 export type MetaKind = "attachments" | "dependencies" | "comments"
 
-const TITLE: Record<MetaKind, string> = {
-  attachments: "Attachments",
-  dependencies: "Dependencies",
-  comments: "Comments",
+const TITLE_KEY: Record<MetaKind, string> = {
+  attachments: "task.meta.attachments",
+  dependencies: "task.meta.dependencies",
+  comments: "task.meta.comments",
 }
 const ICON: Record<MetaKind, typeof Paperclip> = {
   attachments: Paperclip,
   dependencies: Link2,
   comments: MessageCircle,
 }
-const DEP_LABEL: Record<string, string> = {
-  blocks: "Blocks",
-  blocked_by: "Blocked by",
-  relates_to: "Relates to",
+const DEP_LABEL_KEY: Record<string, string> = {
+  blocks: "task.depType.blocks",
+  blocked_by: "task.depType.blocked_by",
+  relates_to: "task.depType.relates_to",
 }
 
 type Attachment = { id: string; fileName: string; fileSize: number }
@@ -59,6 +60,7 @@ export function TaskMetaPopover({
   y: number
   onClose: () => void
 }) {
+  const { t } = useT()
   const [loading, setLoading] = useState(true)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [deps, setDeps] = useState<Dependency[]>([])
@@ -123,18 +125,18 @@ export function TaskMetaPopover({
         <div className="flex items-center justify-between px-2.5 py-2 border-b sticky top-0 bg-popover">
           <span className="flex items-center gap-1.5 text-xs font-medium">
             <Icon className="size-3.5 text-muted-foreground" />
-            {TITLE[kind]}
+            {t(TITLE_KEY[kind])}
           </span>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label={t("task.meta.close")}>
             <X className="size-3.5" />
           </button>
         </div>
 
         <div className="p-1">
           {loading ? (
-            <p className="text-xs text-muted-foreground px-2 py-3">Loading…</p>
+            <p className="text-xs text-muted-foreground px-2 py-3">{t("task.meta.loading")}</p>
           ) : empty ? (
-            <p className="text-xs text-muted-foreground px-2 py-3">Nothing here yet.</p>
+            <p className="text-xs text-muted-foreground px-2 py-3">{t("task.meta.empty")}</p>
           ) : kind === "attachments" ? (
             attachments.map((a) => (
               <a
@@ -154,8 +156,8 @@ export function TaskMetaPopover({
           ) : kind === "dependencies" ? (
             deps.map((d) => (
               <div key={d.id} className="px-2 py-1.5 text-xs">
-                <span className="text-muted-foreground">{DEP_LABEL[d.type] ?? d.type}: </span>
-                <span className="truncate">{titles[d.dependsOnTaskId] ?? "Unknown task"}</span>
+                <span className="text-muted-foreground">{(DEP_LABEL_KEY[d.type] ? t(DEP_LABEL_KEY[d.type]) : d.type)}: </span>
+                <span className="truncate">{titles[d.dependsOnTaskId] ?? t("task.meta.unknownTask")}</span>
               </div>
             ))
           ) : (

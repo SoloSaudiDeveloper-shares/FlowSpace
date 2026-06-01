@@ -26,6 +26,7 @@ import {
   clearAllNotifications,
 } from "@/lib/actions/notification-actions"
 import type { Notification, Element } from "@/lib/db/schema"
+import { useT } from "@/lib/hooks/use-i18n"
 
 const TYPE_CONFIG: Record<
   string,
@@ -51,16 +52,17 @@ interface NotificationListProps {
 }
 
 const TABS = [
-  { id: "all", label: "All" },
-  { id: "mentions", label: "Mentions" },
-  { id: "tasks", label: "Tasks" },
-  { id: "system", label: "System" },
-  { id: "approvals", label: "Approvals" },
+  { id: "all", labelKey: "misc.notif.tab.all" },
+  { id: "mentions", labelKey: "misc.notif.tab.mentions" },
+  { id: "tasks", labelKey: "misc.notif.tab.tasks" },
+  { id: "system", labelKey: "misc.notif.tab.system" },
+  { id: "approvals", labelKey: "misc.notif.tab.approvals" },
 ] as const
 
 type TabId = (typeof TABS)[number]["id"]
 
 export function NotificationList({ notifications }: NotificationListProps) {
+  const { t } = useT()
   const [filter, setFilter] = useState<"all" | "unread">("all")
   const [activeTab, setActiveTab] = useState<TabId>("all")
 
@@ -87,17 +89,17 @@ export function NotificationList({ notifications }: NotificationListProps) {
 
   async function handleMarkAllRead() {
     await markAllAsRead()
-    toast.success("All notifications marked as read")
+    toast.success(t("misc.notif.allMarkedRead"))
   }
 
   async function handleDelete(id: string) {
     await deleteNotification(id)
-    toast.success("Notification deleted")
+    toast.success(t("misc.notif.deleted"))
   }
 
   async function handleClearAll() {
     await clearAllNotifications()
-    toast.success("Cleared read notifications")
+    toast.success(t("misc.notif.clearedRead"))
   }
 
   return (
@@ -121,7 +123,7 @@ export function NotificationList({ notifications }: NotificationListProps) {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab.label}
+              {t(tab.labelKey)}
               {count > 0 && (
                 <span className="bg-primary/10 text-primary text-[10px] rounded-full px-1.5 min-w-[18px] text-center">
                   {count}
@@ -143,7 +145,7 @@ export function NotificationList({ notifications }: NotificationListProps) {
                 : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
             }`}
           >
-            All
+            {t("misc.notif.tab.all")}
           </button>
           <button
             onClick={() => setFilter("unread")}
@@ -153,7 +155,7 @@ export function NotificationList({ notifications }: NotificationListProps) {
                 : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
             }`}
           >
-            Unread
+            {t("misc.notif.unread")}
             {unreadCount > 0 && (
               <Badge
                 variant="secondary"
@@ -168,13 +170,13 @@ export function NotificationList({ notifications }: NotificationListProps) {
           {unreadCount > 0 && (
             <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
               <CheckCheck className="size-3.5 mr-1.5" />
-              Mark all read
+              {t("misc.notif.markAllRead")}
             </Button>
           )}
           {notifications.some((n) => n.notification.isRead) && (
             <Button variant="outline" size="sm" onClick={handleClearAll}>
               <Trash2 className="size-3.5 mr-1.5" />
-              Clear read
+              {t("misc.notif.clearRead")}
             </Button>
           )}
         </div>
@@ -186,11 +188,11 @@ export function NotificationList({ notifications }: NotificationListProps) {
           <BellOff className="size-12 mb-3 opacity-30" />
           <p className="text-sm">
             {filter === "unread"
-              ? "No unread notifications"
-              : "No notifications yet"}
+              ? t("misc.notif.emptyUnread")
+              : t("misc.notif.empty")}
           </p>
           <p className="text-xs mt-1">
-            Notifications for reminders and tasks will appear here
+            {t("misc.notif.emptyHint")}
           </p>
         </div>
       ) : (

@@ -41,35 +41,36 @@ import {
   removeFieldOption,
 } from "@/lib/actions/custom-field-actions"
 import { SectionHelp } from "@/components/shared/section-help"
+import { useT } from "@/lib/hooks/use-i18n"
 
 const FIELD_TYPES = [
-  { value: "text", label: "Text", icon: Type },
-  { value: "long_text", label: "Long Text", icon: Type },
-  { value: "number", label: "Number", icon: Hash },
-  { value: "date", label: "Date", icon: Calendar },
-  { value: "checkbox", label: "Checkbox", icon: CheckSquare },
-  { value: "select", label: "Select", icon: List },
-  { value: "multi_select", label: "Multi Select", icon: List },
-  { value: "url", label: "URL", icon: Link2 },
-  { value: "email", label: "Email", icon: Mail },
-  { value: "rating", label: "Rating", icon: Tag },
+  { value: "text", labelKey: "settings.fields.type.text", icon: Type },
+  { value: "long_text", labelKey: "settings.fields.type.longText", icon: Type },
+  { value: "number", labelKey: "settings.fields.type.number", icon: Hash },
+  { value: "date", labelKey: "settings.fields.type.date", icon: Calendar },
+  { value: "checkbox", labelKey: "settings.fields.type.checkbox", icon: CheckSquare },
+  { value: "select", labelKey: "settings.fields.type.select", icon: List },
+  { value: "multi_select", labelKey: "settings.fields.type.multiSelect", icon: List },
+  { value: "url", labelKey: "settings.fields.type.url", icon: Link2 },
+  { value: "email", labelKey: "settings.fields.type.email", icon: Mail },
+  { value: "rating", labelKey: "settings.fields.type.rating", icon: Tag },
 ] as const
 
 type FieldType = (typeof FIELD_TYPES)[number]["value"]
 
 const SCOPE_TYPES = [
-  { value: "global", label: "All Elements", icon: Globe },
-  { value: "element_type", label: "Element Type", icon: Settings2 },
-  { value: "project", label: "Specific Project", icon: FolderKanban },
+  { value: "global", labelKey: "settings.fields.scope.global", icon: Globe },
+  { value: "element_type", labelKey: "settings.fields.scope.elementType", icon: Settings2 },
+  { value: "project", labelKey: "settings.fields.scope.project", icon: FolderKanban },
 ] as const
 
 const ELEMENT_TYPES = [
-  { value: "project", label: "Projects" },
-  { value: "page", label: "Pages" },
-  { value: "canvas", label: "Canvases" },
-  { value: "todo_list", label: "Todo Lists" },
-  { value: "reminder", label: "Reminders" },
-  { value: "process", label: "Processes" },
+  { value: "project", labelKey: "settings.fields.element.project" },
+  { value: "page", labelKey: "settings.fields.element.page" },
+  { value: "canvas", labelKey: "settings.fields.element.canvas" },
+  { value: "todo_list", labelKey: "settings.fields.element.todoList" },
+  { value: "reminder", labelKey: "settings.fields.element.reminder" },
+  { value: "process", labelKey: "settings.fields.element.process" },
 ] as const
 
 type FieldWithOptions = Awaited<ReturnType<typeof getFields>>[number]
@@ -79,12 +80,13 @@ function getFieldIcon(fieldType: string) {
   return found?.icon ?? Type
 }
 
-function getFieldLabel(fieldType: string) {
+function getFieldLabelKey(fieldType: string) {
   const found = FIELD_TYPES.find((f) => f.value === fieldType)
-  return found?.label ?? fieldType
+  return found?.labelKey ?? null
 }
 
 export function CustomFieldsSettings() {
+  const { t } = useT()
   const [fields, setFields] = useState<FieldWithOptions[]>([])
   const [loading, setLoading] = useState(true)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -105,7 +107,7 @@ export function CustomFieldsSettings() {
       const result = await getFields()
       setFields(result)
     } catch {
-      toast.error("Failed to load custom fields")
+      toast.error(t("settings.fields.loadFailed"))
     } finally {
       setLoading(false)
     }
@@ -127,7 +129,7 @@ export function CustomFieldsSettings() {
 
   async function handleCreate() {
     if (!newName.trim()) {
-      toast.error("Field name is required")
+      toast.error(t("settings.fields.nameRequired"))
       return
     }
 
@@ -155,12 +157,12 @@ export function CustomFieldsSettings() {
           }
         }
 
-        toast.success(`Field "${newName}" created`)
+        toast.success(t("settings.fields.created").replace("{name}", newName))
         setCreateDialogOpen(false)
         resetForm()
         await loadFields()
       } catch {
-        toast.error("Failed to create field")
+        toast.error(t("settings.fields.createFailed"))
       }
     })
   }
@@ -169,10 +171,10 @@ export function CustomFieldsSettings() {
     startTransition(async () => {
       try {
         await deleteField(id)
-        toast.success(`Field "${name}" deleted`)
+        toast.success(t("settings.fields.deleted").replace("{name}", name))
         await loadFields()
       } catch {
-        toast.error("Failed to delete field")
+        toast.error(t("settings.fields.deleteFailed"))
       }
     })
   }
@@ -189,10 +191,10 @@ export function CustomFieldsSettings() {
       if (fieldId) {
         await addFieldScope(fieldId, "type", "task").catch(() => undefined)
       }
-      toast.success("Example field 'Estimated hours' created — scoped to tasks")
+      toast.success(t("settings.fields.exampleCreated"))
       await loadFields()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't create example")
+      toast.error(err instanceof Error ? err.message : t("settings.fields.exampleFailed"))
     }
   }
 
@@ -200,7 +202,7 @@ export function CustomFieldsSettings() {
     const trimmed = newOptionInput.trim()
     if (!trimmed) return
     if (newOptions.includes(trimmed)) {
-      toast.error("Option already exists")
+      toast.error(t("settings.fields.optionExists"))
       return
     }
     setNewOptions([...newOptions, trimmed])
@@ -214,10 +216,10 @@ export function CustomFieldsSettings() {
       <section>
         <h2 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Settings2 className="size-4" />
-          Custom Fields
+          {t("settings.fields.title")}
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Loading custom fields...
+          {t("settings.fields.loading")}
         </p>
       </section>
     )
@@ -228,7 +230,7 @@ export function CustomFieldsSettings() {
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-base font-semibold flex items-center gap-2">
           <Settings2 className="size-4" />
-          Custom Fields
+          {t("settings.fields.title")}
         </h2>
         <div className="flex items-center gap-2.5">
           <SectionHelp guideId="customFields" />
@@ -239,21 +241,21 @@ export function CustomFieldsSettings() {
             onClick={() => setCreateDialogOpen(true)}
           >
             <Plus className="size-3 mr-1.5" />
-            New Field
+            {t("settings.fields.newField")}
           </Button>
         </div>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
-        Define custom metadata fields for your elements and tasks.
+        {t("settings.fields.subtitle")}
       </p>
 
       {/* Field list */}
       {fields.length === 0 ? (
         <div className="px-4 py-8 rounded-lg border bg-card text-center">
           <Settings2 className="size-8 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground mb-1">No custom fields yet</p>
+          <p className="text-sm text-muted-foreground mb-1">{t("settings.fields.emptyTitle")}</p>
           <p className="text-xs text-muted-foreground mb-4">
-            Create your first custom field to add structured metadata to your elements.
+            {t("settings.fields.emptyDesc")}
           </p>
           <div className="flex items-center justify-center gap-2">
             <Button
@@ -262,7 +264,7 @@ export function CustomFieldsSettings() {
               onClick={() => setCreateDialogOpen(true)}
             >
               <Plus className="size-3.5 mr-1.5" />
-              Create Field
+              {t("settings.fields.createField")}
             </Button>
             <Button
               variant="ghost"
@@ -271,11 +273,11 @@ export function CustomFieldsSettings() {
               onClick={() => startTransition(handleCreateExample)}
             >
               <Plus className="size-3.5 mr-1.5" />
-              Create example field
+              {t("settings.fields.createExample")}
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground/70 mt-2">
-            The example is an &ldquo;Estimated hours&rdquo; number field scoped to tasks, so you can see one wired up end-to-end.
+            {t("settings.fields.exampleNote")}
           </p>
         </div>
       ) : (
@@ -299,11 +301,11 @@ export function CustomFieldsSettings() {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium truncate">{field.name}</span>
                       <Badge variant="secondary" className="text-[10px]">
-                        {getFieldLabel(field.fieldType)}
+                        {(() => { const k = getFieldLabelKey(field.fieldType); return k ? t(k) : field.fieldType })()}
                       </Badge>
                       {field.isRequired && (
                         <Badge variant="outline" className="text-[10px]">
-                          Required
+                          {t("settings.fields.required")}
                         </Badge>
                       )}
                     </div>
@@ -331,21 +333,21 @@ export function CustomFieldsSettings() {
                   <div className="px-4 pb-3 pt-1 border-t bg-muted/20">
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <span className="text-muted-foreground">Type:</span>{" "}
-                        <span className="font-medium">{getFieldLabel(field.fieldType)}</span>
+                        <span className="text-muted-foreground">{t("settings.fields.type")}</span>{" "}
+                        <span className="font-medium">{(() => { const k = getFieldLabelKey(field.fieldType); return k ? t(k) : field.fieldType })()}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Required:</span>{" "}
-                        <span className="font-medium">{field.isRequired ? "Yes" : "No"}</span>
+                        <span className="text-muted-foreground">{t("settings.fields.requiredLabel")}</span>{" "}
+                        <span className="font-medium">{field.isRequired ? t("settings.fields.yes") : t("settings.fields.no")}</span>
                       </div>
                       {field.groupName && (
                         <div>
-                          <span className="text-muted-foreground">Group:</span>{" "}
+                          <span className="text-muted-foreground">{t("settings.fields.group")}</span>{" "}
                           <span className="font-medium">{field.groupName}</span>
                         </div>
                       )}
                       <div>
-                        <span className="text-muted-foreground">Created:</span>{" "}
+                        <span className="text-muted-foreground">{t("settings.fields.createdAt")}</span>{" "}
                         <span className="font-medium">
                           {new Date(field.createdAt).toLocaleDateString()}
                         </span>
@@ -355,7 +357,7 @@ export function CustomFieldsSettings() {
                     {/* Options for select fields */}
                     {field.options && field.options.length > 0 && (
                       <div className="mt-3">
-                        <span className="text-xs text-muted-foreground">Options:</span>
+                        <span className="text-xs text-muted-foreground">{t("settings.fields.options")}</span>
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
                           {field.options.map((opt) => (
                             <Badge
@@ -386,18 +388,18 @@ export function CustomFieldsSettings() {
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Create Custom Field</DialogTitle>
+            <DialogTitle>{t("settings.fields.dialog.title")}</DialogTitle>
             <DialogDescription>
-              Add a new custom field to your workspace. Fields appear on elements matching the chosen scope.
+              {t("settings.fields.dialog.desc")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-2">
             {/* Name */}
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Name</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("settings.fields.name")}</label>
               <Input
-                placeholder="e.g. Priority Level, Budget, Client..."
+                placeholder={t("settings.fields.namePlaceholder")}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
@@ -405,7 +407,7 @@ export function CustomFieldsSettings() {
 
             {/* Type */}
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Field Type</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("settings.fields.fieldType")}</label>
               <div className="grid grid-cols-2 gap-2">
                 {FIELD_TYPES.map((ft) => {
                   const FtIcon = ft.icon
@@ -422,7 +424,7 @@ export function CustomFieldsSettings() {
                       }`}
                     >
                       <FtIcon className="size-3.5 shrink-0" />
-                      {ft.label}
+                      {t(ft.labelKey)}
                     </button>
                   )
                 })}
@@ -433,7 +435,7 @@ export function CustomFieldsSettings() {
             {isSelectType && (
               <div>
                 <label className="text-sm font-medium mb-1.5 block">
-                  Options
+                  {t("settings.fields.optionsLabel")}
                 </label>
                 {newOptions.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2">
@@ -453,7 +455,7 @@ export function CustomFieldsSettings() {
                 )}
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Add an option..."
+                    placeholder={t("settings.fields.optionPlaceholder")}
                     value={newOptionInput}
                     onChange={(e) => setNewOptionInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -469,7 +471,7 @@ export function CustomFieldsSettings() {
                     size="sm"
                     onClick={addOption}
                   >
-                    Add
+                    {t("settings.fields.add")}
                   </Button>
                 </div>
               </div>
@@ -477,7 +479,7 @@ export function CustomFieldsSettings() {
 
             {/* Scope */}
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Scope</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("settings.fields.scope")}</label>
               <div className="space-y-2">
                 {SCOPE_TYPES.map((scope) => {
                   const ScopeIcon = scope.icon
@@ -497,7 +499,7 @@ export function CustomFieldsSettings() {
                       }`}
                     >
                       <ScopeIcon className="size-3.5 shrink-0" />
-                      {scope.label}
+                      {t(scope.labelKey)}
                     </button>
                   )
                 })}
@@ -517,7 +519,7 @@ export function CustomFieldsSettings() {
                           : "border-border hover:border-primary/50"
                       }`}
                     >
-                      {et.label}
+                      {t(et.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -526,7 +528,7 @@ export function CustomFieldsSettings() {
 
             {/* Required toggle */}
             <div className="flex items-center justify-between">
-              <span className="text-sm">Required field</span>
+              <span className="text-sm">{t("settings.fields.requiredField")}</span>
               <button
                 type="button"
                 role="switch"
@@ -554,7 +556,7 @@ export function CustomFieldsSettings() {
                 resetForm()
               }}
             >
-              Cancel
+              {t("settings.fields.cancel")}
             </Button>
             <Button
               size="sm"
@@ -566,7 +568,7 @@ export function CustomFieldsSettings() {
               ) : (
                 <Plus className="size-3.5 mr-1.5" />
               )}
-              Create Field
+              {t("settings.fields.createField")}
             </Button>
           </DialogFooter>
         </DialogContent>

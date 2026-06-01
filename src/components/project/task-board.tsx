@@ -22,6 +22,7 @@ import { Plus, Trash2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { useT } from "@/lib/hooks/use-i18n"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { TaskCard } from "./task-card"
 import { TaskDetailSheet } from "./task-detail-sheet"
@@ -71,6 +72,7 @@ function StatusColumn({
   selectedIds?: Set<string>
   onToggleSelect?: (taskId: string) => void
 }) {
+  const { t } = useT()
   const [isAdding, setIsAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
   const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
@@ -91,15 +93,15 @@ function StatusColumn({
   function handleHeaderContextMenu(e: React.MouseEvent) {
     const items: ContextMenuEntry[] = [
       {
-        label: "Add Task",
+        label: t("proj.board.addTask"),
         icon: Plus,
         onClick: () => setIsAdding(true),
       },
       {
-        label: "Rename",
+        label: t("proj.board.rename"),
         icon: Pencil,
         onClick: async () => {
-          const name = window.prompt("Rename column to:", status.name)
+          const name = window.prompt(t("proj.board.renamePrompt"), status.name)
           if (name && name.trim()) {
             await updateTaskStatus(status.id, projectId, { name: name.trim() })
           }
@@ -107,7 +109,7 @@ function StatusColumn({
       },
       { separator: true },
       {
-        label: "Delete Column",
+        label: t("proj.board.deleteColumn"),
         icon: Trash2,
         variant: "destructive",
         onClick: () => deleteTaskStatus(status.id, projectId),
@@ -181,7 +183,7 @@ function StatusColumn({
           <div className="space-y-2">
             <Input
               autoFocus
-              placeholder={'Task title…  (try "fri #high")'}
+              placeholder={t("proj.addTask.titlePlaceholder")}
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -194,7 +196,7 @@ function StatusColumn({
             />
             <div className="flex gap-1">
               <Button size="sm" onClick={handleAdd}>
-                Add
+                {t("proj.board.add")}
               </Button>
               <Button
                 size="sm"
@@ -204,7 +206,7 @@ function StatusColumn({
                   setNewTitle("")
                 }}
               >
-                Cancel
+                {t("proj.board.cancel")}
               </Button>
             </div>
           </div>
@@ -218,7 +220,7 @@ function StatusColumn({
           className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors border-t"
         >
           <Plus className="size-3" />
-          Add task
+          {t("proj.addTask")}
         </button>
       )}
     </div>
@@ -236,6 +238,7 @@ function StatusColumn({
 }
 
 export function TaskBoard({ projectId, statuses, tasks: allTasks, progress, taskMeta, selectMode, selectedIds, onToggleSelect }: TaskBoardProps) {
+  const { t } = useT()
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -351,7 +354,7 @@ export function TaskBoard({ projectId, statuses, tasks: allTasks, progress, task
             <div className="w-72 shrink-0 rounded-lg border border-dashed p-3 space-y-2">
               <Input
                 autoFocus
-                placeholder="Column name..."
+                placeholder={t("proj.board.columnPlaceholder")}
                 value={newColumnName}
                 onChange={(e) => setNewColumnName(e.target.value)}
                 onKeyDown={(e) => {
@@ -364,7 +367,7 @@ export function TaskBoard({ projectId, statuses, tasks: allTasks, progress, task
               />
               <div className="flex gap-1">
                 <Button size="sm" onClick={handleAddColumn}>
-                  Add
+                  {t("proj.board.add")}
                 </Button>
                 <Button
                   size="sm"
@@ -374,7 +377,7 @@ export function TaskBoard({ projectId, statuses, tasks: allTasks, progress, task
                     setNewColumnName("")
                   }}
                 >
-                  Cancel
+                  {t("proj.board.cancel")}
                 </Button>
               </div>
             </div>
@@ -384,7 +387,7 @@ export function TaskBoard({ projectId, statuses, tasks: allTasks, progress, task
               className="flex items-center gap-2 w-72 shrink-0 rounded-lg border border-dashed p-4 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors justify-center"
             >
               <Plus className="size-4" />
-              Add column
+              {t("proj.board.addColumn")}
             </button>
           )}
         </div>

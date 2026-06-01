@@ -30,6 +30,7 @@ import { Mail, Send, Loader2, Check, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { sendTaskAsEmail, isTaskEmailReady } from "@/lib/actions/task-email-actions"
 import type { tasks } from "@/lib/db/schema"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type Task = typeof tasks.$inferSelect
 
@@ -40,14 +41,15 @@ interface Props {
 }
 
 const INCLUDE_OPTIONS = [
-  { key: "description", label: "Description" },
-  { key: "dueDate",     label: "Due date" },
-  { key: "status",      label: "Status" },
-  { key: "priority",    label: "Priority" },
-  { key: "appLink",     label: "Link back to FlowSpace" },
+  { key: "description", labelKey: "task.email.includeDescription" },
+  { key: "dueDate",     labelKey: "task.email.includeDueDate" },
+  { key: "status",      labelKey: "task.email.includeStatus" },
+  { key: "priority",    labelKey: "task.email.includePriority" },
+  { key: "appLink",     labelKey: "task.email.includeAppLink" },
 ] as const
 
 export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
+  const { t } = useT()
   const [to, setTo] = useState("")
   const [message, setMessage] = useState("")
   const [include, setInclude] = useState<Record<string, boolean>>({
@@ -96,13 +98,13 @@ export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
         },
       })
       if (result.ok) {
-        toast.success(`Email sent to ${to.trim()}`)
+        toast.success(t("task.email.sentTo").replace("{to}", to.trim()))
         onOpenChange(false)
       } else {
         toast.error(result.error)
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't send email")
+      toast.error(err instanceof Error ? err.message : t("task.email.sendFailed"))
     } finally {
       setSending(false)
     }
@@ -114,11 +116,11 @@ export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="size-4 text-primary" />
-            Send task as email
+            {t("task.email.title")}
           </DialogTitle>
           <DialogDescription>
-            Email someone a clean summary of <strong>{task.title}</strong>.
-            They&apos;ll see the details you choose below.
+            {t("task.email.descPrefix")} <strong>{task.title}</strong>.
+            {" "}{t("task.email.descSuffix")}
           </DialogDescription>
         </DialogHeader>
 
@@ -127,9 +129,8 @@ export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
           <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-amber-500/40 bg-amber-500/5 text-xs">
             <AlertCircle className="size-3.5 text-amber-500 shrink-0 mt-0.5" />
             <div className="text-amber-200/90 leading-relaxed">
-              The server isn&apos;t set up to send email yet. Ask an admin to
-              configure <code className="px-1 py-0.5 rounded bg-amber-500/15">RESEND_API_KEY</code>
-              {" "}or Gmail SMTP credentials.
+              {t("task.email.notConfigured")} <code className="px-1 py-0.5 rounded bg-amber-500/15">RESEND_API_KEY</code>
+              {" "}{t("task.email.notConfiguredOr")}
             </div>
           </div>
         )}
@@ -138,11 +139,11 @@ export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
           {/* Recipient */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Recipient email
+              {t("task.email.recipient")}
             </label>
             <Input
               type="email"
-              placeholder="name@example.com"
+              placeholder={t("task.email.recipientPlaceholder")}
               value={to}
               onChange={(e) => setTo(e.target.value)}
               autoFocus
@@ -153,10 +154,10 @@ export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
           {/* Optional message */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Add a note <span className="text-muted-foreground/50">(optional)</span>
+              {t("task.email.note")} <span className="text-muted-foreground/50">{t("task.email.noteOptional")}</span>
             </label>
             <textarea
-              placeholder={`e.g. "Quick reminder — can you take a look at this before Friday?"`}
+              placeholder={t("task.email.notePlaceholder")}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={3}
@@ -168,7 +169,7 @@ export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
           {/* What to include */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-2">
-              What to include
+              {t("task.email.whatToInclude")}
             </label>
             <div className="flex flex-wrap gap-1.5">
               {INCLUDE_OPTIONS.map((opt) => {
@@ -185,7 +186,7 @@ export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
                     }`}
                   >
                     {active && <Check className="size-3" />}
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </button>
                 )
               })}
@@ -195,7 +196,7 @@ export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
 
         <div className="flex items-center justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={sending}>
-            Cancel
+            {t("task.email.cancel")}
           </Button>
           <Button
             onClick={handleSend}
@@ -206,7 +207,7 @@ export function SendTaskEmailDialog({ open, onOpenChange, task }: Props) {
             ) : (
               <Send className="size-3.5 mr-1.5" />
             )}
-            {sending ? "Sending…" : "Send email"}
+            {sending ? t("task.email.sending") : t("task.email.send")}
           </Button>
         </div>
       </DialogContent>

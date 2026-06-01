@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { usePreferences, DEFAULT_PREFERENCES } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 import { getGlobalFeed, setFeedEventPriority } from "@/lib/actions/feed-actions"
 import {
   ContextMenu,
@@ -53,6 +54,7 @@ interface TickerItem {
  */
 export function FeedTicker() {
   const router = useRouter()
+  const { t } = useT()
   const { preferences, updatePreference } = usePreferences()
   const cfg = preferences.feedTicker ?? DEFAULT_PREFERENCES.feedTicker
   const [items, setItems] = useState<TickerItem[]>([])
@@ -115,9 +117,11 @@ export function FeedTicker() {
     )
     try {
       await setFeedEventPriority(eventId, priority)
-      toast.success(`Priority set to ${priority}`)
+      toast.success(
+        t("feed.toast.prioritySet").replace("{priority}", t(`feed.priority.${priority}`)),
+      )
     } catch {
-      toast.error("Couldn't change priority — you don't own this event")
+      toast.error(t("feed.toast.priorityFail"))
       // revert by refetching
       const rows = await getGlobalFeed({ limit: 30 })
       setItems(
@@ -141,13 +145,13 @@ export function FeedTicker() {
         title: item.title,
         subtitle: [
           item.type.replace(/_/g, " "),
-          relativeTime(item.createdAt),
+          relativeTime(item.createdAt, t),
         ].join(" · "),
         icon: Rss,
       },
       { separator: true },
       {
-        label: "Open subject",
+        label: t("feed.action.openSubject"),
         icon: ExternalLink,
         onClick: () =>
           item.subjectElementId &&
@@ -155,35 +159,35 @@ export function FeedTicker() {
         disabled: !item.subjectElementId,
       },
       {
-        label: "Open Feed page",
+        label: t("feed.action.openFeedPage"),
         icon: Rss,
         onClick: () => router.push("/feed"),
       },
       { separator: true },
       // Priority quick-set group — same colors used in the dot below.
       {
-        label: "High priority",
+        label: t("feed.action.highPriority"),
         icon: Flame,
         onClick: () => changePriority(item.id, "high"),
       },
       {
-        label: "Normal priority",
+        label: t("feed.action.normalPriority"),
         icon: Circle,
         onClick: () => changePriority(item.id, "normal"),
       },
       {
-        label: "Low priority",
+        label: t("feed.action.lowPriority"),
         icon: Minus,
         onClick: () => changePriority(item.id, "low"),
       },
       { separator: true },
       {
-        label: "Hide ticker for this session",
+        label: t("feed.action.hideSession"),
         icon: EyeOff,
         onClick: () => setDismissed(true),
       },
       {
-        label: "Hide ticker permanently",
+        label: t("feed.action.hidePermanent"),
         icon: BellOff,
         onClick: () => patchTicker({ show: false }),
       },
@@ -317,6 +321,7 @@ function FloatingTicker({
   onItemClick: (item: TickerItem) => void
   ctx: ReturnType<typeof useContextMenu>
 }) {
+  const { t } = useT()
   // Local rect for smooth dragging — we only push to preferences on release
   // so we're not firing a debounced server write on every mousemove.
   const [rect, setRect] = useState(float)
@@ -385,7 +390,7 @@ function FloatingTicker({
     <div
       data-slot="feed-ticker-floating"
       role="region"
-      aria-label="Floating activity feed ticker"
+      aria-label={t("feed.ticker.floatingAria")}
       className="fixed z-40 rounded-xl border border-border/60 bg-background/80 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden group"
       style={{
         left: rect.x,
@@ -398,7 +403,7 @@ function FloatingTicker({
       <div
         onMouseDown={onDragMouseDown}
         onDoubleClick={onPin}
-        title="Drag to move · Double-click to re-pin"
+        title={t("feed.ticker.dragMove")}
         className="absolute inset-y-0 left-0 z-10 w-7 flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-foreground bg-background/70 backdrop-blur border-r border-border/40"
       >
         <GripHorizontal className="size-3.5" />
@@ -430,7 +435,7 @@ function FloatingTicker({
       {/* Resize handle, bottom-right corner */}
       <div
         onMouseDown={onResizeMouseDown}
-        title="Drag to resize"
+        title={t("feed.ticker.resize")}
         className="absolute bottom-0 right-0 size-3 cursor-nwse-resize z-20"
         style={{
           background:
@@ -453,11 +458,12 @@ function FloatingTicker({
 // ─── Shared sub-pieces ─────────────────────────────────────────────────────
 
 function TickerLabel() {
+  const { t } = useT()
   return (
     <div className="absolute inset-y-0 left-0 z-10 flex items-center gap-1.5 px-2.5 bg-background/90 backdrop-blur-md border-r border-border/40">
       <Rss className="size-3 text-muted-foreground" />
       <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-        Feed
+        {t("feed.label")}
       </span>
     </div>
   )
@@ -472,13 +478,14 @@ function RightControls({
   onDismiss: () => void
   pinned: boolean
 }) {
+  const { t } = useT()
   return (
     <div className="absolute inset-y-0 right-0 z-10 flex items-center bg-background/90 backdrop-blur-md border-l border-border/40 opacity-0 group-hover:opacity-100 transition-opacity">
       <button
         type="button"
         onClick={onUnpin}
-        title={pinned ? "Unpin (make floating)" : "Pin back to top/bottom"}
-        aria-label={pinned ? "Unpin ticker" : "Pin ticker"}
+        title={pinned ? t("feed.ticker.makeFloating") : t("feed.ticker.pinBack")}
+        aria-label={pinned ? t("feed.ticker.unpinAria") : t("feed.ticker.pinAria")}
         className="flex items-center px-1.5 text-muted-foreground/60 hover:text-foreground transition-colors"
       >
         {pinned ? <PinOff className="size-3" /> : <Pin className="size-3" />}
@@ -486,8 +493,8 @@ function RightControls({
       <button
         type="button"
         onClick={onDismiss}
-        title="Hide for this session"
-        aria-label="Hide feed ticker"
+        title={t("feed.ticker.hideSession")}
+        aria-label={t("feed.ticker.hideAria")}
         className="flex items-center px-1.5 text-muted-foreground/60 hover:text-foreground transition-colors"
       >
         <X className="size-3" />
@@ -512,13 +519,14 @@ function TickerEntry({
   onClick: () => void
   onContextMenu: (e: React.MouseEvent) => void
 }) {
+  const { t } = useT()
   return (
     <button
       type="button"
       onClick={onClick}
       onContextMenu={onContextMenu}
       className="group/item inline-flex items-center gap-2 mr-8 px-2 py-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
-      title="Click to open · Right-click for options"
+      title={t("feed.ticker.entryTooltip")}
     >
       <span className={`inline-block size-1.5 rounded-full transition-colors ${PRIORITY_DOT[item.priority]}`} />
       <span
@@ -530,7 +538,7 @@ function TickerEntry({
         <span className="text-muted-foreground/70 truncate max-w-md">— {item.summary}</span>
       )}
       <span className="text-muted-foreground/40 text-[10px] uppercase tracking-wider">
-        {relativeTime(item.createdAt)}
+        {relativeTime(item.createdAt, t)}
       </span>
     </button>
   )
@@ -568,11 +576,13 @@ function elementHref(elementId: string, type: string): string {
   return `/feed`
 }
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, t: (key: string) => string): string {
   const then = new Date(iso).getTime()
   const diffSec = Math.max(0, (Date.now() - then) / 1000)
-  if (diffSec < 60) return "just now"
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`
-  return `${Math.floor(diffSec / 86400)}d ago`
+  if (diffSec < 60) return t("feed.time.justNow")
+  if (diffSec < 3600)
+    return t("feed.time.minutesAgo").replace("{n}", String(Math.floor(diffSec / 60)))
+  if (diffSec < 86400)
+    return t("feed.time.hoursAgo").replace("{n}", String(Math.floor(diffSec / 3600)))
+  return t("feed.time.daysAgo").replace("{n}", String(Math.floor(diffSec / 86400)))
 }

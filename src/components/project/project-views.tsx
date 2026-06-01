@@ -21,6 +21,7 @@ import {
   Check,
 } from "lucide-react"
 import { usePreferences, type SavedView } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 import { createTask } from "@/lib/actions/task-actions"
 import { parseQuickAdd } from "@/lib/quick-add"
 import { PRIORITY_ORDER, PRIORITY_COLOR as PRIORITY_COLORS } from "@/lib/priority"
@@ -59,24 +60,24 @@ export type TaskCardMeta = {
 
 type ViewType = "overview" | "list" | "board" | "calendar" | "gantt" | "table"
 
-const VIEWS: { id: ViewType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: "overview",  label: "Overview",  icon: LayoutDashboard },
-  { id: "list",      label: "List",      icon: List },
-  { id: "board",     label: "Board",     icon: LayoutGrid },
-  { id: "calendar",  label: "Calendar",  icon: Calendar },
-  { id: "gantt",     label: "Gantt",     icon: BarChart2 },
-  { id: "table",     label: "Table",     icon: Table2 },
+const VIEWS: { id: ViewType; tKey: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: "overview",  tKey: "proj.view.overview",  icon: LayoutDashboard },
+  { id: "list",      tKey: "proj.view.list",      icon: List },
+  { id: "board",     tKey: "proj.view.board",     icon: LayoutGrid },
+  { id: "calendar",  tKey: "proj.view.calendar",  icon: Calendar },
+  { id: "gantt",     tKey: "proj.view.gantt",     icon: BarChart2 },
+  { id: "table",     tKey: "proj.view.table",     icon: Table2 },
 ]
 
 const TASK_FIELDS = [
-  { key: "priority", label: "Priority" },
-  { key: "dueDate", label: "Due Date" },
-  { key: "startDate", label: "Start Date" },
-  { key: "labels", label: "Labels" },
-  { key: "subtasks", label: "Subtasks" },
-  { key: "checklists", label: "Checklists" },
-  { key: "timeTracking", label: "Time Tracking" },
-  { key: "description", label: "Description" },
+  { key: "priority", tKey: "proj.field.priority" },
+  { key: "dueDate", tKey: "proj.field.dueDate" },
+  { key: "startDate", tKey: "proj.field.startDate" },
+  { key: "labels", tKey: "proj.field.labels" },
+  { key: "subtasks", tKey: "proj.field.subtasks" },
+  { key: "checklists", tKey: "proj.field.checklists" },
+  { key: "timeTracking", tKey: "proj.field.timeTracking" },
+  { key: "description", tKey: "proj.field.description" },
 ] as const
 
 type SortField = "manual" | "title" | "priority" | "dueDate" | "createdAt" | "updatedAt"
@@ -93,6 +94,25 @@ interface ProjectViewsProps {
 }
 
 export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, projectDescription, parentId, taskMeta }: ProjectViewsProps) {
+  const { t } = useT()
+  // Translate the enum-ish filter values for display only (logic still uses the raw value).
+  const priorityValueLabel = (p: string) =>
+    p === "urgent" ? t("proj.val.urgent")
+    : p === "high" ? t("proj.val.high")
+    : p === "medium" ? t("proj.val.medium")
+    : p === "low" ? t("proj.val.low")
+    : p === "none" ? t("proj.val.none")
+    : t("proj.val.all")
+  const statusValueLabel = (s: string) =>
+    s === "active" ? t("proj.val.active")
+    : s === "completed" ? t("proj.val.completed")
+    : t("proj.val.all")
+  const dueValueLabel = (d: string) =>
+    d === "overdue" ? t("proj.val.overdue")
+    : d === "today" ? t("proj.val.today")
+    : d === "this_week" ? t("proj.val.thisWeek")
+    : d === "no_date" ? t("proj.val.noDate")
+    : t("proj.val.all")
   const [activeView, setActiveView] = useState<ViewType>("overview")
   const [hiddenFields, setHiddenFields] = useState<Set<string>>(new Set())
   const [sortField, setSortField] = useState<SortField>("manual")
@@ -246,7 +266,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
   }
 
   function saveCurrentView() {
-    const name = window.prompt("Name this view (e.g. \"My week\", \"Overdue\"):", "")
+    const name = window.prompt(t("proj.views.namePrompt"), "")
     if (!name || !name.trim()) return
     const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `v_${Date.now()}`
     const next: SavedView = {
@@ -328,7 +348,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Views Bar */}
-      <div className="flex items-center gap-0.5 border-b px-2 shrink-0" role="tablist" aria-label="Project views">
+      <div className="flex items-center gap-0.5 border-b px-2 shrink-0" role="tablist" aria-label={t("proj.toolbar.projectViews")}>
         {VIEWS.map((view) => {
           const Icon = view.icon
           const isActive = activeView === view.id
@@ -347,7 +367,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               }`}
             >
               <Icon className="size-3.5" />
-              {view.label}
+              {t(view.tKey)}
             </button>
           )
         })}
@@ -373,10 +393,10 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               className={`flex items-center gap-1.5 h-7 px-2 text-xs rounded-md hover:bg-accent transition-colors ${
                 selectMode ? "text-primary bg-accent" : "text-muted-foreground"
               }`}
-              title="Select multiple tasks"
+              title={t("proj.toolbar.selectMultiple")}
             >
               <CheckSquare className="size-3" />
-              {selectMode ? "Done" : "Select"}
+              {selectMode ? t("proj.toolbar.done") : t("proj.toolbar.select")}
             </button>
           )}
 
@@ -386,10 +406,10 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               onClick={toggleSelectAll}
               disabled={visibleTaskIds.length === 0}
               className="flex items-center gap-1.5 h-7 px-2 text-xs rounded-md text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40"
-              title={allVisibleSelected ? "Deselect all" : "Select all visible tasks"}
+              title={allVisibleSelected ? t("proj.toolbar.deselectAll") : t("proj.toolbar.selectAllVisible")}
             >
               {allVisibleSelected ? <Square className="size-3" /> : <CheckSquare className="size-3" />}
-              {allVisibleSelected ? "None" : "All"}
+              {allVisibleSelected ? t("proj.toolbar.none") : t("proj.toolbar.all")}
             </button>
           )}
 
@@ -401,7 +421,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
             }`}
           >
             <Filter className="size-3" />
-            Filter
+            {t("proj.toolbar.filter")}
             {activeFilterCount > 0 && (
               <Badge variant="secondary" className="h-4 px-1 text-[10px] min-w-[16px] justify-center">
                 {activeFilterCount}
@@ -417,7 +437,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               }`}
             >
               <Bookmark className="size-3" />
-              Views
+              {t("proj.toolbar.views")}
               {savedViews.length > 0 && (
                 <Badge variant="secondary" className="h-4 px-1 text-[10px] min-w-[16px] justify-center">
                   {savedViews.length}
@@ -427,9 +447,9 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
             <DropdownMenuContent align="end" className="w-56">
               {/* Plain div, NOT DropdownMenuLabel — base-ui's GroupLabel throws
                   if it isn't wrapped in a Menu.Group. */}
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Saved views</div>
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("proj.views.saved")}</div>
               {savedViews.length === 0 && (
-                <div className="px-2 py-1.5 text-xs text-muted-foreground/70">No saved views yet.</div>
+                <div className="px-2 py-1.5 text-xs text-muted-foreground/70">{t("proj.views.empty")}</div>
               )}
               {savedViews.map((v) => (
                 <div key={v.id} className="flex items-center group/vrow">
@@ -443,7 +463,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
                   <button
                     onClick={() => deleteView(v.id)}
                     className="p-1.5 text-muted-foreground/50 hover:text-destructive opacity-0 group-hover/vrow:opacity-100 transition-opacity"
-                    title="Delete view"
+                    title={t("proj.views.delete")}
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -451,7 +471,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={saveCurrentView}>
-                <Save className="size-3.5 mr-2" /> Save current as…
+                <Save className="size-3.5 mr-2" /> {t("proj.views.saveCurrent")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -460,20 +480,20 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-1.5 h-7 px-2 text-xs text-muted-foreground rounded-md hover:bg-accent transition-colors">
               <ArrowUpDown className="size-3" />
-              Sort
+              {t("proj.toolbar.sort")}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               {/* Plain div, NOT DropdownMenuLabel — base-ui's GroupLabel throws
                   if it isn't wrapped in a Menu.Group. */}
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Sort by</div>
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("proj.sort.by")}</div>
               {([
-                ["manual", "Default order"],
-                ["title", "Title"],
-                ["priority", "Priority"],
-                ["dueDate", "Due Date"],
-                ["createdAt", "Created"],
-                ["updatedAt", "Updated"],
-              ] as const).map(([field, label]) => (
+                ["manual", "proj.sort.manual"],
+                ["title", "proj.sort.title"],
+                ["priority", "proj.sort.priority"],
+                ["dueDate", "proj.sort.dueDate"],
+                ["createdAt", "proj.sort.createdAt"],
+                ["updatedAt", "proj.sort.updatedAt"],
+              ] as const).map(([field, labelKey]) => (
                 <DropdownMenuCheckboxItem
                   key={field}
                   checked={sortField === field}
@@ -485,7 +505,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
                     }
                   }}
                 >
-                  {label} {sortField === field && (sortDir === "asc" ? "\u2191" : "\u2193")}
+                  {t(labelKey)} {sortField === field && (sortDir === "asc" ? "\u2191" : "\u2193")}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -499,19 +519,19 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               }`}
             >
               <SlidersHorizontal className="size-3" />
-              Fields
+              {t("proj.toolbar.fields")}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               {/* Plain div, NOT DropdownMenuLabel — base-ui's GroupLabel throws
                   if it isn't wrapped in a Menu.Group. */}
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Visible fields</div>
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("proj.fields.visible")}</div>
               {TASK_FIELDS.map((f) => (
                 <DropdownMenuCheckboxItem
                   key={f.key}
                   checked={!hiddenFields.has(f.key)}
                   onCheckedChange={() => toggleField(f.key)}
                 >
-                  {f.label}
+                  {t(f.tKey)}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -525,7 +545,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           <Search className="size-3.5 text-muted-foreground shrink-0" />
           <Input
             autoFocus
-            placeholder="Search tasks in this project..."
+            placeholder={t("proj.search.placeholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-7 text-sm border-none bg-transparent shadow-none focus-visible:ring-0 px-0"
@@ -548,7 +568,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           <Input
             ref={quickAddRef}
             autoFocus
-            placeholder={'Quick add — e.g. "Submit report fri #high"'}
+            placeholder={t("proj.quickAdd.placeholder")}
             value={quickAddText}
             onChange={(e) => setQuickAddText(e.target.value)}
             onKeyDown={(e) => {
@@ -574,8 +594,8 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <button onClick={handleQuickAdd} className="text-xs text-primary font-medium px-2 shrink-0">Add</button>
-          <button onClick={() => { setQuickAddOpen(false); setQuickAddText("") }} className="text-muted-foreground hover:text-foreground shrink-0" title="Close (Esc)">
+          <button onClick={handleQuickAdd} className="text-xs text-primary font-medium px-2 shrink-0">{t("proj.quickAdd.add")}</button>
+          <button onClick={() => { setQuickAddOpen(false); setQuickAddText("") }} className="text-muted-foreground hover:text-foreground shrink-0" title={t("proj.quickAdd.close")}>
             <X className="size-3.5" />
           </button>
         </div>
@@ -584,7 +604,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
       {/* ClickUp-style Filter Bar (collapsible, with filter pills) */}
       {showFilterBar && (
         <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/20 shrink-0 flex-wrap animate-in slide-in-from-top-1 duration-150">
-          <span className="text-xs text-muted-foreground font-medium shrink-0">Filters:</span>
+          <span className="text-xs text-muted-foreground font-medium shrink-0">{t("proj.filter.label")}</span>
 
           {/* Priority filter pill */}
           <DropdownMenu>
@@ -601,7 +621,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
                     className="size-1.5 rounded-full"
                     style={{ backgroundColor: PRIORITY_COLORS[filterPriority] }}
                   />
-                  Priority: {filterPriority.charAt(0).toUpperCase() + filterPriority.slice(1)}
+                  {t("proj.filter.priorityWith").replace("{v}", priorityValueLabel(filterPriority))}
                   <span
                     role="button"
                     className="ml-0.5 hover:opacity-70"
@@ -613,7 +633,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               ) : (
                 <>
                   <Plus className="size-2.5" />
-                  Priority
+                  {t("proj.filter.priority")}
                 </>
               )}
             </DropdownMenuTrigger>
@@ -625,14 +645,14 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
                   onCheckedChange={() => setFilterPriority(p)}
                 >
                   {p === "all" ? (
-                    "All"
+                    t("proj.val.all")
                   ) : (
                     <span className="flex items-center gap-2">
                       <span
                         className="size-2 rounded-full"
                         style={{ backgroundColor: PRIORITY_COLORS[p] }}
                       />
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                      {priorityValueLabel(p)}
                     </span>
                   )}
                 </DropdownMenuCheckboxItem>
@@ -651,7 +671,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
             >
               {filterCompleted !== "all" ? (
                 <>
-                  Status: {filterCompleted.charAt(0).toUpperCase() + filterCompleted.slice(1)}
+                  {t("proj.filter.statusWith").replace("{v}", statusValueLabel(filterCompleted))}
                   <span
                     role="button"
                     className="ml-0.5 hover:opacity-70"
@@ -663,7 +683,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               ) : (
                 <>
                   <Plus className="size-2.5" />
-                  Status
+                  {t("proj.filter.status")}
                 </>
               )}
             </DropdownMenuTrigger>
@@ -674,7 +694,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
                   checked={filterCompleted === s}
                   onCheckedChange={() => setFilterCompleted(s)}
                 >
-                  {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                  {statusValueLabel(s)}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -691,7 +711,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
             >
               {filterDueDate !== "all" ? (
                 <>
-                  Due: {filterDueDate === "no_date" ? "No date" : filterDueDate === "this_week" ? "This week" : filterDueDate.charAt(0).toUpperCase() + filterDueDate.slice(1)}
+                  {t("proj.filter.dueWith").replace("{v}", dueValueLabel(filterDueDate))}
                   <span
                     role="button"
                     className="ml-0.5 hover:opacity-70"
@@ -703,7 +723,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               ) : (
                 <>
                   <Plus className="size-2.5" />
-                  Due Date
+                  {t("proj.filter.due")}
                 </>
               )}
             </DropdownMenuTrigger>
@@ -714,7 +734,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
                   checked={filterDueDate === d}
                   onCheckedChange={() => setFilterDueDate(d)}
                 >
-                  {d === "all" ? "All" : d === "no_date" ? "No date" : d === "this_week" ? "This week" : d.charAt(0).toUpperCase() + d.slice(1)}
+                  {dueValueLabel(d)}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -728,7 +748,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
                 onClick={clearAllFilters}
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
-                Clear all
+                {t("proj.filter.clearAll")}
               </button>
             </>
           )}
@@ -736,7 +756,7 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           {/* Result count */}
           {activeFilterCount > 0 && (
             <span className="text-xs text-muted-foreground ml-auto">
-              {tasks.length} task{tasks.length !== 1 ? "s" : ""}
+              {(tasks.length === 1 ? t("proj.filter.taskCount") : t("proj.filter.taskCountPlural")).replace("{n}", String(tasks.length))}
             </span>
           )}
         </div>

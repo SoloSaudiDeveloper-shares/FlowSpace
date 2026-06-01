@@ -45,12 +45,14 @@ import {
 } from "@/lib/actions/telegram-actions"
 import { BotReplyTemplatesPanel } from "@/components/settings/bot-reply-templates"
 import { SectionHelp } from "@/components/shared/section-help"
+import { useT } from "@/lib/hooks/use-i18n"
 
 export function TelegramSection({
   featureEnabled,
 }: {
   featureEnabled: boolean
 }) {
+  const { t } = useT()
   const [status, setStatus] = useState<TelegramBotStatus | null>(null)
   const [token, setToken] = useState("")
   const [connecting, setConnecting] = useState(false)
@@ -84,10 +86,10 @@ export function TelegramSection({
     setSavingList(true)
     try {
       await setTelegramTargetList(id)
-      toast.success(id ? "Capture target updated" : "Reverted to most-recent list")
+      toast.success(id ? t("settings.telegram.captureUpdated") : t("settings.telegram.captureReverted"))
       await refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't update target list")
+      toast.error(err instanceof Error ? err.message : t("settings.telegram.captureFailed"))
     } finally {
       setSavingList(false)
     }
@@ -100,7 +102,7 @@ export function TelegramSection({
       setHistory(h)
       setShowHistory(true)
     } catch {
-      toast.error("Couldn't load history")
+      toast.error(t("settings.telegram.historyLoadFailed"))
     } finally {
       setHistoryLoading(false)
     }
@@ -110,10 +112,10 @@ export function TelegramSection({
     setSavingVoice(true)
     try {
       await setTelegramVoiceLanguage(lang)
-      toast.success("Voice language updated")
+      toast.success(t("settings.telegram.langUpdated"))
       await refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to set language")
+      toast.error(err instanceof Error ? err.message : t("settings.telegram.langFailed"))
     } finally {
       setSavingVoice(false)
     }
@@ -123,10 +125,10 @@ export function TelegramSection({
     setSavingVoice(true)
     try {
       await setTelegramVoiceAutoSkip(enabled)
-      toast.success(enabled ? "Auto-skip ON — voice notes use defaults" : "Auto-skip OFF — pickers will show")
+      toast.success(enabled ? t("settings.telegram.autoSkipOn") : t("settings.telegram.autoSkipOff"))
       await refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update setting")
+      toast.error(err instanceof Error ? err.message : t("settings.telegram.updateFailed"))
     } finally {
       setSavingVoice(false)
     }
@@ -137,24 +139,27 @@ export function TelegramSection({
     try {
       await setTelegramVoiceKeyUseShared(useShared)
       toast.success(useShared
-        ? "Switched to the shared workspace key"
-        : "Switched to your own Groq key")
+        ? t("settings.telegram.switchedShared")
+        : t("settings.telegram.switchedOwn"))
       await refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update setting")
+      toast.error(err instanceof Error ? err.message : t("settings.telegram.updateFailed"))
     } finally {
       setSavingVoice(false)
     }
   }
 
   async function handleClearHistory() {
-    if (!confirm("Delete all logged bot messages? This can't be undone.")) return
+    if (!confirm(t("settings.telegram.clearConfirm"))) return
     try {
       const r = await clearMyTelegramHistory()
-      toast.success(`Cleared ${r.deleted} message${r.deleted === 1 ? "" : "s"}`)
+      toast.success(
+        t(r.deleted === 1 ? "settings.telegram.clearedOne" : "settings.telegram.cleared")
+          .replace("{count}", String(r.deleted)),
+      )
       setHistory([])
     } catch {
-      toast.error("Couldn't clear history")
+      toast.error(t("settings.telegram.clearFailed"))
     }
   }
 
@@ -164,7 +169,7 @@ export function TelegramSection({
     try {
       const result = await connectTelegramBot(token.trim())
       if (result.ok) {
-        toast.success(`Connected to @${result.botUsername}`)
+        toast.success(t("settings.telegram.connectedTo").replace("{username}", result.botUsername ?? ""))
         setToken("")
         await refresh()
       } else {
@@ -176,11 +181,11 @@ export function TelegramSection({
   }
 
   async function handleDisconnect() {
-    if (!confirm("Disconnect this Telegram bot? You can reconnect any time.")) return
+    if (!confirm(t("settings.telegram.disconnectConfirm"))) return
     setDisconnecting(true)
     try {
       await disconnectTelegramBot()
-      toast.success("Disconnected")
+      toast.success(t("settings.telegram.disconnected"))
       await refresh()
     } finally {
       setDisconnecting(false)
@@ -191,7 +196,7 @@ export function TelegramSection({
     setTesting(true)
     try {
       const r = await sendTestTelegramMessage()
-      if (r.ok) toast.success("Test message sent")
+      if (r.ok) toast.success(t("settings.telegram.testSent"))
       else toast.error(r.error)
     } finally {
       setTesting(false)
@@ -203,11 +208,9 @@ export function TelegramSection({
       <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/5">
         <AlertCircle className="size-4 text-amber-500 shrink-0 mt-0.5" />
         <div className="text-sm">
-          <p className="font-medium text-amber-200">Telegram integration is disabled</p>
+          <p className="font-medium text-amber-200">{t("settings.telegram.disabledTitle")}</p>
           <p className="text-xs text-amber-200/70 mt-0.5 leading-relaxed">
-            Ask an admin to enable it under <strong>Admin → Telegram</strong>.
-            Once enabled, you can connect your own bot here and it&apos;ll
-            stay private to your account.
+            {t("settings.telegram.disabledHelp")}
           </p>
         </div>
       </div>
@@ -224,29 +227,28 @@ export function TelegramSection({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium flex items-center gap-1.5">
-              Connected
+              {t("settings.telegram.connected")}
               <Check className="size-3.5 text-emerald-400" />
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {status.botUsername ? <>@{status.botUsername}</> : "Bot is online"}
+              {status.botUsername ? <>@{status.botUsername}</> : t("settings.telegram.botOnline")}
             </p>
             {status.lastSeenAt && (
               <p className="text-[11px] text-muted-foreground/70 mt-1">
-                Last message: {new Date(status.lastSeenAt).toLocaleString()}
+                {t("settings.telegram.lastMessage").replace("{when}", new Date(status.lastSeenAt).toLocaleString())}
               </p>
             )}
             {!status.webhookConfigured && (
               <p className="text-xs text-amber-400 mt-2 leading-relaxed">
-                ⚠️ Webhook URL couldn&apos;t be registered (PUBLIC_APP_URL not set
-                in env). Inbound messages won&apos;t arrive until that&apos;s configured.
+                {t("settings.telegram.webhookWarn")}
               </p>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <SectionHelp guideId="telegramBot" label="How to use" />
+            <SectionHelp guideId="telegramBot" label={t("settings.telegram.howToUse")} />
             <Button size="sm" variant="outline" onClick={handleTest} disabled={testing}>
               {testing ? <Loader2 className="size-3 animate-spin mr-1.5" /> : <Send className="size-3 mr-1.5" />}
-              Test
+              {t("settings.telegram.testBtn")}
             </Button>
             <Button size="sm" variant="ghost" onClick={handleDisconnect} disabled={disconnecting}>
               {disconnecting ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
@@ -257,16 +259,14 @@ export function TelegramSection({
         {/* Voice notes defaults */}
         <div className="px-4 py-3 rounded-lg border bg-card">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-            Voice notes
+            {t("settings.telegram.voiceNotes")}
           </p>
           <p className="text-[11px] text-muted-foreground/80 mb-3 leading-relaxed">
-            What happens when you send a voice note to the bot. The defaults
-            below are used by the &ldquo;⚡ Skip&rdquo; button on each
-            picker and by auto-skip mode.
+            {t("settings.telegram.voiceNotesHelp")}
           </p>
 
           {/* Default language */}
-          <label className="block text-[11px] font-medium text-muted-foreground mb-1">Default language</label>
+          <label className="block text-[11px] font-medium text-muted-foreground mb-1">{t("settings.telegram.defaultLanguage")}</label>
           <select
             value={status.voiceLanguage}
             onChange={(e) => handleSetVoiceLanguage(e.target.value)}
@@ -309,10 +309,9 @@ export function TelegramSection({
               />
             </button>
             <div className="flex-1">
-              <p className="text-sm font-medium">Skip pickers automatically</p>
+              <p className="text-sm font-medium">{t("settings.telegram.autoSkip")}</p>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                When on, every voice note goes straight to the default
-                language + default list with zero taps.
+                {t("settings.telegram.autoSkipHelp")}
               </p>
             </div>
           </div>
@@ -337,27 +336,25 @@ export function TelegramSection({
               </button>
               <div className="flex-1">
                 <p className="text-sm font-medium">
-                  Use shared workspace key
+                  {t("settings.telegram.useSharedKey")}
                   {status.voiceKeyUseShared && (
                     <span className="ml-1.5 text-[10px] font-semibold text-amber-400 uppercase tracking-wider">
-                      rate-limited
+                      {t("settings.telegram.rateLimited")}
                     </span>
                   )}
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {status.voiceKeyUseShared
-                    ? "Using the workspace key (free tier: ~2,000 transcriptions/day, shared with everyone). Switch off to use your own."
-                    : "Using your personal key from Settings → Speech. Best — each user gets their own quota."}
+                    ? t("settings.telegram.sharedKeyOn")
+                    : t("settings.telegram.sharedKeyOff")}
                 </p>
               </div>
             </div>
           ) : (
             <div className="pt-3 mt-3 border-t border-border/40">
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                💡 <strong className="text-foreground/80">Using your personal Groq key</strong>
-                {" "}from Settings → Speech. Workspace admin hasn&apos;t set a
-                shared fallback key (TELEGRAM_VOICE_GROQ_KEY env var), so each user provides their own. Get a free
-                one at{" "}
+                💡 <strong className="text-foreground/80">{t("settings.telegram.usingPersonalKey")}</strong>
+                {" "}{t("settings.telegram.personalKeyNote")}{" "}
                 <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
                   console.groq.com/keys
                 </a>.
@@ -369,11 +366,10 @@ export function TelegramSection({
         {/* Where captures go */}
         <div className="px-4 py-3 rounded-lg border bg-card">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-            Where freeform messages land
+            {t("settings.telegram.captureLand")}
           </p>
           <p className="text-[11px] text-muted-foreground/80 mb-2 leading-relaxed">
-            When you text the bot without a slash command, the message gets
-            captured as a todo item. Pick which list it lands in here.
+            {t("settings.telegram.captureHelp")}
           </p>
           <div className="flex items-center gap-2">
             <select
@@ -382,10 +378,12 @@ export function TelegramSection({
               disabled={savingList || lists.length === 0}
               className="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <option value="">Most-recently-updated list (auto)</option>
+              <option value="">{t("settings.telegram.autoList")}</option>
               {lists.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.title} ({l.itemCount} item{l.itemCount === 1 ? "" : "s"})
+                  {t(l.itemCount === 1 ? "settings.telegram.listOptionOne" : "settings.telegram.listOption")
+                    .replace("{title}", l.title)
+                    .replace("{count}", String(l.itemCount))}
                 </option>
               ))}
             </select>
@@ -393,8 +391,7 @@ export function TelegramSection({
           </div>
           {lists.length === 0 && (
             <p className="text-[11px] text-amber-400 mt-1.5">
-              You don&apos;t have any todo lists yet. The bot will auto-create one
-              called &ldquo;Inbox&rdquo; on your first message.
+              {t("settings.telegram.noLists")}
             </p>
           )}
         </div>
@@ -404,7 +401,7 @@ export function TelegramSection({
         <div className="px-4 py-3 rounded-lg border bg-card">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-3">
             <Bot className="size-3 text-primary" />
-            Reply templates
+            {t("settings.telegram.replyTemplates")}
           </p>
           <BotReplyTemplatesPanel />
         </div>
@@ -414,18 +411,18 @@ export function TelegramSection({
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <MessageSquare className="size-3 text-primary" />
-              Message history
+              {t("settings.telegram.messageHistory")}
             </p>
             <div className="flex items-center gap-1.5">
               {showHistory && history.length > 0 && (
                 <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={handleClearHistory}>
                   <Trash2 className="size-3 mr-1" />
-                  Clear
+                  {t("settings.telegram.clear")}
                 </Button>
               )}
               <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={loadHistory} disabled={historyLoading}>
                 {historyLoading ? <Loader2 className="size-3 mr-1 animate-spin" /> : null}
-                {showHistory ? "Refresh" : "Load history"}
+                {showHistory ? t("settings.telegram.refresh") : t("settings.telegram.loadHistory")}
               </Button>
             </div>
           </div>
@@ -433,7 +430,7 @@ export function TelegramSection({
             <>
               {history.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground text-center py-6">
-                  No bot messages logged yet. Send something to your bot and reload.
+                  {t("settings.telegram.historyEmpty")}
                 </p>
               ) : (
                 <div className="max-h-72 overflow-y-auto space-y-1 -mx-1 px-1">
@@ -477,11 +474,9 @@ export function TelegramSection({
             <Bot className="size-4" />
           </div>
           <div>
-            <p className="text-sm font-medium">Connect your bot</p>
+            <p className="text-sm font-medium">{t("settings.telegram.connectTitle")}</p>
             <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-              Each user has their own bot — your messages stay yours. Once
-              connected, text the bot from anywhere and ideas become real
-              items in FlowSpace.
+              {t("settings.telegram.connectHelp")}
             </p>
           </div>
         </div>
@@ -489,7 +484,7 @@ export function TelegramSection({
         {/* Steps */}
         <ol className="text-xs space-y-1.5 pl-1">
           <Step n={1}>
-            Open Telegram and message{" "}
+            {t("settings.telegram.step1.pre")}{" "}
             <a
               href="https://t.me/BotFather"
               target="_blank"
@@ -499,11 +494,42 @@ export function TelegramSection({
               @BotFather
               <ExternalLink className="size-2.5" />
             </a>{" "}
-            — send <code className="px-1 py-0.5 rounded bg-muted text-[10px]">/newbot</code> and follow the prompts.
+            {(() => {
+              const [a, b] = t("settings.telegram.step1.post").split("{cmd}")
+              return (
+                <>
+                  {a}
+                  <code className="px-1 py-0.5 rounded bg-muted text-[10px]">/newbot</code>
+                  {b}
+                </>
+              )
+            })()}
           </Step>
-          <Step n={2}>Copy the bot token BotFather gives you (looks like <code className="px-1 py-0.5 rounded bg-muted text-[10px]">123456:ABC-DEF…</code>).</Step>
-          <Step n={3}>Paste it below — FlowSpace verifies it and wires the webhook automatically.</Step>
-          <Step n={4}>Open your bot in Telegram and send <code className="px-1 py-0.5 rounded bg-muted text-[10px]">/start</code>.</Step>
+          <Step n={2}>
+            {(() => {
+              const [a, b] = t("settings.telegram.step2").split("{sample}")
+              return (
+                <>
+                  {a}
+                  <code className="px-1 py-0.5 rounded bg-muted text-[10px]">123456:ABC-DEF…</code>
+                  {b}
+                </>
+              )
+            })()}
+          </Step>
+          <Step n={3}>{t("settings.telegram.step3")}</Step>
+          <Step n={4}>
+            {(() => {
+              const [a, b] = t("settings.telegram.step4").split("{cmd}")
+              return (
+                <>
+                  {a}
+                  <code className="px-1 py-0.5 rounded bg-muted text-[10px]">/start</code>
+                  {b}
+                </>
+              )
+            })()}
+          </Step>
         </ol>
 
         <div className="flex items-center gap-2 pt-1">
@@ -522,13 +548,12 @@ export function TelegramSection({
             ) : (
               <LinkIcon className="size-3.5 mr-1.5" />
             )}
-            Connect
+            {t("settings.telegram.connect")}
           </Button>
         </div>
 
         <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
-          🔒 Your token is stored server-side, scoped to your account only,
-          and never sent back to the browser after this initial paste.
+          {t("settings.telegram.tokenNote")}
         </p>
       </div>
     </div>

@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { Keyboard } from "lucide-react"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type Shortcut = {
   keys: string[]
@@ -27,31 +28,37 @@ function Kbd({ children }: { children: string }) {
 }
 
 export function KeyboardShortcuts() {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const router = useRouter()
 
+  const catNavigation = t("misc.shortcuts.cat.navigation")
+  const catTasks = t("misc.shortcuts.cat.tasks")
+  const catEditor = t("misc.shortcuts.cat.editor")
+  const catGeneral = t("misc.shortcuts.cat.general")
+
   const shortcuts: Shortcut[] = [
     // Navigation
-    { keys: ["Ctrl", "K"], label: "Open command palette", category: "Navigation", action: () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true })) } },
-    { keys: ["Shift", "?"], label: "Show keyboard shortcuts", category: "Navigation" },
-    { keys: ["Alt", "H"], label: "Go to home", category: "Navigation", action: () => router.push("/") },
-    { keys: ["Alt", "R"], label: "Go to reminders", category: "Navigation", action: () => router.push("/reminders") },
+    { keys: ["Ctrl", "K"], label: t("misc.shortcuts.openPalette"), category: catNavigation, action: () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true })) } },
+    { keys: ["Shift", "?"], label: t("misc.shortcuts.showShortcuts"), category: catNavigation },
+    { keys: ["Alt", "H"], label: t("misc.shortcuts.goHome"), category: catNavigation, action: () => router.push("/") },
+    { keys: ["Alt", "R"], label: t("misc.shortcuts.goReminders"), category: catNavigation, action: () => router.push("/reminders") },
 
     // Task actions
-    { keys: ["Ctrl", "Enter"], label: "Submit / confirm", category: "Tasks" },
-    { keys: ["Escape"], label: "Close dialog / cancel", category: "Tasks" },
+    { keys: ["Ctrl", "Enter"], label: t("misc.shortcuts.submit"), category: catTasks },
+    { keys: ["Escape"], label: t("misc.shortcuts.closeDialog"), category: catTasks },
 
     // Editor
-    { keys: ["Ctrl", "B"], label: "Bold text", category: "Editor" },
-    { keys: ["Ctrl", "I"], label: "Italic text", category: "Editor" },
-    { keys: ["Ctrl", "U"], label: "Underline text", category: "Editor" },
-    { keys: ["Ctrl", "Shift", "X"], label: "Strikethrough", category: "Editor" },
-    { keys: ["Ctrl", "Z"], label: "Undo", category: "Editor" },
-    { keys: ["Ctrl", "Shift", "Z"], label: "Redo", category: "Editor" },
+    { keys: ["Ctrl", "B"], label: t("misc.shortcuts.bold"), category: catEditor },
+    { keys: ["Ctrl", "I"], label: t("misc.shortcuts.italic"), category: catEditor },
+    { keys: ["Ctrl", "U"], label: t("misc.shortcuts.underline"), category: catEditor },
+    { keys: ["Ctrl", "Shift", "X"], label: t("misc.shortcuts.strikethrough"), category: catEditor },
+    { keys: ["Ctrl", "Z"], label: t("misc.shortcuts.undo"), category: catEditor },
+    { keys: ["Ctrl", "Shift", "Z"], label: t("misc.shortcuts.redo"), category: catEditor },
 
     // General
-    { keys: ["Ctrl", "S"], label: "Save (auto-saves)", category: "General" },
-    { keys: ["/"], label: "Slash command (in editor)", category: "General" },
+    { keys: ["Ctrl", "S"], label: t("misc.shortcuts.save"), category: catGeneral },
+    { keys: ["/"], label: t("misc.shortcuts.slash"), category: catGeneral },
   ]
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -94,10 +101,17 @@ export function KeyboardShortcuts() {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Keyboard className="size-5" />
-            Keyboard Shortcuts
+            {t("misc.shortcuts.title")}
           </DialogTitle>
           <DialogDescription>
-            Press <Kbd>Shift</Kbd> + <Kbd>?</Kbd> anywhere to show this overlay
+            {(() => {
+              const parts = t("misc.shortcuts.help").split(/(\{shift\}|\{question\})/)
+              return parts.map((part, i) =>
+                part === "{shift}" ? <Kbd key={i}>Shift</Kbd> :
+                part === "{question}" ? <Kbd key={i}>?</Kbd> :
+                <span key={i}>{part}</span>
+              )
+            })()}
           </DialogDescription>
         </DialogHeader>
 

@@ -17,6 +17,7 @@ import {
 } from "@/components/shared/context-menu"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   Plus,
   CheckCircle,
@@ -69,13 +70,13 @@ type SourceFilter = "all" | "manual" | "system" | "automation"
 // ─── Event Type Config ──────────────────────────────────────────────────
 
 const EVENT_TYPE_FILTERS = [
-  { key: "tasks", label: "Tasks", types: ["task_created", "task_completed", "task_assigned", "task_updated", "task_overdue"] },
-  { key: "comments", label: "Comments", types: ["comment_added", "comment_mention"] },
-  { key: "pages", label: "Pages", types: ["page_updated"] },
-  { key: "canvas", label: "Canvas", types: ["canvas_updated"] },
-  { key: "approvals", label: "Approvals", types: ["approval_requested", "approval_completed"] },
-  { key: "automation", label: "Automation", types: ["automation_fired"] },
-  { key: "system", label: "System", types: ["backup_completed", "backup_failed", "user_joined", "permission_changed", "reminder_triggered"] },
+  { key: "tasks", labelKey: "feed.filter.tasks", types: ["task_created", "task_completed", "task_assigned", "task_updated", "task_overdue"] },
+  { key: "comments", labelKey: "feed.filter.comments", types: ["comment_added", "comment_mention"] },
+  { key: "pages", labelKey: "feed.filter.pages", types: ["page_updated"] },
+  { key: "canvas", labelKey: "feed.filter.canvas", types: ["canvas_updated"] },
+  { key: "approvals", labelKey: "feed.filter.approvals", types: ["approval_requested", "approval_completed"] },
+  { key: "automation", labelKey: "feed.filter.automation", types: ["automation_fired"] },
+  { key: "system", labelKey: "feed.filter.system", types: ["backup_completed", "backup_failed", "user_joined", "permission_changed", "reminder_triggered"] },
 ] as const
 
 const EVENT_ICON_MAP: Record<string, typeof Activity> = {
@@ -133,7 +134,9 @@ function getInitials(name: string): string {
     .slice(0, 2)
 }
 
-function formatRelativeTime(dateString: string): string {
+type TFn = (key: string) => string
+
+function formatRelativeTime(dateString: string, t: TFn): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
@@ -142,31 +145,34 @@ function formatRelativeTime(dateString: string): string {
   const diffHour = Math.floor(diffMin / 60)
   const diffDay = Math.floor(diffHour / 24)
 
-  if (diffSec < 60) return "just now"
-  if (diffMin < 60) return `${diffMin}m ago`
-  if (diffHour < 24) return `${diffHour}h ago`
+  if (diffSec < 60) return t("feed.time.justNow")
+  if (diffMin < 60) return t("feed.time.minutesAgo").replace("{n}", String(diffMin))
+  if (diffHour < 24) return t("feed.time.hoursAgo").replace("{n}", String(diffHour))
   if (diffDay === 1) {
-    return `Yesterday at ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+    return t("feed.time.yesterdayAt").replace(
+      "{time}",
+      date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+    )
   }
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
-function getDayLabel(dateString: string): string {
+function getDayLabel(dateString: string, t: TFn): string {
   const date = new Date(dateString)
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const eventDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
   const diffDays = Math.floor((today.getTime() - eventDay.getTime()) / (1000 * 60 * 60 * 24))
 
-  if (diffDays === 0) return "Today"
-  if (diffDays === 1) return "Yesterday"
+  if (diffDays === 0) return t("feed.day.today")
+  if (diffDays === 1) return t("feed.day.yesterday")
   return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
 }
 
-function groupEventsByDay(events: any[]): Map<string, any[]> {
+function groupEventsByDay(events: any[], t: TFn): Map<string, any[]> {
   const groups = new Map<string, any[]>()
   for (const ev of events) {
-    const label = getDayLabel(ev.event.createdAt)
+    const label = getDayLabel(ev.event.createdAt, t)
     if (!groups.has(label)) groups.set(label, [])
     groups.get(label)!.push(ev)
   }
@@ -183,6 +189,7 @@ export function FeedContent({
   pinnedEvents,
 }: FeedContentProps) {
   const router = useRouter()
+  const { t } = useT()
   const [isPending, startTransition] = useTransition()
 
   // Filter state
@@ -223,7 +230,7 @@ export function FeedContent({
     })
   }, [events, activeTypeFilters, priorityFilter, sourceFilter])
 
-  const groupedEvents = useMemo(() => groupEventsByDay(filteredEvents), [filteredEvents])
+  const groupedEvents = useMemo(() => groupEventsByDay(filteredEvents, t), [filteredEvents, t])
 
   // Actions
   const handleMarkRead = useCallback(
@@ -232,13 +239,13 @@ export function FeedContent({
       startTransition(async () => {
         try {
           await markEventRead(currentUserId, eventId)
-          toast.success("Marked as read")
+          toast.success(t("feed.toast.markedRead"))
         } catch {
-          toast.error("Failed to mark as read")
+          toast.error(t("feed.toast.markReadFail"))
         }
       })
     },
-    [currentUserId]
+    [currentUserId, t]
   )
 
   const handlePin = useCallback(
@@ -254,18 +261,18 @@ export function FeedContent({
               next.delete(eventId)
               return next
             })
-            toast.success("Unpinned")
+            toast.success(t("feed.toast.unpinned"))
           } else {
             await pinEvent(currentUserId, eventId)
             setPinnedIds((prev) => new Set(prev).add(eventId))
-            toast.success("Pinned")
+            toast.success(t("feed.toast.pinned"))
           }
         } catch {
-          toast.error("Failed to update pin")
+          toast.error(t("feed.toast.pinFail"))
         }
       })
     },
-    [currentUserId, pinnedIds]
+    [currentUserId, pinnedIds, t]
   )
 
   const handleOpenRelated = useCallback(
@@ -287,9 +294,11 @@ export function FeedContent({
       setPriorityOverrides((p) => ({ ...p, [eventId]: priority }))
       try {
         await setFeedEventPriority(eventId, priority)
-        toast.success(`Priority set to ${priority}`)
+        toast.success(
+          t("feed.toast.prioritySet").replace("{priority}", t(`feed.priority.${priority}`)),
+        )
       } catch {
-        toast.error("Couldn't change priority — you don't own this event")
+        toast.error(t("feed.toast.priorityFail"))
         setPriorityOverrides((p) => {
           const next = { ...p }
           delete next[eventId]
@@ -297,7 +306,7 @@ export function FeedContent({
         })
       }
     },
-    [],
+    [t],
   )
 
   // ─── Render ─────────────────────────────────────────────────────────
@@ -321,7 +330,7 @@ export function FeedContent({
                   : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
               }`}
             >
-              {filter.label}
+              {t(filter.labelKey)}
             </button>
           ))}
         </div>
@@ -329,7 +338,7 @@ export function FeedContent({
         {/* Priority + Source filters */}
         <div className="flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Priority:</span>
+            <span className="text-muted-foreground">{t("feed.priority.label")}</span>
             {(["all", "high", "normal", "low"] as const).map((p) => (
               <button
                 key={p}
@@ -340,12 +349,12 @@ export function FeedContent({
                     : "text-muted-foreground hover:bg-muted"
                 }`}
               >
-                {p}
+                {p === "all" ? t("feed.filter.all") : t(`feed.priority.${p}`)}
               </button>
             ))}
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Source:</span>
+            <span className="text-muted-foreground">{t("feed.source.label")}</span>
             {(["all", "manual", "system", "automation"] as const).map((s) => (
               <button
                 key={s}
@@ -356,7 +365,7 @@ export function FeedContent({
                     : "text-muted-foreground hover:bg-muted"
                 }`}
               >
-                {s}
+                {s === "all" ? t("feed.filter.all") : t(`feed.source.${s}`)}
               </button>
             ))}
           </div>
@@ -372,7 +381,7 @@ export function FeedContent({
           >
             {pinnedExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
             <Pin className="size-3.5 text-primary" />
-            <span>Pinned</span>
+            <span>{t("feed.pinned")}</span>
             <span className="text-muted-foreground">({pinnedEvents.length})</span>
           </button>
           {pinnedExpanded && (
@@ -399,8 +408,8 @@ export function FeedContent({
       {filteredEvents.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <Rss className="size-10 mb-3 opacity-40" />
-          <p className="text-sm font-medium">No feed events yet</p>
-          <p className="text-xs mt-1">Activity will appear here as it happens.</p>
+          <p className="text-sm font-medium">{t("feed.empty.title")}</p>
+          <p className="text-xs mt-1">{t("feed.empty.desc")}</p>
         </div>
       ) : (
         Array.from(groupedEvents.entries()).map(([dayLabel, dayEvents]) => (
@@ -434,19 +443,20 @@ export function FeedContent({
 // ─── Side panel: docs + quick-post composer ───────────────────────────────
 
 function FeedSidePanel({ onPosted }: { onPosted: () => void }) {
+  const { t } = useT()
   const [title, setTitle] = useState("")
   const [summary, setSummary] = useState("")
   const [priority, setPriority] = useState<"low" | "normal" | "high">("normal")
   const [posting, setPosting] = useState(false)
 
   async function post() {
-    const t = title.trim()
-    if (!t) return
+    const trimmedTitle = title.trim()
+    if (!trimmedTitle) return
     setPosting(true)
     try {
       await createFeedEvent({
         type: "comment_added", // closest fit for a manual note
-        title: t,
+        title: trimmedTitle,
         summary: summary.trim() || undefined,
         priority,
         sourceType: "manual",
@@ -455,10 +465,10 @@ function FeedSidePanel({ onPosted }: { onPosted: () => void }) {
       setTitle("")
       setSummary("")
       setPriority("normal")
-      toast.success("Posted to feed")
+      toast.success(t("feed.toast.posted"))
       onPosted()
     } catch {
-      toast.error("Couldn't post — please try again")
+      toast.error(t("feed.toast.postFail"))
     } finally {
       setPosting(false)
     }
@@ -467,17 +477,17 @@ function FeedSidePanel({ onPosted }: { onPosted: () => void }) {
   return (
     <aside
       className="hidden xl:flex flex-col w-72 shrink-0 border-l border-border/40 bg-card/30 h-full overflow-hidden"
-      aria-label="Feed documentation and quick post"
+      aria-label={t("feed.panel.aria")}
     >
       <div className="flex flex-col gap-5 p-5 overflow-y-auto">
         {/* ── Quick post ─────────────────────────────────────────── */}
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mb-2">
-            Post to feed
+            {t("feed.panel.postHeading")}
           </div>
           <div className="space-y-2">
             <Input
-              placeholder="What's the headline?"
+              placeholder={t("feed.panel.titlePlaceholder")}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -487,7 +497,7 @@ function FeedSidePanel({ onPosted }: { onPosted: () => void }) {
               className="h-9 text-sm"
             />
             <textarea
-              placeholder="Optional detail…"
+              placeholder={t("feed.panel.detailPlaceholder")}
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               rows={2}
@@ -518,7 +528,7 @@ function FeedSidePanel({ onPosted }: { onPosted: () => void }) {
                     className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md border text-[11px] capitalize transition-colors ${tone}`}
                   >
                     <Icon className="size-3" />
-                    {p}
+                    {t(`feed.priority.${p}`)}
                   </button>
                 )
               })}
@@ -530,7 +540,7 @@ function FeedSidePanel({ onPosted }: { onPosted: () => void }) {
               onClick={post}
             >
               <Send className="size-3 mr-1.5" />
-              {posting ? "Posting…" : "Post to feed"}
+              {posting ? t("feed.panel.posting") : t("feed.panel.postButton")}
             </Button>
           </div>
         </div>
@@ -538,47 +548,43 @@ function FeedSidePanel({ onPosted }: { onPosted: () => void }) {
         {/* ── About the feed ─────────────────────────────────────── */}
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mb-2">
-            About the feed
+            {t("feed.panel.aboutHeading")}
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            The feed is your workspace&apos;s activity stream. Anything
-            interesting that happens — tasks completing, comments landing,
-            approvals firing, automations running — turns into a feed event.
-            They show up here, in the scrolling ticker, and the home
-            dashboard&apos;s heatmap.
+            {t("feed.panel.aboutBody")}
           </p>
         </div>
 
         {/* ── Sources ────────────────────────────────────────────── */}
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mb-2">
-            Where items come from
+            {t("feed.panel.sourcesHeading")}
           </div>
           <ul className="space-y-2 text-xs">
             <SourceRow
               icon={Sparkles}
-              title="System events"
-              desc="Tasks, comments, page edits — generated automatically as you work in projects."
+              title={t("feed.panel.source.systemTitle")}
+              desc={t("feed.panel.source.systemDesc")}
             />
             <SourceRow
               icon={Bot}
-              title="Automations"
-              desc="Triggers you set up under Platform → Automations publish here when they fire."
+              title={t("feed.panel.source.automationsTitle")}
+              desc={t("feed.panel.source.automationsDesc")}
             />
             <SourceRow
               icon={FileText}
-              title="Form submissions"
-              desc="External forms (Platform → Forms) push a feed event with each submission."
+              title={t("feed.panel.source.formsTitle")}
+              desc={t("feed.panel.source.formsDesc")}
             />
             <SourceRow
               icon={Send}
-              title="Manual posts"
-              desc="Use the composer above to drop a note for the team. Right-click on any item in your projects to also push it to the feed."
+              title={t("feed.panel.source.manualTitle")}
+              desc={t("feed.panel.source.manualDesc")}
             />
             <SourceRow
               icon={Globe}
-              title="API"
-              desc="Programmatic events from integrations land here too."
+              title={t("feed.panel.source.apiTitle")}
+              desc={t("feed.panel.source.apiDesc")}
             />
           </ul>
         </div>
@@ -587,23 +593,20 @@ function FeedSidePanel({ onPosted }: { onPosted: () => void }) {
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mb-2 flex items-center gap-1.5">
             <Info className="size-3" />
-            Tips
+            {t("feed.panel.tipsHeading")}
           </div>
           <ul className="space-y-1.5 text-xs text-muted-foreground leading-relaxed list-disc pl-4">
             <li>
-              <strong className="text-foreground">Right-click</strong> any item
-              (here, in the ticker, on the home dashboard) to change its
-              priority. High items get a rose dot and float up.
+              <strong className="text-foreground">{t("feed.panel.tip.rightClickLabel")}</strong>{" "}
+              {t("feed.panel.tip.rightClickBody")}
             </li>
             <li>
-              <strong className="text-foreground">Pin</strong> items you want to
-              keep visible — they get their own section at the top.
+              <strong className="text-foreground">{t("feed.panel.tip.pinLabel")}</strong>{" "}
+              {t("feed.panel.tip.pinBody")}
             </li>
             <li>
-              <strong className="text-foreground">Drag the ticker.</strong>{" "}
-              Unpin it from the ticker&apos;s pin icon (top-right) to float it
-              anywhere on screen, then drag the left edge to move and the
-              bottom-right corner to resize.
+              <strong className="text-foreground">{t("feed.panel.tip.dragLabel")}</strong>{" "}
+              {t("feed.panel.tip.dragBody")}
             </li>
           </ul>
         </div>
@@ -655,8 +658,9 @@ function FeedCard({
   onOpenRelated: (ev: any) => void
   onSetPriority: (id: string, p: "low" | "normal" | "high") => void
 }) {
+  const { t } = useT()
   const ev = event.event
-  const actorName = event.actorDisplayName ?? "System"
+  const actorName = event.actorDisplayName ?? t("feed.actor.system")
   const IconComponent = EVENT_ICON_MAP[ev.type] ?? Activity
   const isSystem = !event.actorDisplayName
   const ctx = useContextMenu()
@@ -675,34 +679,34 @@ function FeedCard({
       },
       { separator: true },
       {
-        label: isPinned ? "Unpin" : "Pin",
+        label: isPinned ? t("feed.action.unpin") : t("feed.action.pin"),
         icon: isPinned ? PinOff : Pin,
         onClick: () => onPin(ev.id),
       },
       {
-        label: "Mark as read",
+        label: t("feed.action.markRead"),
         icon: Eye,
         onClick: () => onMarkRead(ev.id),
       },
       {
-        label: "Open related",
+        label: t("feed.action.openRelated"),
         icon: ExternalLink,
         onClick: () => onOpenRelated(event),
         disabled: !(ev.subjectElementId || ev.projectId),
       },
       { separator: true },
       {
-        label: "High priority",
+        label: t("feed.action.highPriority"),
         icon: Flame,
         onClick: () => onSetPriority(ev.id, "high"),
       },
       {
-        label: "Normal priority",
+        label: t("feed.action.normalPriority"),
         icon: Circle,
         onClick: () => onSetPriority(ev.id, "normal"),
       },
       {
-        label: "Low priority",
+        label: t("feed.action.lowPriority"),
         icon: Minus,
         onClick: () => onSetPriority(ev.id, "low"),
       },
@@ -725,7 +729,7 @@ function FeedCard({
     <div
       onContextMenu={openMenu}
       className={`${priorityBg} border ${priorityBorder} rounded-lg p-4 hover:shadow-md transition-all group`}
-      title="Right-click for priority & actions"
+      title={t("feed.card.tooltip")}
     >
       <div className="flex items-start gap-3">
         {/* Left: Avatar or system icon */}
@@ -752,17 +756,17 @@ function FeedCard({
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{ev.summary}</p>
           )}
           <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-            <span>{formatRelativeTime(ev.createdAt)}</span>
+            <span>{formatRelativeTime(ev.createdAt, t)}</span>
             {ev.projectId && (
               <>
                 <span className="text-muted-foreground/40">-</span>
-                <span className="truncate max-w-[150px]">Project</span>
+                <span className="truncate max-w-[150px]">{t("feed.meta.project")}</span>
               </>
             )}
             {ev.subjectElementId && (
               <>
                 <span className="text-muted-foreground/40">-</span>
-                <span className="truncate max-w-[150px]">Element</span>
+                <span className="truncate max-w-[150px]">{t("feed.meta.element")}</span>
               </>
             )}
           </div>
@@ -778,14 +782,14 @@ function FeedCard({
                 ) : (
                   <Minus className="size-2.5" />
                 )}
-                {effectivePriority}
+                {t(`feed.priority.${effectivePriority}`)}
               </span>
             )}
             {ev.sourceType && ev.sourceType !== "system" && (
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${SOURCE_COLORS[ev.sourceType] ?? ""}`}
               >
-                {ev.sourceType}
+                {t(`feed.sourceChip.${ev.sourceType}`)}
               </span>
             )}
           </div>
@@ -798,14 +802,14 @@ function FeedCard({
               <button
                 onClick={() => onPin(ev.id)}
                 className="p-1.5 rounded-md hover:bg-muted transition-colors"
-                title={isPinned ? "Unpin" : "Pin"}
+                title={isPinned ? t("feed.action.unpin") : t("feed.action.pin")}
               >
                 {isPinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
               </button>
               <button
                 onClick={() => onMarkRead(ev.id)}
                 className="p-1.5 rounded-md hover:bg-muted transition-colors"
-                title="Mark as read"
+                title={t("feed.action.markRead")}
               >
                 <Eye className="size-3.5" />
               </button>
@@ -815,7 +819,7 @@ function FeedCard({
             <button
               onClick={() => onOpenRelated(event)}
               className="p-1.5 rounded-md hover:bg-muted transition-colors"
-              title="Open related item"
+              title={t("feed.action.openRelatedItem")}
             >
               <ExternalLink className="size-3.5" />
             </button>

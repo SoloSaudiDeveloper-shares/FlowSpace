@@ -18,6 +18,7 @@ import {
   getMyVoiceUsage,
   type VoiceUsageStats,
 } from "@/lib/actions/voice-usage-actions"
+import { useT } from "@/lib/hooks/use-i18n"
 
 function formatSeconds(s: number): string {
   if (s < 60) return `${s}s`
@@ -29,6 +30,7 @@ function formatSeconds(s: number): string {
 }
 
 export function VoiceUsageCard() {
+  const { t } = useT()
   const [stats, setStats] = useState<VoiceUsageStats | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -58,7 +60,7 @@ export function VoiceUsageCard() {
     <div className="px-4 py-3 rounded-lg border bg-card space-y-3">
       <div className="flex items-center gap-2">
         <Mic className="size-4 text-muted-foreground" />
-        <h3 className="text-sm font-medium">Voice usage</h3>
+        <h3 className="text-sm font-medium">{t("settings.voiceUsage.title")}</h3>
         <Button
           size="sm"
           variant="ghost"
@@ -74,19 +76,18 @@ export function VoiceUsageCard() {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Groq doesn't expose a balance endpoint. This counts what FlowSpace
-        sent today — your real quota lives in the Groq dashboard.
+        {t("settings.voiceUsage.help")}
       </p>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Today" count={stats.todayCount} seconds={stats.todaySeconds} highlight />
-        <Stat label="Last 7 days" count={stats.weekCount} seconds={stats.weekSeconds} />
+        <Stat label={t("settings.voiceUsage.today")} count={stats.todayCount} seconds={stats.todaySeconds} highlight />
+        <Stat label={t("settings.voiceUsage.last7")} count={stats.weekCount} seconds={stats.weekSeconds} />
       </div>
 
       {/* Sparkline (7 bars) */}
       <div>
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mb-1.5">
-          7-day trend
+          {t("settings.voiceUsage.trend")}
         </p>
         <div className="flex items-end gap-1 h-12">
           {stats.trend.map((d) => {
@@ -96,7 +97,9 @@ export function VoiceUsageCard() {
               <div
                 key={d.date}
                 className="flex-1 flex flex-col items-center gap-1"
-                title={`${d.date}: ${d.count} transcription${d.count === 1 ? "" : "s"}`}
+                title={t(d.count === 1 ? "settings.voiceUsage.trendTooltipOne" : "settings.voiceUsage.trendTooltip")
+                  .replace("{date}", d.date)
+                  .replace("{count}", String(d.count))}
               >
                 <div
                   className={`w-full rounded-sm transition-all ${
@@ -127,6 +130,7 @@ function Stat({
   seconds: number
   highlight?: boolean
 }) {
+  const { t } = useT()
   return (
     <div
       className={`rounded-md border px-3 py-2 ${
@@ -139,12 +143,12 @@ function Stat({
       <p className="text-base font-semibold tabular-nums leading-tight mt-1">
         {count}{" "}
         <span className="text-[11px] font-normal text-muted-foreground">
-          transcription{count === 1 ? "" : "s"}
+          {t(count === 1 ? "settings.voiceUsage.transcription" : "settings.voiceUsage.transcriptions")}
         </span>
       </p>
       {seconds > 0 && (
         <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
-          {formatSeconds(seconds)} audio
+          {t("settings.voiceUsage.audio").replace("{duration}", formatSeconds(seconds))}
         </p>
       )}
     </div>
