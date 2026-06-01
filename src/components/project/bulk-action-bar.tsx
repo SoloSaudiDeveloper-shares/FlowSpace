@@ -40,6 +40,7 @@ import {
   bulkAddLabel,
   bulkAddToFeed,
   getAllLabels,
+  restoreTasks,
 } from "@/lib/actions/task-actions"
 import { sendTasksDigestEmail, isTaskEmailReady } from "@/lib/actions/task-email-actions"
 import type { taskStatuses, taskLabels } from "@/lib/db/schema"
@@ -266,9 +267,19 @@ export function BulkActionBar({
             <CheckCircle2 className="size-3.5" /> Done
           </Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive hover:text-destructive gap-1.5" disabled={busy}
-            onClick={() => {
-              if (!confirm(`Delete ${n} task${n === 1 ? "" : "s"}? This cannot be undone.`)) return
-              run(() => bulkDeleteTasks(taskIds, projectId), `Deleted ${n}`).then(onClear)
+            onClick={async () => {
+              setBusy(true)
+              try {
+                const snaps = await bulkDeleteTasks(taskIds, projectId)
+                onClear()
+                toast.success(`Deleted ${n} task${n === 1 ? "" : "s"}`, {
+                  action: { label: "Undo", onClick: () => restoreTasks(snaps, projectId) },
+                })
+              } catch {
+                toast.error("Bulk delete failed")
+              } finally {
+                setBusy(false)
+              }
             }}>
             <Trash2 className="size-3.5" />
           </Button>

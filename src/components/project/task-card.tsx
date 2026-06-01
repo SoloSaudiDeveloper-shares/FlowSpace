@@ -22,7 +22,8 @@ import {
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { deleteTask, updateTask, duplicateTask } from "@/lib/actions/task-actions"
+import { deleteTask, updateTask, duplicateTask, restoreTasks } from "@/lib/actions/task-actions"
+import { toast } from "sonner"
 import type { tasks, taskLabels } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 import { TaskMetaPopover, type MetaKind } from "./task-meta-popover"
@@ -123,10 +124,11 @@ export function TaskCard({
         label: "Delete",
         icon: Trash2,
         variant: "destructive",
-        onClick: () => {
-          if (confirm(`Delete "${task.title}"? This cannot be undone.`)) {
-            deleteTask(task.id, task.projectId)
-          }
+        onClick: async () => {
+          const snap = await deleteTask(task.id, task.projectId)
+          toast.success("Task deleted", {
+            action: snap ? { label: "Undo", onClick: () => restoreTasks([snap], task.projectId) } : undefined,
+          })
         },
       },
     ]

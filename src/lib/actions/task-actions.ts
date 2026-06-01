@@ -60,6 +60,59 @@ async function idsInProject(taskIds: string[], projectId: string): Promise<strin
   return rows.map((r) => r.id)
 }
 
+// ─── Delete + Undo (snapshot / restore) ─────────────────────────────────
+//
+// Deleting a task is a hard delete (so it disappears consistently from every
+// surface — board, search, digests, calendar, exports). To support Undo we
+// first snapshot the task and the child rows that a cascade would remove, then
+// restore re-inserts them. Snapshots are returned to the client and handed
+// back to restoreTasks() if the user clicks Undo.
+
+export type TaskSnapshot = {
+  task: typeof tasks.$inferSelect
+  comments: (typeof taskComments.$inferSelect)[]
+  checklists: (typeof taskChecklists.$inferSelect)[]
+  checklistItems: (typeof taskChecklistItems.$inferSelect)[]
+  attachments: (typeof taskAttachments.$inferSelect)[]
+  dependencies: (typeof taskDependencies.$inferSelect)[]
+  labels: (typeof taskToLabels.$inferSelect)[]
+}
+
+async function snapshotTask(id: string): Promise<TaskSnapshot | null> {
+  const taskRow = (await db.select().from(tasks).where(eq(tasks.id, id)).limit(1))[0]
+  if (!taskRow) return null
+  const checklists = await db.select().from(taskChecklists).where(eq(taskChecklists.taskId, id))
+  const clIds = checklists.map((c) => c.id)
+  return {
+    task: taskRow,
+    comments: await db.select().from(taskComments).where(eq(taskComments.taskId, id)),
+    checklists,
+    checklistItems: clIds.length
+      ? await db.select().from(taskChecklistItems).where(inArray(taskChecklistItems.checklistId, clIds))
+      : [],
+    attachments: await db.select().from(taskAttachments).where(eq(taskAttachments.taskId, id)),
+    dependencies: await db.select().from(taskDependencies).where(eq(taskDependencies.taskId, id)),
+    labels: await db.select().from(taskToLabels).where(eq(taskToLabels.taskId, id)),
+  }
+}
+
+/** Re-insert previously-deleted tasks (+ their child rows) from snapshots. */
+export async function restoreTasks(snapshots: TaskSnapshot[], projectId: string) {
+  await requireProjectAccess(projectId)
+  for (const s of snapshots) {
+    if (!s?.task) continue
+    await db.insert(tasks).values(s.task)
+    for (const c of s.comments) await db.insert(taskComments).values(c)
+    for (const cl of s.checklists) await db.insert(taskChecklists).values(cl)
+    for (const it of s.checklistItems) await db.insert(taskChecklistItems).values(it)
+    for (const a of s.attachments) await db.insert(taskAttachments).values(a)
+    for (const d of s.dependencies) await db.insert(taskDependencies).values(d)
+    for (const l of s.labels) await db.insert(taskToLabels).values(l)
+  }
+  await db.update(elements).set({ updatedAt: new Date().toISOString() }).where(eq(elements.id, projectId))
+  revalidatePath(`/projects/${projectId}`)
+}
+
 // ─── Task Statuses ──────────────────────────────────────────────────────
 
 export async function getTaskStatuses(projectId: string) {
@@ -264,8 +317,9 @@ export async function updateTask(
   revalidatePath(`/projects/${projectId}`)
 }
 
-export async function deleteTask(id: string, projectId: string) {
+export async function deleteTask(id: string, projectId: string): Promise<TaskSnapshot | null> {
   await requireProjectAccess(projectId)
+  const snap = await snapshotTask(id)
   await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.projectId, projectId)))
   await db
     .update(elements)
@@ -273,6 +327,7 @@ export async function deleteTask(id: string, projectId: string) {
     .where(eq(elements.id, projectId))
 
   revalidatePath(`/projects/${projectId}`)
+  return snap // returned so the client can offer Undo
 }
 
 /**
@@ -374,13 +429,19 @@ export async function bulkSetTimer(taskIds: string[], projectId: string, running
   revalidatePath(`/projects/${projectId}`)
 }
 
-export async function bulkDeleteTasks(taskIds: string[], projectId: string) {
-  if (!taskIds.length) return
+export async function bulkDeleteTasks(taskIds: string[], projectId: string): Promise<TaskSnapshot[]> {
+  if (!taskIds.length) return []
   await requireProjectAccess(projectId)
   const ids = await idsInProject(taskIds, projectId)
-  for (const id of ids) await db.delete(tasks).where(eq(tasks.id, id))
+  const snaps: TaskSnapshot[] = []
+  for (const id of ids) {
+    const snap = await snapshotTask(id)
+    if (snap) snaps.push(snap)
+    await db.delete(tasks).where(eq(tasks.id, id))
+  }
   await db.update(elements).set({ updatedAt: new Date().toISOString() }).where(eq(elements.id, projectId))
   revalidatePath(`/projects/${projectId}`)
+  return snaps // returned so the client can offer Undo
 }
 
 /** Attach a label to many tasks at once (skips ones that already have it). */

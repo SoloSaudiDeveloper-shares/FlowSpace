@@ -32,7 +32,9 @@ import {
   deleteTask,
   startTaskTimer,
   stopTaskTimer,
+  restoreTasks,
 } from "@/lib/actions/task-actions"
+import { toast } from "sonner"
 import { TaskDetailSheet } from "../task-detail-sheet"
 import { parseQuickAdd } from "@/lib/quick-add"
 import {
@@ -344,10 +346,11 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, s
         label: "Delete task",
         icon: Trash2,
         variant: "destructive",
-        onClick: () => {
-          if (confirm(`Delete "${task.title}"? This cannot be undone.`)) {
-            deleteTask(task.id, task.projectId)
-          }
+        onClick: async () => {
+          const snap = await deleteTask(task.id, task.projectId)
+          toast.success("Task deleted", {
+            action: snap ? { label: "Undo", onClick: () => restoreTasks([snap], task.projectId) } : undefined,
+          })
         },
       },
     ]
