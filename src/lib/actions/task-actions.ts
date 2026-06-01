@@ -214,6 +214,76 @@ export async function stopTaskTimer(id: string, projectId: string) {
   revalidatePath(`/projects/${projectId}`)
 }
 
+// ─── Bulk actions (multi-select) ─────────────────────────────────────────
+
+export async function bulkUpdateTasks(
+  taskIds: string[],
+  projectId: string,
+  data: {
+    priority?: "urgent" | "high" | "medium" | "low" | "none"
+    statusId?: string
+    dueDate?: string | null
+    isCompleted?: boolean
+  },
+) {
+  if (!taskIds.length) return
+  const now = new Date().toISOString()
+  for (const id of taskIds) {
+    const updateData: Record<string, unknown> = { ...data, updatedAt: now }
+    if (data.isCompleted !== undefined) {
+      updateData.completedAt = data.isCompleted ? now : null
+    }
+    if (data.isCompleted === true) {
+      const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+      if (cur[0]?.timeTrackingStartedAt) {
+        const elapsed = Math.max(0, Math.floor((Date.now() - new Date(cur[0].timeTrackingStartedAt).getTime()) / 1000))
+        updateData.timeTracked = (cur[0].timeTracked ?? 0) + elapsed
+        updateData.timeTrackingStartedAt = null
+      }
+    }
+    await db.update(tasks).set(updateData).where(eq(tasks.id, id))
+  }
+  await db.update(elements).set({ updatedAt: now }).where(eq(elements.id, projectId))
+  revalidatePath(`/projects/${projectId}`)
+}
+
+export async function bulkAddComment(taskIds: string[], projectId: string, content: string) {
+  const text = content.trim()
+  if (!taskIds.length || !text) return
+  for (const id of taskIds) {
+    await db.insert(taskComments).values({ id: createId(), taskId: id, content: text })
+  }
+  revalidatePath(`/projects/${projectId}`)
+}
+
+/** Start (running=true) or stop the timer on many tasks at once. */
+export async function bulkSetTimer(taskIds: string[], projectId: string, running: boolean) {
+  if (!taskIds.length) return
+  const now = new Date().toISOString()
+  for (const id of taskIds) {
+    const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+    if (!cur[0]) continue
+    if (running && !cur[0].timeTrackingStartedAt) {
+      await db.update(tasks).set({ timeTrackingStartedAt: now, updatedAt: now }).where(eq(tasks.id, id))
+    } else if (!running && cur[0].timeTrackingStartedAt) {
+      const elapsed = Math.max(0, Math.floor((Date.now() - new Date(cur[0].timeTrackingStartedAt).getTime()) / 1000))
+      await db
+        .update(tasks)
+        .set({ timeTracked: (cur[0].timeTracked ?? 0) + elapsed, timeTrackingStartedAt: null, updatedAt: now })
+        .where(eq(tasks.id, id))
+    }
+  }
+  await db.update(elements).set({ updatedAt: now }).where(eq(elements.id, projectId))
+  revalidatePath(`/projects/${projectId}`)
+}
+
+export async function bulkDeleteTasks(taskIds: string[], projectId: string) {
+  if (!taskIds.length) return
+  for (const id of taskIds) await db.delete(tasks).where(eq(tasks.id, id))
+  await db.update(elements).set({ updatedAt: new Date().toISOString() }).where(eq(elements.id, projectId))
+  revalidatePath(`/projects/${projectId}`)
+}
+
 export async function moveTask(
   taskId: string,
   projectId: string,

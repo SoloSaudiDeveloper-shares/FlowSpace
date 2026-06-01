@@ -20,6 +20,8 @@ import {
   ListChecks,
   Tag,
   FileText,
+  Square,
+  CheckSquare,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SpeechButton } from "@/components/shared/speech-button"
@@ -157,9 +159,13 @@ interface ListViewProps {
   hiddenFields?: Set<string>
   /** Per-task labels + subtask/checklist counts (shared with the board). */
   taskMeta?: TaskCardMeta
+  /** Multi-select mode (bulk actions). */
+  selectMode?: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (taskId: string) => void
 }
 
-export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta }: ListViewProps) {
+export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta, selectMode, selectedIds, onToggleSelect }: ListViewProps) {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetTab, setSheetTab] = useState<"details" | "comments">("details")
@@ -322,6 +328,9 @@ export function ListView({ projectId, statuses, tasks, hiddenFields, taskMeta }:
             cols={cols}
             meta={taskMeta}
             nowTick={nowTick}
+            selectMode={!!selectMode}
+            selectedIds={selectedIds}
+            onToggleSelect={onToggleSelect}
           />
         )
       })}
@@ -369,6 +378,9 @@ function StatusGroup({
   cols,
   meta,
   nowTick,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
 }: {
   status: TaskStatus
   tasks: Task[]
@@ -383,6 +395,9 @@ function StatusGroup({
   cols: Cols
   meta?: TaskCardMeta
   nowTick: number
+  selectMode: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (id: string) => void
 }) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTitle, setNewTitle] = useState("")
@@ -423,6 +438,9 @@ function StatusGroup({
               cols={cols}
               meta={meta}
               nowTick={nowTick}
+              selectMode={selectMode}
+              selected={!!selectedIds?.has(task.id)}
+              onToggleSelect={onToggleSelect}
             />
           ))}
 
@@ -472,6 +490,9 @@ function TaskRow({
   cols,
   meta,
   nowTick,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: {
   task: Task
   depth: number
@@ -483,6 +504,9 @@ function TaskRow({
   cols: Cols
   meta?: TaskCardMeta
   nowTick: number
+  selectMode: boolean
+  selected: boolean
+  onToggleSelect?: (id: string) => void
 }) {
   const priorityColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.none
   const barColor = PRIORITY_BAR[task.priority] ?? PRIORITY_BAR.none
@@ -497,12 +521,29 @@ function TaskRow({
 
   return (
     <div
-      className="relative flex items-center gap-2 px-4 py-1.5 border-b hover:bg-accent/30 cursor-pointer group"
+      className={`relative flex items-center gap-2 px-4 py-1.5 border-b cursor-pointer group ${
+        selected ? "bg-primary/10" : "hover:bg-accent/30"
+      }`}
       style={{ paddingLeft: 16 + depth * INDENT_PX }}
-      onClick={() => onTaskClick(task)}
+      onClick={() => (selectMode ? onToggleSelect?.(task.id) : onTaskClick(task))}
       onContextMenu={(e) => onTaskContextMenu(e, task)}
     >
       <span className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: barColor }} aria-hidden />
+
+      {/* Selection checkbox (multi-select mode) */}
+      {selectMode && (
+        <button
+          className="shrink-0"
+          onClick={(e) => { e.stopPropagation(); onToggleSelect?.(task.id) }}
+          aria-label={selected ? "Deselect" : "Select"}
+        >
+          {selected ? (
+            <CheckSquare className="size-4 text-primary" />
+          ) : (
+            <Square className="size-4 text-muted-foreground/50" />
+          )}
+        </button>
+      )}
 
       {isSubtask && (
         <div

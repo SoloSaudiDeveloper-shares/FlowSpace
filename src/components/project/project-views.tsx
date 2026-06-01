@@ -29,6 +29,8 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { OverviewView } from "./views/overview-view"
 import { ListView } from "./views/list-view"
+import { BulkActionBar } from "./bulk-action-bar"
+import { CheckSquare } from "lucide-react"
 import { TaskBoard } from "./task-board"
 import { CalendarView } from "./views/calendar-view"
 import { GanttView } from "./views/gantt-view"
@@ -110,6 +112,22 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
   const [showFilterBar, setShowFilterBar] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
+
+  // Multi-select (bulk actions) — only meaningful in the List view.
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  function toggleSelect(taskId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }
+  function exitSelect() {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
 
   function toggleField(key: string) {
     setHiddenFields((prev) => {
@@ -244,6 +262,20 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           >
             <Search className="size-3" />
           </button>
+
+          {/* Multi-select toggle (List view only) */}
+          {activeView === "list" && (
+            <button
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              className={`flex items-center gap-1.5 h-7 px-2 text-xs rounded-md hover:bg-accent transition-colors ${
+                selectMode ? "text-primary bg-accent" : "text-muted-foreground"
+              }`}
+              title="Select multiple tasks"
+            >
+              <CheckSquare className="size-3" />
+              Select
+            </button>
+          )}
 
           {/* Filter toggle */}
           <button
@@ -515,7 +547,16 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           />
         )}
         {activeView === "list" && (
-          <ListView projectId={projectId} statuses={statuses} tasks={tasks} hiddenFields={hiddenFields} taskMeta={taskMeta} />
+          <ListView
+            projectId={projectId}
+            statuses={statuses}
+            tasks={tasks}
+            hiddenFields={hiddenFields}
+            taskMeta={taskMeta}
+            selectMode={selectMode}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+          />
         )}
         {activeView === "board" && (
           <div className="p-6">
@@ -536,6 +577,16 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
           <TableView projectId={projectId} statuses={statuses} tasks={tasks} />
         )}
       </div>
+
+      {selectMode && selectedIds.size > 0 && (
+        <BulkActionBar
+          ids={selectedIds}
+          projectId={projectId}
+          statuses={statuses}
+          onClear={() => setSelectedIds(new Set())}
+          onExit={exitSelect}
+        />
+      )}
     </div>
   )
 }
