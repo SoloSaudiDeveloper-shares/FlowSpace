@@ -20,7 +20,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
@@ -300,7 +299,9 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               Sort
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel className="text-xs">Sort by</DropdownMenuLabel>
+              {/* Plain div, NOT DropdownMenuLabel — base-ui's GroupLabel throws
+                  if it isn't wrapped in a Menu.Group. */}
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Sort by</div>
               {([
                 ["manual", "Default order"],
                 ["title", "Title"],
@@ -337,7 +338,9 @@ export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, p
               Fields
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel className="text-xs">Visible fields</DropdownMenuLabel>
+              {/* Plain div, NOT DropdownMenuLabel — base-ui's GroupLabel throws
+                  if it isn't wrapped in a Menu.Group. */}
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Visible fields</div>
               {TASK_FIELDS.map((f) => (
                 <DropdownMenuCheckboxItem
                   key={f.key}
