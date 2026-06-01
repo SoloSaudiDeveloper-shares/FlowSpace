@@ -204,7 +204,14 @@ export async function restoreBackup(
       type: "full",
     })
 
-    // Use a transaction to restore all data
+    // Use a transaction to restore all data.
+    //
+    // FK enforcement MUST be off during a bulk reload: rows are inserted in an
+    // order that can transiently violate constraints (most notably the self-
+    // referencing `elements.parent_id`, where a child element can precede its
+    // parent in the backup). `PRAGMA foreign_keys` is a no-op *inside* a
+    // transaction, so it has to be toggled before BEGIN and restored after.
+    sqlite.pragma("foreign_keys = OFF")
     sqlite.exec("BEGIN TRANSACTION")
 
     try {
@@ -411,11 +418,13 @@ export async function restoreBackup(
       }
 
       sqlite.exec("COMMIT")
+      sqlite.pragma("foreign_keys = ON")
 
       revalidatePath("/")
       return { success: true }
     } catch (txError) {
       sqlite.exec("ROLLBACK")
+      sqlite.pragma("foreign_keys = ON")
 
       // Log a server event on failure
       await db.insert(serverEvents).values({

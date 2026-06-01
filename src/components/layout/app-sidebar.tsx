@@ -76,6 +76,7 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { SidebarResizer } from "@/components/layout/sidebar-resizer"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1777,6 +1778,7 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
       </SidebarFooter>
 
       <SidebarRail />
+      <SidebarResizer />
 
       {ctxMenu && (
         <ContextMenu

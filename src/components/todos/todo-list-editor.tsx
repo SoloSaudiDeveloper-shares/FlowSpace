@@ -15,6 +15,7 @@ import {
 } from "@/lib/actions/todo-actions"
 import type { todoItems } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
+import { toast } from "sonner"
 
 type TodoItem = typeof todoItems.$inferSelect & {
   priority?: "urgent" | "high" | "medium" | "low" | null
@@ -41,6 +42,9 @@ const PRIORITY_LABEL: Record<NonNullable<TodoItem["priority"]>, string> = {
 
 export function TodoListEditor({ listId, items }: TodoListEditorProps) {
   const [newTitle, setNewTitle] = useState("")
+  // Items hidden optimistically while their delete is in flight, so removal is
+  // instant on screen instead of waiting for the server revalidation round-trip.
+  const [removing, setRemoving] = useState<Set<string>>(new Set())
 
   async function handleAdd() {
     if (!newTitle.trim()) return
@@ -48,23 +52,39 @@ export function TodoListEditor({ listId, items }: TodoListEditorProps) {
     setNewTitle("")
   }
 
-  const completedCount = items.filter((i) => i.isCompleted).length
+  async function handleDelete(id: string) {
+    setRemoving((prev) => new Set(prev).add(id))
+    try {
+      await deleteTodoItem(id, listId)
+    } catch {
+      // Restore the row and tell the user.
+      setRemoving((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      toast.error("Couldn't delete that item")
+    }
+  }
+
+  const visibleItems = items.filter((i) => !removing.has(i.id))
+  const completedCount = visibleItems.filter((i) => i.isCompleted).length
 
   return (
     <div className="space-y-4">
       {/* Progress */}
-      {items.length > 0 && (
+      {visibleItems.length > 0 && (
         <div className="flex items-center gap-3">
           <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className="h-full rounded-full bg-green-500 transition-all duration-300"
               style={{
-                width: `${(completedCount / items.length) * 100}%`,
+                width: `${(completedCount / visibleItems.length) * 100}%`,
               }}
             />
           </div>
           <span className="text-xs text-muted-foreground">
-            {completedCount}/{items.length}
+            {completedCount}/{visibleItems.length}
           </span>
         </div>
       )}
@@ -98,10 +118,10 @@ export function TodoListEditor({ listId, items }: TodoListEditorProps) {
 
       {/* Items */}
       <div className="space-y-1">
-        {items.map((item) => (
-          <TodoItemRow key={item.id} item={item} listId={listId} />
+        {visibleItems.map((item) => (
+          <TodoItemRow key={item.id} item={item} listId={listId} onDelete={handleDelete} />
         ))}
-        {items.length === 0 && (
+        {visibleItems.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">
             No items yet. Add one above.
           </p>
@@ -111,7 +131,7 @@ export function TodoListEditor({ listId, items }: TodoListEditorProps) {
   )
 }
 
-function TodoItemRow({ item, listId }: { item: TodoItem; listId: string }) {
+function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: string; onDelete: (id: string) => void }) {
   const [title, setTitle] = useState(item.title)
   const [isEditing, setIsEditing] = useState(false)
   /** "priority" | "date" | null — which inline popover is open. */
@@ -146,7 +166,7 @@ function TodoItemRow({ item, listId }: { item: TodoItem; listId: string }) {
         label: "Delete",
         icon: Trash2,
         variant: "destructive",
-        onClick: () => deleteTodoItem(item.id, listId),
+        onClick: () => onDelete(item.id),
       },
     ]
     openCtx(e, entries)
@@ -251,6 +271,16 @@ function TodoItemRow({ item, listId }: { item: TodoItem; listId: string }) {
               aria-label="More actions"
             >
               <MoreVertical className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 text-muted-foreground/40 hover:text-destructive"
+              onClick={() => onDelete(item.id)}
+              aria-label="Delete item"
+              title="Delete"
+            >
+              <Trash2 className="size-3.5" />
             </Button>
           </div>
         </div>

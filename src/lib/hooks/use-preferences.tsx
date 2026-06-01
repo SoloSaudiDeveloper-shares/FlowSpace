@@ -169,6 +169,8 @@ export interface Preferences {
   pomodoroVisible: boolean
   /** Saved per-project toolbar presets (view + sort + filters + columns). */
   savedViews: SavedView[]
+  /** Sidebar width in px (drag the sidebar's right edge to resize). */
+  sidebarWidth: number
 }
 
 // Home dashboard sections — each one can be toggled on/off by the user.
@@ -285,6 +287,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   locale: "en",
   pomodoroVisible: false,
   savedViews: [],
+  sidebarWidth: 256,
 }
 
 export const HOME_SECTION_LABELS: Record<HomeSectionKey, string> = {
