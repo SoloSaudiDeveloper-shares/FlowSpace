@@ -4,6 +4,7 @@ import { useEffect, useRef, useId } from "react"
 import { Mic, MicOff, Loader2 } from "lucide-react"
 import { useSpeechRecognition } from "@/lib/hooks/use-speech-recognition"
 import { usePreferences } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 
 interface SpeechButtonProps {
   /** Called with final transcribed text */
@@ -35,10 +36,11 @@ export function SpeechButton({
   className = "",
   size = "md",
   showPulse = true,
-  tooltip = "Voice input",
+  tooltip,
   preferAccuracy = false,
 }: SpeechButtonProps) {
   const { preferences } = usePreferences()
+  const { t } = useT()
   const buttonId = useId()
   const {
     status,
@@ -103,14 +105,14 @@ export function SpeechButton({
         disabled={isLoading || isBusy}
         title={
           hasError
-            ? error?.message ?? "Speech error"
+            ? error?.message ?? t("shared.speech.error")
             : isLoading
-              ? "Loading speech model..."
+              ? t("shared.speech.loadingModel")
               : isActive && isListening
-                ? "Stop listening"
+                ? t("shared.speech.stopListening")
                 : isBusy
-                  ? "Another input is recording"
-                  : tooltip
+                  ? t("shared.speech.anotherRecording")
+                  : tooltip ?? t("shared.speech.voiceInput")
         }
         className={`
           inline-flex items-center justify-center rounded-full transition-all

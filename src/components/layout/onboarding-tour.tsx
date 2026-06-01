@@ -24,11 +24,12 @@ import { useEffect, useMemo, useState } from "react"
 import { X, ArrowRight, ArrowLeft, Sparkles, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePreferences } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 
 interface TourStep {
   selector: string
-  title: string
-  body: string
+  /** Dictionary key stem; resolves to `<titleKey>.title` / `.body`. */
+  key: string
   /** Side to position the callout relative to the highlighted element. */
   side?: "top" | "right" | "bottom" | "left"
   /** Center the callout in the viewport instead of attaching to a node
@@ -40,51 +41,37 @@ const STEPS: TourStep[] = [
   {
     selector: "[data-tour=intro]",
     center: true,
-    title: "Welcome to FlowSpace 👋",
-    body:
-      "Let's spend 60 seconds on the seven things that make this feel like home. You can skip any time.",
+    key: "layout.tour.intro",
   },
   {
     selector: "[data-slot=sidebar]",
     side: "right",
-    title: "Your sidebar",
-    body:
-      "Every element type — projects, pages, canvases, todo lists, reminders, processes — lives in its own collapsible group. Right-click a group header to tint it, right-click an item for the full menu.",
+    key: "layout.tour.sidebar",
   },
   {
     selector: "[data-slot=sidebar] input[placeholder*='Search'], [data-slot=sidebar] button[aria-label*='Search']",
     side: "right",
-    title: "Command palette",
-    body:
-      "Press ⌘K (Ctrl+K on Windows) anywhere to jump to anything: an element, an action, a settings page. The fastest path to almost everything.",
+    key: "layout.tour.palette",
   },
   {
     selector: "[data-slot=topbar-clock]",
     side: "left",
-    title: "The floating clock",
-    body:
-      "Drag it anywhere. Right-click for colour, format, analog/digital, second timezone. Hide it from Settings if you don't need it.",
+    key: "layout.tour.clock",
   },
   {
     selector: "header [aria-label*='Notifications'], [data-tour=notifications]",
     side: "bottom",
-    title: "Your bell",
-    body:
-      "A single rose number summarising what needs your attention: unread notifications, pending imports from Telegram or Email, overdue tasks, overdue reminders. Click for the full list.",
+    key: "layout.tour.bell",
   },
   {
     selector: "[data-tour=quick-capture], main",
     side: "bottom",
-    title: "Right-click is your friend",
-    body:
-      "Right-click on the page background, on sidebar items, on feed entries, on tasks. We added a lot of context menus — the platform feels much smaller once you know they're there.",
+    key: "layout.tour.rightClick",
   },
   {
     selector: "[data-tour=intro]",
     center: true,
-    title: "You're set 🎉",
-    body:
-      "Settings → Help has a Replay tour button if you ever want to see this again. Now go build something.",
+    key: "layout.tour.outro",
   },
 ]
 
@@ -92,6 +79,7 @@ const TOUR_DELAY_MS = 1500
 
 export function OnboardingTour() {
   const { preferences, updatePreference } = usePreferences()
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const [stepIdx, setStepIdx] = useState(0)
   const [target, setTarget] = useState<{
@@ -266,21 +254,23 @@ export function OnboardingTour() {
           <div className="flex items-center gap-1.5">
             <Sparkles className="size-3.5 text-primary" />
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-medium">
-              Step {stepIdx + 1} of {STEPS.length}
+              {t("layout.tour.step")
+                .replace("{n}", String(stepIdx + 1))
+                .replace("{total}", String(STEPS.length))}
             </span>
           </div>
           <button
             type="button"
             onClick={finish}
             className="size-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center"
-            aria-label="Skip tour"
+            aria-label={t("layout.tour.skip")}
           >
             <X className="size-3.5" />
           </button>
         </div>
-        <h3 className="text-base font-semibold mb-1.5">{step.title}</h3>
+        <h3 className="text-base font-semibold mb-1.5">{t(`${step.key}.title`)}</h3>
         <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-          {step.body}
+          {t(`${step.key}.body`)}
         </p>
         <div className="flex items-center justify-between gap-2">
           <Button
@@ -291,7 +281,7 @@ export function OnboardingTour() {
             disabled={isFirst}
           >
             <ArrowLeft className="size-3" />
-            Back
+            {t("layout.tour.back")}
           </Button>
           <div className="flex items-center gap-0.5">
             {STEPS.map((_, i) => (
@@ -310,7 +300,7 @@ export function OnboardingTour() {
           {isLast ? (
             <Button size="sm" className="h-7 text-xs gap-1.5" onClick={finish}>
               <Check className="size-3" />
-              Done
+              {t("layout.tour.done")}
             </Button>
           ) : (
             <Button
@@ -318,7 +308,7 @@ export function OnboardingTour() {
               className="h-7 text-xs gap-1.5"
               onClick={() => setStepIdx((i) => Math.min(STEPS.length - 1, i + 1))}
             >
-              Next
+              {t("layout.tour.next")}
               <ArrowRight className="size-3" />
             </Button>
           )}

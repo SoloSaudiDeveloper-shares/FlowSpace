@@ -3,13 +3,22 @@
 import { useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useT } from "@/lib/hooks/use-i18n"
 import { TaskDetailSheet } from "../task-detail-sheet"
 import type { tasks, taskStatuses } from "@/lib/db/schema"
 
 type Task = typeof tasks.$inferSelect
 type TaskStatus = typeof taskStatuses.$inferSelect
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const DAY_KEYS = [
+  "projx.calendar.day.sun",
+  "projx.calendar.day.mon",
+  "projx.calendar.day.tue",
+  "projx.calendar.day.wed",
+  "projx.calendar.day.thu",
+  "projx.calendar.day.fri",
+  "projx.calendar.day.sat",
+]
 
 interface CalendarViewProps {
   projectId: string
@@ -18,6 +27,7 @@ interface CalendarViewProps {
 }
 
 export function CalendarView({ statuses, tasks }: CalendarViewProps) {
+  const { t } = useT()
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -81,7 +91,7 @@ export function CalendarView({ statuses, tasks }: CalendarViewProps) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
         <div className="flex items-center gap-2 px-4 py-2 border-b">
-          <Button variant="outline" size="sm" onClick={goToday} className="h-7 text-xs">Today</Button>
+          <Button variant="outline" size="sm" onClick={goToday} className="h-7 text-xs">{t("projx.today")}</Button>
           <Button variant="ghost" size="icon" className="size-7" onClick={prevMonth}>
             <ChevronLeft className="size-4" />
           </Button>
@@ -93,9 +103,9 @@ export function CalendarView({ statuses, tasks }: CalendarViewProps) {
 
         {/* Day headers */}
         <div className="grid grid-cols-7 border-b">
-          {DAYS.map((d) => (
-            <div key={d} className="py-2 text-center text-xs font-medium text-muted-foreground border-r last:border-r-0">
-              {d}
+          {DAY_KEYS.map((dKey) => (
+            <div key={dKey} className="py-2 text-center text-xs font-medium text-muted-foreground border-r last:border-r-0">
+              {t(dKey)}
             </div>
           ))}
         </div>
@@ -143,7 +153,7 @@ export function CalendarView({ statuses, tasks }: CalendarViewProps) {
                   )
                 })}
                 {cellTasks.length > 3 && (
-                  <span className="text-xs text-muted-foreground px-1">+{cellTasks.length - 3} more</span>
+                  <span className="text-xs text-muted-foreground px-1">{t("projx.calendar.more").replace("{n}", String(cellTasks.length - 3))}</span>
                 )}
               </div>
             )
@@ -155,11 +165,11 @@ export function CalendarView({ statuses, tasks }: CalendarViewProps) {
       <div className="w-36 border-l flex flex-col shrink-0">
         <div className="p-3 border-b">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-muted-foreground">Unscheduled</span>
+            <span className="text-xs text-muted-foreground">{t("projx.calendar.unscheduled")}</span>
             <span className="text-xs font-semibold">{unscheduled.length}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-xs text-red-400">Overdue</span>
+            <span className="text-xs text-red-400">{t("projx.calendar.overdue")}</span>
             <span className="text-xs font-semibold text-red-400">{overdue.length}</span>
           </div>
         </div>

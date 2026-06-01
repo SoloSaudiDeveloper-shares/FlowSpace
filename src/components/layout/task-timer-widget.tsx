@@ -27,16 +27,17 @@ import {
   useContextMenu,
   type ContextMenuEntry,
 } from "@/components/shared/context-menu"
+import { useT } from "@/lib/hooks/use-i18n"
 
 const PRESETS_MIN = [5, 15, 25, 45, 60]
-const COLOR_OPTIONS: { value: TimerColor; label: string }[] = [
-  { value: "neutral", label: "Neutral" },
-  { value: "blue",    label: "Blue" },
-  { value: "violet",  label: "Violet" },
-  { value: "rose",    label: "Rose" },
-  { value: "green",   label: "Green" },
-  { value: "orange",  label: "Orange" },
-  { value: "teal",    label: "Teal" },
+const COLOR_OPTIONS: { value: TimerColor; labelKey: string }[] = [
+  { value: "neutral", labelKey: "layout.timer.color.neutral" },
+  { value: "blue",    labelKey: "layout.timer.color.blue" },
+  { value: "violet",  labelKey: "layout.timer.color.violet" },
+  { value: "rose",    labelKey: "layout.timer.color.rose" },
+  { value: "green",   labelKey: "layout.timer.color.green" },
+  { value: "orange",  labelKey: "layout.timer.color.orange" },
+  { value: "teal",    labelKey: "layout.timer.color.teal" },
 ]
 
 /**
@@ -45,6 +46,7 @@ const COLOR_OPTIONS: { value: TimerColor; label: string }[] = [
  * Mounted in the root layout so it follows the user across every page.
  */
 export function TaskTimerWidget() {
+  const { t } = useT()
   const timer = useTimerStore()
   const active = isTimerActive(timer)
   const [, force] = useState(0)
@@ -73,10 +75,15 @@ export function TaskTimerWidget() {
     const remaining = getRemainingMs(timer)
     if (remaining === 0 && !expiredRef.current) {
       expiredRef.current = true
-      toast.success(`Timer done${timer.label ? ` — ${timer.label}` : ""}`, {
-        description: "Take a break.",
-        duration: 8000,
-      })
+      toast.success(
+        timer.label
+          ? t("layout.timer.doneLabeled").replace("{label}", timer.label)
+          : t("layout.timer.done"),
+        {
+          description: t("layout.timer.takeBreak"),
+          duration: 8000,
+        },
+      )
       setTimeout(() => timer.stop(), 200)
     }
   })
@@ -85,19 +92,19 @@ export function TaskTimerWidget() {
     const items: ContextMenuEntry[] = []
     if (active) {
       items.push({
-        label: timer.paused ? "Resume" : "Pause",
+        label: timer.paused ? t("layout.timer.resume") : t("layout.timer.pause"),
         icon: timer.paused ? Play : Pause,
         onClick: () => (timer.paused ? timer.resume() : timer.pause()),
       })
       items.push({
-        label: "Add 5 minutes",
+        label: t("layout.timer.add5"),
         icon: Plus,
         onClick: () => timer.extend(5 * 60 * 1000),
       })
       items.push({ separator: true })
     }
     items.push({
-      label: active ? "Edit / Restart…" : "Set up timer…",
+      label: active ? t("layout.timer.edit") : t("layout.timer.setup"),
       icon: Pencil,
       onClick: () => setPickerOpen(true),
     })
@@ -105,21 +112,21 @@ export function TaskTimerWidget() {
     // Color sub-items, flat
     for (const c of COLOR_OPTIONS) {
       items.push({
-        label: `Color: ${c.label}${timer.accentColor === c.value ? "  ✓" : ""}`,
+        label: `${t("layout.timer.color").replace("{label}", t(c.labelKey))}${timer.accentColor === c.value ? "  ✓" : ""}`,
         icon: Palette,
         onClick: () => timer.setAccentColor(c.value),
       })
     }
     items.push({ separator: true })
     items.push({
-      label: "Reset position",
+      label: t("layout.timer.resetPosition"),
       icon: Move,
       onClick: () => drag.resetPosition(),
     })
     if (active) {
       items.push({ separator: true })
       items.push({
-        label: "Stop timer",
+        label: t("layout.timer.stop"),
         icon: Square,
         variant: "destructive",
         onClick: () => timer.stop(),
@@ -156,8 +163,8 @@ export function TaskTimerWidget() {
             className={`flex items-center pl-2 pr-0.5 opacity-0 group-hover/fab:opacity-60 hover:!opacity-100 transition-opacity ${
               drag.isDragging ? "cursor-grabbing opacity-100" : "cursor-grab"
             }`}
-            title="Drag to move (right-click for options)"
-            aria-label="Drag timer"
+            title={t("layout.timer.dragMove")}
+            aria-label={t("layout.timer.dragTimer")}
           >
             <GripVertical className="size-3" />
           </span>
@@ -166,11 +173,11 @@ export function TaskTimerWidget() {
             data-no-drag
             onClick={() => setPickerOpen(true)}
             className="inline-flex items-center gap-1.5 pr-2 md:pr-3.5 pl-2 md:pl-1 py-2"
-            aria-label="Start a focus timer"
+            aria-label={t("layout.timer.startFocus")}
           >
             <Timer className="size-3.5 transition-transform duration-500 group-hover/fab:rotate-180" style={{ color: accent }} />
             {/* Label drops on phones — the icon + tap target stay. */}
-            <span className="hidden md:inline tracking-wide">Start timer</span>
+            <span className="hidden md:inline tracking-wide">{t("layout.timer.startTimer")}</span>
           </button>
         </div>
         <TimerPicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
@@ -218,15 +225,15 @@ export function TaskTimerWidget() {
               className="text-[11px] uppercase tracking-wider font-medium"
               style={{ color: accent }}
             >
-              {timer.paused ? "Paused" : "Focus"}
+              {timer.paused ? t("layout.timer.paused") : t("layout.timer.focus")}
             </span>
             <button
               type="button"
               data-no-drag
               onClick={timer.stop}
               className="p-1 -mr-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Stop timer"
-              title="Stop"
+              aria-label={t("layout.timer.stop")}
+              title={t("layout.timer.stopShort")}
             >
               <Square className="size-3.5" />
             </button>
@@ -249,7 +256,7 @@ export function TaskTimerWidget() {
                 style={{ background: accent }}
               >
                 <Play className="size-3" />
-                Resume
+                {t("layout.timer.resume")}
               </button>
             ) : (
               <button
@@ -259,7 +266,7 @@ export function TaskTimerWidget() {
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border text-xs font-medium hover:bg-accent transition-colors"
               >
                 <Pause className="size-3" />
-                Pause
+                {t("layout.timer.pause")}
               </button>
             )}
             <button
@@ -267,7 +274,7 @@ export function TaskTimerWidget() {
               data-no-drag
               onClick={() => timer.extend(5 * 60 * 1000)}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="Add 5 minutes"
+              title={t("layout.timer.add5")}
             >
               <Plus className="size-3" />5m
             </button>
@@ -281,6 +288,7 @@ export function TaskTimerWidget() {
 }
 
 function TimerPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useT()
   const start = useTimerStore((s) => s.start)
   const currentLabel = useTimerStore((s) => s.label)
   const [label, setLabel] = useState("")
@@ -294,7 +302,7 @@ function TimerPicker({ open, onClose }: { open: boolean; onClose: () => void }) 
   function go(minutes: number) {
     if (minutes <= 0) return
     start({
-      label: label.trim() || `${minutes}-minute focus`,
+      label: label.trim() || t("layout.timer.picker.defaultLabel").replace("{n}", String(minutes)),
       durationMs: minutes * 60_000,
     })
     setLabel("")
@@ -308,30 +316,29 @@ function TimerPicker({ open, onClose }: { open: boolean; onClose: () => void }) 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Timer className="size-4" />
-            Start a focus timer
+            {t("layout.timer.picker.title")}
           </DialogTitle>
           <DialogDescription>
-            Pick a duration. The countdown follows you everywhere — drag it to
-            move; right-click for more options.
+            {t("layout.timer.picker.desc")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              What are you focusing on? (optional)
+              {t("layout.timer.picker.labelLabel")}
             </label>
             <input
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g. Finish CCB submission package"
+              placeholder={t("layout.timer.picker.labelPh")}
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               autoFocus
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Duration
+              {t("layout.timer.picker.durationLabel")}
             </label>
             <div className="flex flex-wrap gap-1.5">
               {PRESETS_MIN.map((m) => (
@@ -341,7 +348,7 @@ function TimerPicker({ open, onClose }: { open: boolean; onClose: () => void }) 
                   onClick={() => go(m)}
                   className="inline-flex items-center px-3 py-1.5 rounded-md border border-input text-sm hover:bg-accent transition-colors"
                 >
-                  {m} min
+                  {t("layout.timer.picker.minutes").replace("{n}", String(m))}
                 </button>
               ))}
             </div>
@@ -349,7 +356,7 @@ function TimerPicker({ open, onClose }: { open: boolean; onClose: () => void }) 
           <div className="flex items-end gap-2 pt-2 border-t">
             <div className="flex-1">
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Custom (minutes)
+                {t("layout.timer.picker.customLabel")}
               </label>
               <input
                 type="number"
@@ -357,7 +364,7 @@ function TimerPicker({ open, onClose }: { open: boolean; onClose: () => void }) 
                 max={240}
                 value={custom}
                 onChange={(e) => setCustom(e.target.value)}
-                placeholder="e.g. 30"
+                placeholder={t("layout.timer.picker.customPh")}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
@@ -371,7 +378,7 @@ function TimerPicker({ open, onClose }: { open: boolean; onClose: () => void }) 
               className="h-9 inline-flex items-center px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
             >
               <Play className="size-3.5 mr-1" />
-              Start
+              {t("layout.timer.picker.start")}
             </button>
           </div>
         </div>

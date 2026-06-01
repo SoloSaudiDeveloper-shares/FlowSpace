@@ -39,6 +39,7 @@ import {
   CircleDot,
   Clock,
 } from "lucide-react"
+import { useT } from "@/lib/hooks/use-i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -145,31 +146,31 @@ const TYPE_CONFIG: Record<
   { label: string; color: string; bgClass: string; icon: React.ElementType }
 > = {
   task_intake: {
-    label: "Task Intake",
+    label: "forms.type.task_intake",
     color: "text-blue-600 dark:text-blue-400",
     bgClass: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
     icon: Inbox,
   },
   project_request: {
-    label: "Project Request",
+    label: "forms.type.project_request",
     color: "text-indigo-600 dark:text-indigo-400",
     bgClass: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
     icon: FolderKanban,
   },
   issue_report: {
-    label: "Issue Report",
+    label: "forms.type.issue_report",
     color: "text-red-600 dark:text-red-400",
     bgClass: "bg-red-500/10 text-red-600 dark:text-red-400",
     icon: AlertTriangle,
   },
   approval_request: {
-    label: "Approval Request",
+    label: "forms.type.approval_request",
     color: "text-amber-600 dark:text-amber-400",
     bgClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
     icon: CircleDot,
   },
   checklist_submission: {
-    label: "Checklist Submission",
+    label: "forms.type.checklist_submission",
     color: "text-green-600 dark:text-green-400",
     bgClass: "bg-green-500/10 text-green-600 dark:text-green-400",
     icon: ClipboardList,
@@ -180,19 +181,19 @@ const FIELD_TYPE_CONFIG: Record<
   FieldType,
   { label: string; icon: React.ElementType }
 > = {
-  text: { label: "Short Text", icon: Type },
-  long_text: { label: "Long Text", icon: AlignLeft },
-  number: { label: "Number", icon: Hash },
-  date: { label: "Date", icon: Calendar },
-  select: { label: "Select", icon: List },
-  multi_select: { label: "Multi Select", icon: ListChecks },
-  checkbox: { label: "Checkbox", icon: CheckSquare },
-  email: { label: "Email", icon: Mail },
-  url: { label: "URL", icon: Link },
-  phone: { label: "Phone", icon: Phone },
-  file: { label: "File", icon: Paperclip },
-  user: { label: "User", icon: User },
-  rating: { label: "Rating", icon: Star },
+  text: { label: "forms.field.text", icon: Type },
+  long_text: { label: "forms.field.long_text", icon: AlignLeft },
+  number: { label: "forms.field.number", icon: Hash },
+  date: { label: "forms.field.date", icon: Calendar },
+  select: { label: "forms.field.select", icon: List },
+  multi_select: { label: "forms.field.multi_select", icon: ListChecks },
+  checkbox: { label: "forms.field.checkbox", icon: CheckSquare },
+  email: { label: "forms.field.email", icon: Mail },
+  url: { label: "forms.field.url", icon: Link },
+  phone: { label: "forms.field.phone", icon: Phone },
+  file: { label: "forms.field.file", icon: Paperclip },
+  user: { label: "forms.field.user", icon: User },
+  rating: { label: "forms.field.rating", icon: Star },
 }
 
 // ─── Create Form Dialog ───────────────────────────────────────────────
@@ -204,6 +205,7 @@ function CreateFormDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const { t } = useT()
   const router = useRouter()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -212,7 +214,7 @@ function CreateFormDialog({
 
   async function handleCreate() {
     if (!title.trim()) {
-      toast.error("Title is required")
+      toast.error(t("forms.create.titleRequired"))
       return
     }
     setSaving(true)
@@ -222,14 +224,14 @@ function CreateFormDialog({
         description: description.trim() || undefined,
         type,
       })
-      toast.success("Form created")
+      toast.success(t("forms.create.success"))
       setTitle("")
       setDescription("")
       setType("task_intake")
       onOpenChange(false)
       router.refresh()
     } catch {
-      toast.error("Failed to create form")
+      toast.error(t("forms.create.error"))
     } finally {
       setSaving(false)
     }
@@ -239,17 +241,17 @@ function CreateFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create Form</DialogTitle>
+          <DialogTitle>{t("forms.create.title")}</DialogTitle>
           <DialogDescription>
-            Set up a new form to collect submissions.
+            {t("forms.create.description")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Title</label>
+            <label className="text-sm font-medium">{t("forms.create.titleLabel")}</label>
             <Input
-              placeholder="e.g. Bug Report Form"
+              placeholder={t("forms.create.titlePh")}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -259,34 +261,34 @@ function CreateFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Description</label>
+            <label className="text-sm font-medium">{t("forms.create.descLabel")}</label>
             <textarea
               className="flex w-full rounded-md border bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[72px] resize-none"
-              placeholder="Describe the purpose of this form..."
+              placeholder={t("forms.create.descPh")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Type</label>
+            <label className="text-sm font-medium">{t("forms.create.typeLabel")}</label>
             <div className="grid grid-cols-1 gap-1.5">
-              {(Object.keys(TYPE_CONFIG) as FormType[]).map((t) => {
-                const config = TYPE_CONFIG[t]
+              {(Object.keys(TYPE_CONFIG) as FormType[]).map((ft) => {
+                const config = TYPE_CONFIG[ft]
                 const Icon = config.icon
                 return (
                   <button
-                    key={t}
+                    key={ft}
                     type="button"
-                    onClick={() => setType(t)}
+                    onClick={() => setType(ft)}
                     className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
-                      type === t
+                      type === ft
                         ? "border-primary bg-primary/5 font-medium"
                         : "border-transparent hover:bg-accent"
                     }`}
                   >
                     <Icon className={`size-4 ${config.color}`} />
-                    {config.label}
+                    {t(config.label)}
                   </button>
                 )
               })}
@@ -298,10 +300,10 @@ function CreateFormDialog({
           <DialogClose
             className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
           >
-            Cancel
+            {t("common.cancel")}
           </DialogClose>
           <Button onClick={handleCreate} disabled={saving || !title.trim()}>
-            {saving ? "Creating..." : "Create Form"}
+            {saving ? t("forms.create.submitting") : t("forms.create.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -322,6 +324,7 @@ function AddFieldDialog({
   formId: string
   onAdded: () => void
 }) {
+  const { t } = useT()
   const [fieldType, setFieldType] = useState<FieldType | null>(null)
   const [label, setLabel] = useState("")
   const [placeholder, setPlaceholder] = useState("")
@@ -345,12 +348,12 @@ function AddFieldDialog({
         placeholder: placeholder.trim() || undefined,
         isRequired: required,
       })
-      toast.success("Field added")
+      toast.success(t("forms.addField.success"))
       reset()
       onOpenChange(false)
       onAdded()
     } catch {
-      toast.error("Failed to add field")
+      toast.error(t("forms.addField.error"))
     } finally {
       setSaving(false)
     }
@@ -366,9 +369,9 @@ function AddFieldDialog({
     >
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add Field</DialogTitle>
+          <DialogTitle>{t("forms.addField.title")}</DialogTitle>
           <DialogDescription>
-            Choose a field type and configure it.
+            {t("forms.addField.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -385,7 +388,7 @@ function AddFieldDialog({
                   className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent transition-colors"
                 >
                   <Icon className="size-4 text-muted-foreground" />
-                  {config.label}
+                  {t(config.label)}
                 </button>
               )
             })}
@@ -397,20 +400,20 @@ function AddFieldDialog({
                 const Icon = FIELD_TYPE_CONFIG[fieldType].icon
                 return <Icon className="size-4" />
               })()}
-              <span>{FIELD_TYPE_CONFIG[fieldType].label}</span>
+              <span>{t(FIELD_TYPE_CONFIG[fieldType].label)}</span>
               <button
                 type="button"
                 onClick={() => setFieldType(null)}
                 className="ml-auto text-xs hover:text-foreground"
               >
-                Change
+                {t("forms.addField.change")}
               </button>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Label</label>
+              <label className="text-sm font-medium">{t("forms.addField.labelLabel")}</label>
               <Input
-                placeholder="e.g. Full Name"
+                placeholder={t("forms.addField.labelPh")}
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 onKeyDown={(e) => {
@@ -420,9 +423,9 @@ function AddFieldDialog({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Placeholder</label>
+              <label className="text-sm font-medium">{t("forms.addField.placeholderLabel")}</label>
               <Input
-                placeholder="e.g. Enter your name..."
+                placeholder={t("forms.addField.placeholderPh")}
                 value={placeholder}
                 onChange={(e) => setPlaceholder(e.target.value)}
               />
@@ -435,7 +438,7 @@ function AddFieldDialog({
                 onChange={(e) => setRequired(e.target.checked)}
                 className="rounded border"
               />
-              Required field
+              {t("forms.addField.required")}
             </label>
           </div>
         )}
@@ -445,10 +448,10 @@ function AddFieldDialog({
             <DialogClose
               className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
             >
-              Cancel
+              {t("common.cancel")}
             </DialogClose>
             <Button onClick={handleAdd} disabled={saving || !label.trim()}>
-              {saving ? "Adding..." : "Add Field"}
+              {saving ? t("forms.addField.submitting") : t("forms.addField.submit")}
             </Button>
           </DialogFooter>
         )}
@@ -470,6 +473,7 @@ function EditFieldDialog({
   field: FormField
   onUpdated: () => void
 }) {
+  const { t } = useT()
   const [label, setLabel] = useState(field.label)
   const [placeholder, setPlaceholder] = useState(field.placeholder ?? "")
   const [required, setRequired] = useState(field.isRequired)
@@ -484,11 +488,11 @@ function EditFieldDialog({
         placeholder: placeholder.trim() || undefined,
         isRequired: required,
       })
-      toast.success("Field updated")
+      toast.success(t("forms.editField.success"))
       onOpenChange(false)
       onUpdated()
     } catch {
-      toast.error("Failed to update field")
+      toast.error(t("forms.editField.error"))
     } finally {
       setSaving(false)
     }
@@ -498,7 +502,7 @@ function EditFieldDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Edit Field</DialogTitle>
+          <DialogTitle>{t("forms.editField.title")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -507,11 +511,11 @@ function EditFieldDialog({
               const Icon = FIELD_TYPE_CONFIG[field.fieldType].icon
               return <Icon className="size-4" />
             })()}
-            <span>{FIELD_TYPE_CONFIG[field.fieldType].label}</span>
+            <span>{t(FIELD_TYPE_CONFIG[field.fieldType].label)}</span>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Label</label>
+            <label className="text-sm font-medium">{t("forms.addField.labelLabel")}</label>
             <Input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
@@ -522,7 +526,7 @@ function EditFieldDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Placeholder</label>
+            <label className="text-sm font-medium">{t("forms.addField.placeholderLabel")}</label>
             <Input
               value={placeholder}
               onChange={(e) => setPlaceholder(e.target.value)}
@@ -536,7 +540,7 @@ function EditFieldDialog({
               onChange={(e) => setRequired(e.target.checked)}
               className="rounded border"
             />
-            Required field
+            {t("forms.addField.required")}
           </label>
         </div>
 
@@ -544,10 +548,10 @@ function EditFieldDialog({
           <DialogClose
             className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
           >
-            Cancel
+            {t("common.cancel")}
           </DialogClose>
           <Button onClick={handleSave} disabled={saving || !label.trim()}>
-            {saving ? "Saving..." : "Save Changes"}
+            {saving ? t("forms.editField.submitting") : t("forms.editField.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -574,6 +578,7 @@ function FieldRow({
   onDelete: () => void
   onEdit: () => void
 }) {
+  const { t } = useT()
   const config = FIELD_TYPE_CONFIG[field.fieldType]
   const Icon = config.icon
 
@@ -584,11 +589,11 @@ function FieldRow({
       <span className="text-sm flex-1 truncate">{field.label}</span>
       {field.isRequired && (
         <Badge variant="secondary" className="text-xs px-1.5 py-0 shrink-0">
-          Required
+          {t("forms.fieldRow.required")}
         </Badge>
       )}
       <span className="text-xs text-muted-foreground shrink-0">
-        {config.label}
+        {t(config.label)}
       </span>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         <Button
@@ -639,6 +644,7 @@ function SubmissionsPanel({
   formId: string
   formTitle: string
 }) {
+  const { t } = useT()
   const [submissions, setSubmissions] = useState<FormSubmission[]>([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
@@ -649,7 +655,7 @@ function SubmissionsPanel({
       const data = await getFormSubmissions(formId)
       setSubmissions(data as FormSubmission[])
     } catch {
-      toast.error("Failed to load submissions")
+      toast.error(t("forms.submissions.loadError"))
     } finally {
       setLoading(false)
     }
@@ -671,10 +677,10 @@ function SubmissionsPanel({
     setProcessing(id)
     try {
       await processSubmission(id)
-      toast.success("Submission processed")
+      toast.success(t("forms.submissions.processSuccess"))
       loadSubmissions()
     } catch {
-      toast.error("Failed to process submission")
+      toast.error(t("forms.submissions.processError"))
     } finally {
       setProcessing(null)
     }
@@ -684,10 +690,10 @@ function SubmissionsPanel({
     setProcessing(id)
     try {
       await rejectSubmission(id)
-      toast.success("Submission rejected")
+      toast.success(t("forms.submissions.rejectSuccess"))
       loadSubmissions()
     } catch {
-      toast.error("Failed to reject submission")
+      toast.error(t("forms.submissions.rejectError"))
     } finally {
       setProcessing(null)
     }
@@ -702,7 +708,7 @@ function SubmissionsPanel({
   if (loading) {
     return (
       <div className="py-4 text-sm text-muted-foreground text-center">
-        Loading submissions...
+        {t("forms.submissions.loading")}
       </div>
     )
   }
@@ -710,7 +716,7 @@ function SubmissionsPanel({
   if (submissions.length === 0) {
     return (
       <div className="py-6 text-sm text-muted-foreground text-center border rounded-lg border-dashed">
-        No submissions yet
+        {t("forms.submissions.empty")}
       </div>
     )
   }
@@ -718,17 +724,20 @@ function SubmissionsPanel({
   return (
     <div className="space-y-2">
       <div className="text-xs font-medium text-muted-foreground mb-2">
-        {submissions.length} submission{submissions.length !== 1 ? "s" : ""}
+        {(submissions.length === 1
+          ? t("forms.submissions.count")
+          : t("forms.submissions.countPlural")
+        ).replace("{n}", String(submissions.length))}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left">
-              <th className="pb-2 pr-4 font-medium text-muted-foreground">Date</th>
-              <th className="pb-2 pr-4 font-medium text-muted-foreground">Submitted By</th>
-              <th className="pb-2 pr-4 font-medium text-muted-foreground">Status</th>
-              <th className="pb-2 pr-4 font-medium text-muted-foreground">Data Preview</th>
-              <th className="pb-2 font-medium text-muted-foreground">Actions</th>
+              <th className="pb-2 pr-4 font-medium text-muted-foreground">{t("forms.submissions.colDate")}</th>
+              <th className="pb-2 pr-4 font-medium text-muted-foreground">{t("forms.submissions.colSubmittedBy")}</th>
+              <th className="pb-2 pr-4 font-medium text-muted-foreground">{t("forms.submissions.colStatus")}</th>
+              <th className="pb-2 pr-4 font-medium text-muted-foreground">{t("forms.submissions.colDataPreview")}</th>
+              <th className="pb-2 font-medium text-muted-foreground">{t("forms.submissions.colActions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -753,7 +762,7 @@ function SubmissionsPanel({
                     </span>
                   </td>
                   <td className="py-2 pr-4 whitespace-nowrap">
-                    {sub.submittedBy ?? "Anonymous"}
+                    {sub.submittedBy ?? t("forms.submissions.anonymous")}
                   </td>
                   <td className="py-2 pr-4">
                     <span
@@ -761,11 +770,11 @@ function SubmissionsPanel({
                         STATUS_STYLE[sub.status] ?? ""
                       }`}
                     >
-                      {sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                      {t(`forms.status.${sub.status}`)}
                     </span>
                   </td>
                   <td className="py-2 pr-4 max-w-[200px] truncate text-muted-foreground">
-                    {preview || "No data"}
+                    {preview || t("forms.submissions.noData")}
                   </td>
                   <td className="py-2">
                     {sub.status === "pending" && (
@@ -776,7 +785,7 @@ function SubmissionsPanel({
                           className="size-7 text-green-600"
                           disabled={processing === sub.id}
                           onClick={() => handleProcess(sub.id)}
-                          title="Process"
+                          title={t("forms.submissions.process")}
                         >
                           <Check className="size-3.5" />
                         </Button>
@@ -786,7 +795,7 @@ function SubmissionsPanel({
                           className="size-7 text-red-600"
                           disabled={processing === sub.id}
                           onClick={() => handleReject(sub.id)}
-                          title="Reject"
+                          title={t("forms.submissions.reject")}
                         >
                           <XCircle className="size-3.5" />
                         </Button>
@@ -812,6 +821,7 @@ function FormCard({
   form: Form
   onRefresh: () => void
 }) {
+  const { t } = useT()
   const router = useRouter()
   const [expanded, setExpanded] = useState<"fields" | "submissions" | null>(null)
   const [fields, setFields] = useState<FormField[]>([])
@@ -830,7 +840,7 @@ function FormCard({
       const data = await getFormFields(form.id)
       setFields(data as FormField[])
     } catch {
-      toast.error("Failed to load fields")
+      toast.error(t("forms.card.loadFieldsError"))
     } finally {
       setLoadingFields(false)
     }
@@ -851,14 +861,14 @@ function FormCard({
     try {
       if (form.isPublished) {
         await unpublishForm(form.id)
-        toast.success("Form unpublished")
+        toast.success(t("forms.card.unpublishSuccess"))
       } else {
         await publishForm(form.id)
-        toast.success("Form published")
+        toast.success(t("forms.card.publishSuccess"))
       }
       onRefresh()
     } catch {
-      toast.error("Failed to update form")
+      toast.error(t("forms.card.updateError"))
     }
   }
 
@@ -866,10 +876,10 @@ function FormCard({
     setDeleting(true)
     try {
       await deleteForm(form.id)
-      toast.success("Form deleted")
+      toast.success(t("forms.card.deleteSuccess"))
       onRefresh()
     } catch {
-      toast.error("Failed to delete form")
+      toast.error(t("forms.card.deleteError"))
     } finally {
       setDeleting(false)
     }
@@ -896,7 +906,7 @@ function FormCard({
         sortOrder: updated.find((f) => f.id === fields[swapIdx].id)!.sortOrder,
       })
     } catch {
-      toast.error("Failed to reorder fields")
+      toast.error(t("forms.card.reorderError"))
       loadFields()
     }
   }
@@ -904,10 +914,10 @@ function FormCard({
   async function handleDeleteField(fieldId: string) {
     try {
       await removeFormField(fieldId)
-      toast.success("Field removed")
+      toast.success(t("forms.card.fieldRemoved"))
       setFields((prev) => prev.filter((f) => f.id !== fieldId))
     } catch {
-      toast.error("Failed to remove field")
+      toast.error(t("forms.card.removeFieldError"))
     }
   }
 
@@ -942,15 +952,15 @@ function FormCard({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => handleToggle("fields")}>
                   <Pencil />
-                  Edit Fields
+                  {t("forms.card.editFields")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handlePublishToggle}>
                   {form.isPublished ? <EyeOff /> : <Eye />}
-                  {form.isPublished ? "Unpublish" : "Publish"}
+                  {form.isPublished ? t("forms.card.unpublish") : t("forms.card.publish")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleToggle("submissions")}>
                   <Send />
-                  View Submissions
+                  {t("forms.card.viewSubmissions")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -959,7 +969,7 @@ function FormCard({
                   disabled={deleting}
                 >
                   <Trash2 />
-                  {deleting ? "Deleting..." : "Delete"}
+                  {deleting ? t("forms.card.deleting") : t("forms.card.delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -970,7 +980,7 @@ function FormCard({
             <span
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeConfig.bgClass}`}
             >
-              {typeConfig.label}
+              {t(typeConfig.label)}
             </span>
             <span
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -979,7 +989,7 @@ function FormCard({
                   : "bg-muted text-muted-foreground"
               }`}
             >
-              {form.isPublished ? "Published" : "Draft"}
+              {form.isPublished ? t("forms.card.published") : t("forms.card.draft")}
             </span>
           </div>
 
@@ -987,8 +997,10 @@ function FormCard({
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Send className="size-3" />
-              {form.submissionCount} submission
-              {form.submissionCount !== 1 ? "s" : ""}
+              {(form.submissionCount === 1
+                ? t("forms.card.submissionCount")
+                : t("forms.card.submissionCountPlural")
+              ).replace("{n}", String(form.submissionCount))}
             </span>
             <span className="flex items-center gap-1">
               <Clock className="size-3" />
@@ -1009,7 +1021,7 @@ function FormCard({
               onClick={() => handleToggle("fields")}
             >
               <Pencil className="size-3 mr-1" />
-              Edit
+              {t("forms.card.edit")}
             </Button>
             <Button
               variant="ghost"
@@ -1020,12 +1032,12 @@ function FormCard({
               {form.isPublished ? (
                 <>
                   <EyeOff className="size-3 mr-1" />
-                  Unpublish
+                  {t("forms.card.unpublish")}
                 </>
               ) : (
                 <>
                   <Eye className="size-3 mr-1" />
-                  Publish
+                  {t("forms.card.publish")}
                 </>
               )}
             </Button>
@@ -1036,7 +1048,7 @@ function FormCard({
               onClick={() => handleToggle("submissions")}
             >
               <Send className="size-3 mr-1" />
-              Submissions
+              {t("forms.card.submissions")}
             </Button>
           </div>
         </div>
@@ -1045,7 +1057,7 @@ function FormCard({
         {expanded === "fields" && (
           <div className="border-t p-4 space-y-3 bg-muted/30">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium">Form Fields</h4>
+              <h4 className="text-sm font-medium">{t("forms.card.formFields")}</h4>
               <div className="flex items-center gap-1.5">
                 <Button
                   variant="outline"
@@ -1054,7 +1066,7 @@ function FormCard({
                   onClick={() => setAddFieldOpen(true)}
                 >
                   <Plus className="size-3 mr-1" />
-                  Add Field
+                  {t("forms.card.addField")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1069,11 +1081,11 @@ function FormCard({
 
             {loadingFields ? (
               <div className="py-4 text-sm text-muted-foreground text-center">
-                Loading fields...
+                {t("forms.card.loadingFields")}
               </div>
             ) : fields.length === 0 ? (
               <div className="py-6 text-sm text-muted-foreground text-center border rounded-lg border-dashed">
-                No fields yet. Add your first field to get started.
+                {t("forms.card.noFields")}
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -1105,7 +1117,7 @@ function FormCard({
         {expanded === "submissions" && (
           <div className="border-t p-4 bg-muted/30">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium">Submissions</h4>
+              <h4 className="text-sm font-medium">{t("forms.card.submissionsHeading")}</h4>
               <Button
                 variant="ghost"
                 size="icon"
@@ -1138,6 +1150,7 @@ function FormCard({
 // ─── Main Content ──────────────────────────────────────────────────────
 
 export function FormsContent({ forms }: { forms: any[] }) {
+  const { t } = useT()
   const router = useRouter()
   const [createOpen, setCreateOpen] = useState(false)
 
@@ -1150,14 +1163,14 @@ export function FormsContent({ forms }: { forms: any[] }) {
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">All Forms</h2>
+          <h2 className="text-lg font-semibold">{t("forms.main.allForms")}</h2>
           <p className="text-sm text-muted-foreground">
-            Create and manage forms to collect submissions.
+            {t("forms.main.subtitle")}
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="size-4 mr-1.5" />
-          New Form
+          {t("forms.main.newForm")}
         </Button>
       </div>
 
@@ -1165,10 +1178,9 @@ export function FormsContent({ forms }: { forms: any[] }) {
       {forms.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center border rounded-lg border-dashed">
           <FileInput className="size-10 text-muted-foreground/50 mb-3" />
-          <h3 className="text-sm font-medium">No forms yet</h3>
+          <h3 className="text-sm font-medium">{t("forms.main.emptyTitle")}</h3>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            Create your first form to start collecting task intakes, project
-            requests, issue reports, and more.
+            {t("forms.main.emptyDescription")}
           </p>
           <Button
             variant="outline"
@@ -1176,7 +1188,7 @@ export function FormsContent({ forms }: { forms: any[] }) {
             onClick={() => setCreateOpen(true)}
           >
             <Plus className="size-4 mr-1.5" />
-            Create Form
+            {t("forms.main.createForm")}
           </Button>
         </div>
       ) : (

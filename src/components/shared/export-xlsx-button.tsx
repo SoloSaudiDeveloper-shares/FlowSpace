@@ -33,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Hint } from "@/components/shared/hint"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   getTodoListXlsx,
   emailTodoListXlsx,
@@ -43,6 +44,7 @@ interface Props {
 }
 
 export function ExportXlsxButton({ listId }: Props) {
+  const { t } = useT()
   const [downloading, setDownloading] = useState(false)
   const [emailOpen, setEmailOpen] = useState(false)
   const [emailTo, setEmailTo] = useState("")
@@ -72,9 +74,9 @@ export function ExportXlsxButton({ listId }: Props) {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast.success(`Downloaded "${r.filename}"`)
+      toast.success(t("shared.export.downloaded").replace("{name}", r.filename))
     } catch {
-      toast.error("Couldn't build the spreadsheet.")
+      toast.error(t("shared.export.buildError"))
     } finally {
       setDownloading(false)
     }
@@ -89,7 +91,7 @@ export function ExportXlsxButton({ listId }: Props) {
         toast.error(r.error)
         return
       }
-      toast.success(`Spreadsheet sent to ${emailTo.trim()}`)
+      toast.success(t("shared.export.sentTo").replace("{to}", emailTo.trim()))
       setEmailOpen(false)
       setEmailTo("")
     } finally {
@@ -100,7 +102,7 @@ export function ExportXlsxButton({ listId }: Props) {
   return (
     <>
       <div className="inline-flex items-center">
-        <Hint label="Download as Excel" delay={350}>
+        <Hint label={t("shared.export.downloadAsExcel")} delay={350}>
           <Button
             variant="ghost"
             size="icon"
@@ -118,18 +120,18 @@ export function ExportXlsxButton({ listId }: Props) {
         <DropdownMenu>
           <DropdownMenuTrigger
             className="inline-flex items-center justify-center size-7 rounded-l-none -ml-px text-muted-foreground/60 hover:text-foreground hover:bg-accent rounded-md"
-            aria-label="Export options"
+            aria-label={t("shared.export.options")}
           >
             <ChevronDown className="size-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuItem onClick={handleDownload}>
               <FileSpreadsheet className="size-3.5 mr-2" />
-              Download .xlsx
+              {t("shared.export.downloadXlsx")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setEmailOpen(true)}>
               <Mail className="size-3.5 mr-2" />
-              Email as Excel…
+              {t("shared.export.emailAsExcel")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -140,21 +142,20 @@ export function ExportXlsxButton({ listId }: Props) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSpreadsheet className="size-4 text-primary" />
-              Email list as Excel
+              {t("shared.export.dialogTitle")}
             </DialogTitle>
             <DialogDescription>
-              Send the spreadsheet to anyone — no FlowSpace account
-              needed.
+              {t("shared.export.dialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Recipient email
+                {t("shared.export.recipientEmail")}
               </label>
               <Input
                 type="email"
-                placeholder="name@example.com"
+                placeholder={t("shared.export.emailPlaceholder")}
                 value={emailTo}
                 onChange={(e) => setEmailTo(e.target.value)}
                 autoFocus
@@ -167,7 +168,7 @@ export function ExportXlsxButton({ listId }: Props) {
               onClick={() => setEmailOpen(false)}
               disabled={sending}
             >
-              Cancel
+              {t("shared.export.cancel")}
             </Button>
             <Button
               onClick={handleSendEmail}
@@ -182,7 +183,7 @@ export function ExportXlsxButton({ listId }: Props) {
               ) : (
                 <Mail className="size-3.5 mr-1.5" />
               )}
-              {sending ? "Sending…" : "Send"}
+              {sending ? t("shared.export.sending") : t("shared.export.send")}
             </Button>
           </div>
         </DialogContent>

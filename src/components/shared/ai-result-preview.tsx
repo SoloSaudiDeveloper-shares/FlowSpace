@@ -16,6 +16,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { usePreferences } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   type AIAction,
   type SummaryStrength,
@@ -50,6 +51,7 @@ export function AIResultPreview({
   onClose: () => void
 }) {
   const { preferences, updatePreference } = usePreferences()
+  const { t } = useT()
   const { action, original, result } = state
   const isSummarize = action === "summarize"
 
@@ -91,7 +93,7 @@ export function AIResultPreview({
     prompts[action] = systemPrompt
     updatePreference("aiSystemPrompts", prompts)
     if (isSummarize) updatePreference("aiSummaryStrength", strength)
-    toast.success("Saved as your default for this action")
+    toast.success(t("shared.ai.savedDefault"))
   }
 
   return (
@@ -100,18 +102,18 @@ export function AIResultPreview({
         <div className="flex items-center gap-1.5 pr-8">
           <Sparkles className="size-3.5 text-primary" />
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-medium">
-            {ACTION_LABELS[action]} · preview
+            {ACTION_LABELS[action]} · {t("shared.ai.previewSuffix")}
           </span>
         </div>
-        <DialogTitle className="text-base">Review before applying</DialogTitle>
+        <DialogTitle className="text-base">{t("shared.ai.reviewTitle")}</DialogTitle>
         <p className="text-xs text-muted-foreground -mt-1">
-          Nothing changes in your page until you click <strong>Apply</strong>.
+          {t("shared.ai.reviewNote")} <strong>{t("shared.ai.applyWord")}</strong>.
         </p>
 
         {/* Strength picker (summarize only) */}
         {isSummarize && (
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-medium text-muted-foreground">Strength</span>
+            <span className="text-[11px] font-medium text-muted-foreground">{t("shared.ai.strength")}</span>
             <div className="inline-flex rounded-md border border-border/60 p-0.5">
               {STRENGTHS.map((s) => (
                 <button
@@ -136,7 +138,7 @@ export function AIResultPreview({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Result — editable
+              {t("shared.ai.resultEditable")}
             </span>
             <Button
               size="sm"
@@ -146,7 +148,7 @@ export function AIResultPreview({
               onClick={() => onRegenerate(systemPrompt, strength)}
             >
               {busy ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
-              Regenerate
+              {t("shared.ai.regenerate")}
             </Button>
           </div>
           <div className="relative">
@@ -167,7 +169,10 @@ export function AIResultPreview({
         {/* Original (collapsed) */}
         <details className="rounded-md border border-border/60 bg-muted/20 text-xs">
           <summary className="cursor-pointer select-none px-3 py-1.5 text-muted-foreground hover:text-foreground">
-            Show original ({original.split(/\s+/).filter(Boolean).length.toLocaleString()} words)
+            {t("shared.ai.showOriginal").replace(
+              "{count}",
+              original.split(/\s+/).filter(Boolean).length.toLocaleString(),
+            )}
           </summary>
           <div className="max-h-40 overflow-y-auto px-3 pb-3 whitespace-pre-wrap text-muted-foreground/80 leading-relaxed">
             {original}
@@ -182,7 +187,7 @@ export function AIResultPreview({
             className="flex w-full items-center gap-1.5 px-3 py-2 text-[11px] font-medium text-muted-foreground hover:text-foreground"
           >
             <ChevronDown className={`size-3.5 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-            Advanced — custom instructions
+            {t("shared.ai.advanced")}
           </button>
           {showAdvanced && (
             <div className="px-3 pb-3 space-y-2">
@@ -191,7 +196,7 @@ export function AIResultPreview({
                 onChange={(e) => setSystemPrompt(e.target.value)}
                 rows={3}
                 className="w-full rounded-md border border-input bg-background p-2 text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
-                placeholder="System instruction sent to the AI…"
+                placeholder={t("shared.ai.systemPromptPh")}
               />
               <div className="flex items-center gap-2">
                 <Button
@@ -202,7 +207,7 @@ export function AIResultPreview({
                   onClick={() => onRegenerate(systemPrompt, strength)}
                 >
                   <RefreshCw className="size-3" />
-                  Apply prompt &amp; regenerate
+                  {t("shared.ai.applyPromptRegenerate")}
                 </Button>
                 <Button
                   size="sm"
@@ -211,7 +216,7 @@ export function AIResultPreview({
                   onClick={saveAsDefault}
                 >
                   <Save className="size-3" />
-                  Save as my default
+                  {t("shared.ai.saveAsDefault")}
                 </Button>
               </div>
             </div>
@@ -227,11 +232,11 @@ export function AIResultPreview({
               checked={preferences.aiPreviewBeforeApply}
               onChange={(e) => updatePreference("aiPreviewBeforeApply", e.target.checked)}
             />
-            Ask me to preview every time
+            {t("shared.ai.askPreviewEveryTime")}
           </label>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={onClose}>
-              Cancel
+              {t("shared.ai.cancel")}
             </Button>
             <Button
               size="sm"
@@ -240,7 +245,7 @@ export function AIResultPreview({
               onClick={() => onApply(draft)}
             >
               <Check className="size-3.5" />
-              Apply
+              {t("shared.ai.apply")}
             </Button>
           </div>
         </div>

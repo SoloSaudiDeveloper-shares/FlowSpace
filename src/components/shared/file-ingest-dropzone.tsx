@@ -16,12 +16,14 @@ import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { FileText, Loader2, Upload, Sparkles } from "lucide-react"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import { ingestFileAsPage } from "@/lib/actions/file-ingest-actions"
 
 const ACCEPT = ".pdf,.docx,.xlsx,.csv,.tsv,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain,text/markdown"
 
 export function FileIngestDropzone() {
   const router = useRouter()
+  const { t } = useT()
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [filename, setFilename] = useState<string>("")
@@ -30,7 +32,7 @@ export function FileIngestDropzone() {
 
   async function handleFile(file: File) {
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Too big (max 10 MB).")
+      toast.error(t("shared.ingest.tooBig"))
       return
     }
     setBusy(true)
@@ -43,7 +45,7 @@ export function FileIngestDropzone() {
           const idx = url.indexOf(",")
           resolve(idx >= 0 ? url.slice(idx + 1) : url)
         }
-        reader.onerror = () => reject(new Error("Couldn't read file"))
+        reader.onerror = () => reject(new Error(t("shared.ingest.readError")))
         reader.readAsDataURL(file)
       })
       const r = await ingestFileAsPage({
@@ -59,9 +61,9 @@ export function FileIngestDropzone() {
       // One toast, never two stacked on top of each other: if the summary was
       // skipped we fold that into the (still-successful) import notice.
       if (r.warning) {
-        toast.warning(r.warning, { description: `Imported ${file.name}` })
+        toast.warning(r.warning, { description: t("shared.ingest.importedDesc").replace("{name}", file.name) })
       } else {
-        toast.success(`Imported ${file.name}`)
+        toast.success(t("shared.ingest.imported").replace("{name}", file.name))
       }
       router.push(`/pages/${r.pageId}`)
     } finally {
@@ -115,10 +117,10 @@ export function FileIngestDropzone() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">
-            {busy ? `Importing ${filename}…` : "Drop a file → make a Page"}
+            {busy ? t("shared.ingest.importing").replace("{name}", filename) : t("shared.ingest.dropPrompt")}
           </p>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            PDF · Word · Excel · CSV · TSV · TXT · MD · max 10 MB
+            {t("shared.ingest.formats")}
           </p>
         </div>
       </button>
@@ -132,7 +134,7 @@ export function FileIngestDropzone() {
           disabled={busy}
         />
         <Sparkles className="size-3 text-primary" />
-        <span>Add a 3-5 bullet AI summary at the top</span>
+        <span>{t("shared.ingest.summaryToggle")}</span>
       </label>
     </div>
   )

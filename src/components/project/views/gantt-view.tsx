@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PRIORITY_COLOR as PRIORITY_COLORS, PRIORITY_LABEL as PRIORITY_LABELS } from "@/lib/priority"
+import { useT } from "@/lib/hooks/use-i18n"
 import { TaskDetailSheet } from "../task-detail-sheet"
 import {
   ContextMenu,
@@ -107,10 +108,10 @@ function flattenTree(nodes: TaskNode[], expanded: Set<string>): TaskNode[] {
 
 type ZoomLevel = "day" | "week" | "month"
 
-const ZOOM: Record<ZoomLevel, { colW: number; days: number; label: string }> = {
-  day:   { colW: 72, days: 14,  label: "Day" },
-  week:  { colW: 48, days: 28,  label: "Week" },
-  month: { colW: 28, days: 60,  label: "Month" },
+const ZOOM: Record<ZoomLevel, { colW: number; days: number; labelKey: string }> = {
+  day:   { colW: 72, days: 14,  labelKey: "projx.gantt.zoom.day" },
+  week:  { colW: 48, days: 28,  labelKey: "projx.gantt.zoom.week" },
+  month: { colW: 28, days: 60,  labelKey: "projx.gantt.zoom.month" },
 }
 
 const ROW_H = 40
@@ -129,6 +130,7 @@ export function GanttView({
   statuses,
   tasks: allTasks,
 }: GanttViewProps) {
+  const { t } = useT()
   const today = startOfDay(new Date())
   const [viewStart, setViewStart] = useState(() => addDays(today, -3))
   const [zoom, setZoom] = useState<ZoomLevel>("week")
@@ -356,7 +358,7 @@ export function GanttView({
 
     const items: ContextMenuEntry[] = [
       {
-        label: "Open",
+        label: t("projx.gantt.menu.open"),
         icon: Pencil,
         onClick: () => {
           setSelectedTask(task)
@@ -364,10 +366,10 @@ export function GanttView({
         },
       },
       {
-        label: "Rename",
+        label: t("projx.gantt.menu.rename"),
         icon: Pencil,
         onClick: async () => {
-          const name = window.prompt("Rename task:", task.title)
+          const name = window.prompt(t("projx.gantt.renamePrompt"), task.title)
           if (name?.trim())
             await updateTask(task.id, projectId, { title: name.trim() })
         },
@@ -378,7 +380,7 @@ export function GanttView({
       ...priorityItems,
       { separator: true },
       {
-        label: "Unschedule",
+        label: t("projx.gantt.menu.unschedule"),
         icon: Calendar,
         onClick: () =>
           updateTask(task.id, projectId, {
@@ -387,15 +389,15 @@ export function GanttView({
           }),
       },
       {
-        label: "Duplicate",
+        label: t("projx.gantt.menu.duplicate"),
         icon: Copy,
         onClick: async () => {
-          await createTask(projectId, task.statusId, `${task.title} (copy)`)
+          await createTask(projectId, task.statusId, t("projx.gantt.copySuffix").replace("{title}", task.title))
         },
       },
       { separator: true },
       {
-        label: "Delete",
+        label: t("projx.gantt.menu.delete"),
         icon: Trash2,
         variant: "destructive" as const,
         onClick: () => deleteTask(task.id, projectId),
@@ -441,7 +443,7 @@ export function GanttView({
           className="h-7 text-xs"
           onClick={goToday}
         >
-          Today
+          {t("projx.today")}
         </Button>
         <Button
           variant="ghost"
@@ -484,7 +486,7 @@ export function GanttView({
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {ZOOM[z].label}
+              {t(ZOOM[z].labelKey)}
             </button>
           ))}
         </div>
@@ -498,10 +500,10 @@ export function GanttView({
           <div className="border-b bg-muted/30 shrink-0" style={{ height: 56 }}>
             <div className="flex items-end h-full px-4 pb-2 gap-4">
               <span className="text-xs font-medium text-muted-foreground flex-1">
-                Name
+                {t("projx.gantt.col.name")}
               </span>
               <span className="text-xs font-medium text-muted-foreground w-20 text-right">
-                Due Date
+                {t("projx.gantt.col.dueDate")}
               </span>
             </div>
           </div>
@@ -546,7 +548,7 @@ export function GanttView({
                       e.stopPropagation()
                       toggleExpanded(task.id)
                     }}
-                    aria-label={isExpanded ? "Collapse" : "Expand"}
+                    aria-label={isExpanded ? t("projx.gantt.collapse") : t("projx.gantt.expand")}
                   >
                     {isExpanded ? (
                       <ChevronDown className="size-3" />
@@ -593,7 +595,7 @@ export function GanttView({
               <Input
                 autoFocus
                 className="h-7 text-sm"
-                placeholder="Task name..."
+                placeholder={t("projx.gantt.taskName.ph")}
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => {
@@ -612,7 +614,7 @@ export function GanttView({
               style={{ height: ROW_H }}
             >
               <Plus className="size-3" />
-              Add Task
+              {t("projx.gantt.addTask")}
             </button>
           )}
         </div>
@@ -800,7 +802,7 @@ export function GanttView({
                   {!hasBar && (
                     <div className="absolute inset-0 flex items-center px-3 z-10 pointer-events-none">
                       <span className="text-xs text-muted-foreground/50 italic">
-                        Click to schedule
+                        {t("projx.gantt.clickToSchedule")}
                       </span>
                     </div>
                   )}
@@ -862,6 +864,7 @@ function GanttTooltip({
   fields: string[]
   statusMap: Record<string, TaskStatus>
 }) {
+  const { t } = useT()
   const status = statusMap[task.statusId]
 
   // Keep tooltip within viewport
@@ -938,12 +941,12 @@ function GanttTooltip({
                   {task.isCompleted ? (
                     <>
                       <CheckCircle2 className="size-3 shrink-0 text-green-500" />
-                      <span className="text-green-500">Completed</span>
+                      <span className="text-green-500">{t("projx.gantt.tooltip.completed")}</span>
                     </>
                   ) : (
                     <>
                       <Circle className="size-3 shrink-0 text-muted-foreground/50" />
-                      <span className="text-muted-foreground">In progress</span>
+                      <span className="text-muted-foreground">{t("projx.gantt.tooltip.inProgress")}</span>
                     </>
                   )}
                 </div>

@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { logPomodoroSession } from "@/lib/actions/pomodoro-actions"
 import { usePreferences } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 
 type Phase = "focus" | "short_break" | "long_break"
 
@@ -37,14 +38,15 @@ const DEFAULTS: Record<Phase, number> = {
   long_break: 15 * 60,
 }
 
-const PHASE_LABEL: Record<Phase, string> = {
-  focus: "Focus",
-  short_break: "Short break",
-  long_break: "Long break",
+const PHASE_LABEL_KEY: Record<Phase, string> = {
+  focus: "layout.pomodoro.phase.focus",
+  short_break: "layout.pomodoro.phase.shortBreak",
+  long_break: "layout.pomodoro.phase.longBreak",
 }
 
 export function PomodoroWidget() {
   const { preferences, updatePreference } = usePreferences()
+  const { t } = useT()
   const visible = preferences.pomodoroVisible !== false
   const [phase, setPhase] = useState<Phase>("focus")
   const [remaining, setRemaining] = useState<number>(DEFAULTS.focus)
@@ -161,7 +163,7 @@ export function PomodoroWidget() {
         </div>
         <div className="flex flex-col leading-tight">
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-medium">
-            {PHASE_LABEL[phase]}
+            {t(PHASE_LABEL_KEY[phase])}
             {phase === "focus" && completedFocusBlocks > 0 && (
               <span className="ml-1 opacity-70">· {completedFocusBlocks}</span>
             )}
@@ -175,7 +177,7 @@ export function PomodoroWidget() {
           variant="ghost"
           className="size-7 p-0"
           onClick={toggle}
-          aria-label={running ? "Pause" : "Start"}
+          aria-label={running ? t("layout.pomodoro.pause") : t("layout.pomodoro.start")}
         >
           {running ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
         </Button>
@@ -184,7 +186,7 @@ export function PomodoroWidget() {
           variant="ghost"
           className="size-7 p-0"
           onClick={skip}
-          aria-label="Skip phase"
+          aria-label={t("layout.pomodoro.skip")}
         >
           <SkipForward className="size-3.5" />
         </Button>
@@ -193,7 +195,7 @@ export function PomodoroWidget() {
           variant="ghost"
           className="size-7 p-0"
           onClick={() => setShowSettings((s) => !s)}
-          aria-label="Settings"
+          aria-label={t("layout.pomodoro.settings")}
         >
           <SettingsIcon className="size-3.5" />
         </Button>
@@ -202,15 +204,14 @@ export function PomodoroWidget() {
           variant="ghost"
           className="size-7 p-0 text-muted-foreground hover:text-foreground"
           onClick={() => updatePreference("pomodoroVisible", false)}
-          aria-label="Hide widget"
+          aria-label={t("layout.pomodoro.hide")}
         >
           <X className="size-3.5" />
         </Button>
       </div>
       {showSettings && (
         <div className="mt-2 ml-1 rounded-md border border-border/40 bg-card/90 backdrop-blur p-2 text-[10px] text-muted-foreground/80 leading-relaxed shadow-lg max-w-[220px]">
-          25 / 5 / 15 minutes. After 4 focus blocks you earn a long break.
-          Re-enable from Settings → Look & feel if you hide it.
+          {t("layout.pomodoro.help")}
         </div>
       )}
     </div>

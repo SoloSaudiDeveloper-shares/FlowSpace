@@ -31,6 +31,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   createAutomation,
   updateAutomation,
@@ -206,8 +207,8 @@ function humanize(str: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function relativeTime(dateStr: string | null): string {
-  if (!dateStr) return "Never"
+function relativeTime(dateStr: string | null, t: (key: string) => string): string {
+  if (!dateStr) return t("auto.time.never")
   const date = new Date(dateStr)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
@@ -216,10 +217,10 @@ function relativeTime(dateStr: string | null): string {
   const diffHr = Math.floor(diffMin / 60)
   const diffDay = Math.floor(diffHr / 24)
 
-  if (diffSec < 60) return "Just now"
-  if (diffMin < 60) return `${diffMin}m ago`
-  if (diffHr < 24) return `${diffHr}h ago`
-  if (diffDay < 7) return `${diffDay}d ago`
+  if (diffSec < 60) return t("auto.time.justNow")
+  if (diffMin < 60) return t("auto.time.minAgo").replace("{n}", String(diffMin))
+  if (diffHr < 24) return t("auto.time.hrAgo").replace("{n}", String(diffHr))
+  if (diffDay < 7) return t("auto.time.dayAgo").replace("{n}", String(diffDay))
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
 }
 
@@ -249,6 +250,7 @@ export function AutomationsContent({
   failedRuns,
 }: AutomationsContentProps) {
   const router = useRouter()
+  const { t } = useT()
   const [activeTab, setActiveTab] = useState<"automations" | "history">(
     "automations"
   )
@@ -270,6 +272,15 @@ export function AutomationsContent({
   const [runHistory, setRunHistory] = useState<any[]>([])
   const [loadingRuns, setLoadingRuns] = useState(false)
   const [expandedRun, setExpandedRun] = useState<string | null>(null)
+
+  // ─── Localized display-name helpers ─────────────────────────────────
+  // Map enum logic values to translated labels; fall back to humanize()
+  // so unknown values still render readably.
+  const triggerLabel = (v: string) => t(`auto.trigger.${v}`) || humanize(v)
+  const actionLabel = (v: string) => t(`auto.action.${v}`) || humanize(v)
+  const operatorLabel = (v: string) => t(`auto.operator.${v}`) || humanize(v)
+  const fieldLabel = (v: string) => t(`auto.field.${v}`) || humanize(v)
+  const statusLabel = (v: string) => t(`auto.status.${v}`) || humanize(v)
 
   // ─── Builder helpers ────────────────────────────────────────────────
 
@@ -293,14 +304,42 @@ export function AutomationsContent({
   /** Pre-fill the builder from a prebuilt template (create mode only). */
   function applyTemplate(tpl: AutomationTemplate) {
     setEditingId(null)
-    setName(tpl.name)
-    setDescription(tpl.description)
+    setName(t(`auto.tpl.${tpl.id}.name`))
+    setDescription(t(`auto.tpl.${tpl.id}.desc`))
     setTrigger(tpl.trigger)
     setProjectId("")
     setConditions(tpl.conditions.map((c) => ({ ...c })))
-    setActions(tpl.actions.map((a) => ({ actionType: a.actionType, config: { ...a.config } })))
+    setActions(
+      tpl.actions.map((a) => ({
+        actionType: a.actionType,
+        config: localizeTemplateConfig(tpl.id, a.config),
+      }))
+    )
     setConditionsOpen(tpl.conditions.length > 0)
     setActionsOpen(tpl.actions.length > 0)
+  }
+
+  /**
+   * Translate the user-visible string values inside a template's prefilled
+   * action config (notification title/message, task title). Keys are mapped
+   * by template id so the values shown in the builder inputs are localized.
+   */
+  function localizeTemplateConfig(
+    tplId: string,
+    config: Record<string, string>
+  ): Record<string, string> {
+    const next: Record<string, string> = { ...config }
+    if ("title" in next) {
+      // Notification configs use a notifTitle key; create_task uses taskTitle.
+      const notifKey = `auto.tpl.${tplId}.notifTitle`
+      const taskKey = `auto.tpl.${tplId}.taskTitle`
+      const notif = t(notifKey)
+      next.title = notif !== notifKey ? notif : t(taskKey)
+    }
+    if ("message" in next) {
+      next.message = t(`auto.tpl.${tplId}.notifMsg`)
+    }
+    return next
   }
 
   function openEdit(automation: any) {
@@ -361,7 +400,7 @@ export function AutomationsContent({
 
   async function handleSave() {
     if (!name.trim()) {
-      toast.error("Name is required")
+      toast.error(t("auto.toast.nameRequired"))
       return
     }
 
@@ -374,7 +413,7 @@ export function AutomationsContent({
           trigger,
           projectId: projectId.trim() || undefined,
         })
-        toast.success("Automation updated")
+        toast.success(t("auto.toast.updated"))
       } else {
         const automationId = await createAutomation({
           name: name.trim(),
@@ -403,14 +442,14 @@ export function AutomationsContent({
           })
         }
 
-        toast.success("Automation created")
+        toast.success(t("auto.toast.created"))
       }
 
       setShowBuilder(false)
       resetBuilder()
       router.refresh()
     } catch (err) {
-      toast.error("Failed to save automation")
+      toast.error(t("auto.toast.saveFailed"))
     } finally {
       setSaving(false)
     }
@@ -421,10 +460,10 @@ export function AutomationsContent({
   async function handleDelete(id: string) {
     try {
       await deleteAutomation(id)
-      toast.success("Automation deleted")
+      toast.success(t("auto.toast.deleted"))
       router.refresh()
     } catch {
-      toast.error("Failed to delete automation")
+      toast.error(t("auto.toast.deleteFailed"))
     }
   }
 
@@ -435,7 +474,7 @@ export function AutomationsContent({
       await toggleAutomation(id)
       router.refresh()
     } catch {
-      toast.error("Failed to toggle automation")
+      toast.error(t("auto.toast.toggleFailed"))
     }
   }
 
@@ -457,7 +496,7 @@ export function AutomationsContent({
       )
       setRunHistory(allRuns)
     } catch {
-      toast.error("Failed to load run history")
+      toast.error(t("auto.toast.runsFailed"))
     } finally {
       setLoadingRuns(false)
     }
@@ -477,7 +516,7 @@ export function AutomationsContent({
     return (
       <Badge variant={cfg.variant} className="gap-1">
         <Icon className="size-3" />
-        {humanize(status)}
+        {statusLabel(status)}
       </Badge>
     )
   }
@@ -501,7 +540,7 @@ export function AutomationsContent({
       case "create_task":
         return (
           <Input
-            placeholder="Task title"
+            placeholder={t("auto.ph.taskTitle")}
             value={config.title ?? ""}
             onChange={(e) => set("title", e.target.value)}
             className="mt-1"
@@ -510,7 +549,7 @@ export function AutomationsContent({
       case "update_status":
         return (
           <Input
-            placeholder="Status ID"
+            placeholder={t("auto.ph.statusId")}
             value={config.statusId ?? ""}
             onChange={(e) => set("statusId", e.target.value)}
             className="mt-1"
@@ -519,7 +558,7 @@ export function AutomationsContent({
       case "assign_user":
         return (
           <Input
-            placeholder="Assignee ID"
+            placeholder={t("auto.ph.assigneeId")}
             value={config.assigneeId ?? ""}
             onChange={(e) => set("assigneeId", e.target.value)}
             className="mt-1"
@@ -529,12 +568,12 @@ export function AutomationsContent({
         return (
           <div className="mt-1 space-y-1.5">
             <Input
-              placeholder="Notification title"
+              placeholder={t("auto.ph.notifTitle")}
               value={config.title ?? ""}
               onChange={(e) => set("title", e.target.value)}
             />
             <Input
-              placeholder="Notification message"
+              placeholder={t("auto.ph.notifMessage")}
               value={config.message ?? ""}
               onChange={(e) => set("message", e.target.value)}
             />
@@ -560,7 +599,7 @@ export function AutomationsContent({
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Automations
+            {t("auto.tab.automations")}
           </button>
           <button
             onClick={() => {
@@ -573,14 +612,14 @@ export function AutomationsContent({
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Run History
+            {t("auto.tab.history")}
           </button>
         </div>
 
         {activeTab === "automations" && (
           <Button onClick={openCreate} size="sm">
             <Plus className="size-4 mr-1" />
-            Create Automation
+            {t("auto.create")}
           </Button>
         )}
       </div>
@@ -592,14 +631,14 @@ export function AutomationsContent({
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
               <Zap className="size-10 text-muted-foreground/50 mb-3" />
               <p className="text-sm text-muted-foreground">
-                No automations yet
+                {t("auto.empty.title")}
               </p>
               <p className="text-xs text-muted-foreground/70 mt-1">
-                Create one to automate repetitive workflows
+                {t("auto.empty.desc")}
               </p>
               <Button onClick={openCreate} size="sm" className="mt-4">
                 <Plus className="size-4 mr-1" />
-                Create Automation
+                {t("auto.create")}
               </Button>
             </div>
           ) : (
@@ -635,7 +674,7 @@ export function AutomationsContent({
                   {/* Trigger badge */}
                   <div className="mb-3">
                     <Badge variant="secondary" className="text-xs">
-                      When: {humanize(automation.trigger)}
+                      {t("auto.card.when").replace("{trigger}", triggerLabel(automation.trigger))}
                     </Badge>
                   </div>
 
@@ -643,17 +682,17 @@ export function AutomationsContent({
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
                     <span className="flex items-center gap-1">
                       <Filter className="size-3" />
-                      {automation.conditionCount ?? 0} conditions
+                      {t("auto.card.conditions").replace("{count}", String(automation.conditionCount ?? 0))}
                     </span>
                     <span className="flex items-center gap-1">
                       <Play className="size-3" />
-                      {automation.actionCount ?? 0} actions
+                      {t("auto.card.actions").replace("{count}", String(automation.actionCount ?? 0))}
                     </span>
                   </div>
 
                   {/* Run info */}
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
-                    <span>{automation.runCount ?? 0} runs</span>
+                    <span>{t("auto.card.runs").replace("{count}", String(automation.runCount ?? 0))}</span>
                     {automation.lastRunStatus && (
                       <>
                         <span className="text-muted-foreground/40">|</span>
@@ -665,7 +704,7 @@ export function AutomationsContent({
                         <span className="text-muted-foreground/40">|</span>
                         <span className="flex items-center gap-1">
                           <Clock className="size-3" />
-                          {relativeTime(automation.lastRunAt)}
+                          {relativeTime(automation.lastRunAt, t)}
                         </span>
                       </>
                     )}
@@ -677,7 +716,7 @@ export function AutomationsContent({
                       variant="ghost"
                       size="icon-xs"
                       onClick={() => openEdit(automation)}
-                      title="Edit"
+                      title={t("auto.card.edit")}
                     >
                       <Pencil className="size-3" />
                     </Button>
@@ -686,7 +725,7 @@ export function AutomationsContent({
                       size="icon-xs"
                       onClick={() => handleToggle(automation.id)}
                       title={
-                        automation.isActive ? "Deactivate" : "Activate"
+                        automation.isActive ? t("auto.card.deactivate") : t("auto.card.activate")
                       }
                     >
                       <Power
@@ -701,7 +740,7 @@ export function AutomationsContent({
                       variant="ghost"
                       size="icon-xs"
                       onClick={() => handleDelete(automation.id)}
-                      title="Delete"
+                      title={t("auto.card.delete")}
                       className="ml-auto text-destructive hover:text-destructive"
                     >
                       <Trash2 className="size-3" />
@@ -719,25 +758,25 @@ export function AutomationsContent({
         <div className="rounded-lg border">
           {loadingRuns ? (
             <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
-              Loading run history...
+              {t("auto.history.loading")}
             </div>
           ) : runHistory.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Clock className="size-10 text-muted-foreground/50 mb-3" />
               <p className="text-sm text-muted-foreground">
-                No runs recorded yet
+                {t("auto.history.empty")}
               </p>
             </div>
           ) : (
             <div className="divide-y">
               {/* Table header */}
               <div className="grid grid-cols-[1fr_100px_100px_80px_1fr_100px] gap-2 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/50">
-                <span>Automation</span>
-                <span>Status</span>
-                <span>Actions</span>
-                <span>Duration</span>
-                <span>Error</span>
-                <span>Time</span>
+                <span>{t("auto.history.col.automation")}</span>
+                <span>{t("auto.history.col.status")}</span>
+                <span>{t("auto.history.col.actions")}</span>
+                <span>{t("auto.history.col.duration")}</span>
+                <span>{t("auto.history.col.error")}</span>
+                <span>{t("auto.history.col.time")}</span>
               </div>
 
               {runHistory.map((run) => (
@@ -761,7 +800,7 @@ export function AutomationsContent({
                       <StatusBadge status={run.status} />
                     </span>
                     <span className="text-muted-foreground">
-                      {run.actionsExecuted ?? 0} executed
+                      {t("auto.history.executed").replace("{count}", String(run.actionsExecuted ?? 0))}
                     </span>
                     <span className="text-muted-foreground">
                       {run.duration != null ? `${run.duration}ms` : "-"}
@@ -773,7 +812,7 @@ export function AutomationsContent({
                       {run.error ?? "-"}
                     </span>
                     <span className="text-muted-foreground">
-                      {relativeTime(run.createdAt)}
+                      {relativeTime(run.createdAt, t)}
                     </span>
                   </button>
 
@@ -781,35 +820,35 @@ export function AutomationsContent({
                   {expandedRun === run.id && (
                     <div className="bg-muted/20 px-6 py-3 text-xs space-y-1 border-t">
                       <p className="text-muted-foreground font-medium mb-1">
-                        Run details
+                        {t("auto.history.details")}
                       </p>
                       <p>
-                        <span className="text-muted-foreground">Status: </span>
-                        {humanize(run.status)}
+                        <span className="text-muted-foreground">{t("auto.history.status")}</span>
+                        {statusLabel(run.status)}
                       </p>
                       <p>
                         <span className="text-muted-foreground">
-                          Actions executed:{" "}
+                          {t("auto.history.actionsExecuted")}
                         </span>
                         {run.actionsExecuted ?? 0}
                       </p>
                       <p>
                         <span className="text-muted-foreground">
-                          Duration:{" "}
+                          {t("auto.history.duration")}
                         </span>
                         {run.duration != null ? `${run.duration}ms` : "-"}
                       </p>
                       {run.error && (
                         <p>
                           <span className="text-muted-foreground">
-                            Error:{" "}
+                            {t("auto.history.error")}
                           </span>
                           <span className="text-destructive">{run.error}</span>
                         </p>
                       )}
                       <p>
                         <span className="text-muted-foreground">
-                          Trigger data:{" "}
+                          {t("auto.history.triggerData")}
                         </span>
                         <code className="rounded bg-muted px-1 py-0.5 text-[10px]">
                           {run.triggerData ?? "{}"}
@@ -829,12 +868,12 @@ export function AutomationsContent({
         <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingId ? "Edit Automation" : "Create Automation"}
+              {editingId ? t("auto.builder.editTitle") : t("auto.builder.createTitle")}
             </DialogTitle>
             <DialogDescription>
               {editingId
-                ? "Update the automation settings below."
-                : "Set up a trigger, conditions, and actions for your automation."}
+                ? t("auto.builder.editDesc")
+                : t("auto.builder.createDesc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -843,7 +882,7 @@ export function AutomationsContent({
             {!editingId && (
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                  Start from a template
+                  {t("auto.builder.templateLabel")}
                 </label>
                 <div className="grid grid-cols-2 gap-1.5">
                   {AUTOMATION_TEMPLATES.map((tpl) => (
@@ -851,21 +890,21 @@ export function AutomationsContent({
                       key={tpl.id}
                       type="button"
                       onClick={() => applyTemplate(tpl)}
-                      title={tpl.description}
+                      title={t(`auto.tpl.${tpl.id}.desc`)}
                       className="flex items-start gap-2 rounded-lg border border-border/60 p-2 text-left transition-colors hover:border-primary/40 hover:bg-accent/30"
                     >
                       <span className="text-base leading-none mt-0.5">{tpl.icon}</span>
                       <span className="min-w-0">
-                        <span className="block text-xs font-medium truncate">{tpl.name}</span>
+                        <span className="block text-xs font-medium truncate">{t(`auto.tpl.${tpl.id}.name`)}</span>
                         <span className="block text-[10px] text-muted-foreground leading-tight line-clamp-2">
-                          {tpl.description}
+                          {t(`auto.tpl.${tpl.id}.desc`)}
                         </span>
                       </span>
                     </button>
                   ))}
                 </div>
                 <p className="text-[10px] text-muted-foreground/70 mt-1.5">
-                  Picking a template fills in the form below — tweak anything before you create it.
+                  {t("auto.builder.templateHint")}
                 </p>
               </div>
             )}
@@ -873,10 +912,10 @@ export function AutomationsContent({
             {/* Name */}
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                Name
+                {t("auto.builder.name")}
               </label>
               <Input
-                placeholder="My automation"
+                placeholder={t("auto.builder.namePh")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -885,10 +924,10 @@ export function AutomationsContent({
             {/* Description */}
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                Description
+                {t("auto.builder.description")}
               </label>
               <textarea
-                placeholder="Optional description..."
+                placeholder={t("auto.builder.descriptionPh")}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
@@ -899,16 +938,16 @@ export function AutomationsContent({
             {/* Trigger */}
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                Trigger
+                {t("auto.builder.trigger")}
               </label>
               <select
                 value={trigger}
                 onChange={(e) => setTrigger(e.target.value as TriggerType)}
                 className="h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
               >
-                {TRIGGER_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {humanize(t)}
+                {TRIGGER_TYPES.map((tr) => (
+                  <option key={tr} value={tr}>
+                    {triggerLabel(tr)}
                   </option>
                 ))}
               </select>
@@ -917,10 +956,10 @@ export function AutomationsContent({
             {/* Project scope */}
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                Project scope (optional)
+                {t("auto.builder.projectScope")}
               </label>
               <Input
-                placeholder="Project ID or leave blank for all projects"
+                placeholder={t("auto.builder.projectScopePh")}
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
               />
@@ -936,7 +975,7 @@ export function AutomationsContent({
                 >
                   <span className="flex items-center gap-2">
                     <Filter className="size-4 text-muted-foreground" />
-                    Conditions
+                    {t("auto.builder.conditions")}
                     {conditions.length > 0 && (
                       <Badge variant="secondary" className="ml-1">
                         {conditions.length}
@@ -967,8 +1006,8 @@ export function AutomationsContent({
                             }
                             className="h-7 w-16 shrink-0 rounded border border-input bg-transparent px-1 text-xs outline-none focus-visible:border-ring dark:bg-input/30"
                           >
-                            <option value="and">AND</option>
-                            <option value="or">OR</option>
+                            <option value="and">{t("auto.builder.gate.and")}</option>
+                            <option value="or">{t("auto.builder.gate.or")}</option>
                           </select>
                         )}
                         <select
@@ -982,7 +1021,7 @@ export function AutomationsContent({
                         >
                           {CONDITION_FIELDS.map((f) => (
                             <option key={f} value={f}>
-                              {humanize(f)}
+                              {fieldLabel(f)}
                             </option>
                           ))}
                         </select>
@@ -997,7 +1036,7 @@ export function AutomationsContent({
                         >
                           {OPERATORS.map((op) => (
                             <option key={op} value={op}>
-                              {humanize(op)}
+                              {operatorLabel(op)}
                             </option>
                           ))}
                         </select>
@@ -1010,7 +1049,7 @@ export function AutomationsContent({
                                   value: e.target.value,
                                 })
                               }
-                              placeholder="Value"
+                              placeholder={t("auto.builder.conditionValuePh")}
                               className="h-7 flex-1 text-xs"
                             />
                           )}
@@ -1030,7 +1069,7 @@ export function AutomationsContent({
                       className="mt-2"
                     >
                       <Plus className="size-3 mr-1" />
-                      Add condition
+                      {t("auto.builder.addCondition")}
                     </Button>
                   </div>
                 )}
@@ -1047,7 +1086,7 @@ export function AutomationsContent({
                 >
                   <span className="flex items-center gap-2">
                     <Play className="size-4 text-muted-foreground" />
-                    Actions
+                    {t("auto.builder.actions")}
                     {actions.length > 0 && (
                       <Badge variant="secondary" className="ml-1">
                         {actions.length}
@@ -1080,7 +1119,7 @@ export function AutomationsContent({
                         >
                           {ACTION_TYPES.map((a) => (
                             <option key={a} value={a}>
-                              {humanize(a)}
+                              {actionLabel(a)}
                             </option>
                           ))}
                         </select>
@@ -1110,7 +1149,7 @@ export function AutomationsContent({
                       className="mt-2"
                     >
                       <Plus className="size-3 mr-1" />
-                      Add action
+                      {t("auto.builder.addAction")}
                     </Button>
                   </div>
                 )}
@@ -1120,10 +1159,10 @@ export function AutomationsContent({
 
           <DialogFooter>
             <DialogClose className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">
-              Cancel
+              {t("auto.builder.cancel")}
             </DialogClose>
             <Button onClick={handleSave} disabled={saving} size="sm">
-              {saving ? "Saving..." : editingId ? "Update" : "Create"}
+              {saving ? t("auto.builder.saving") : editingId ? t("auto.builder.update") : t("auto.builder.create")}
             </Button>
           </DialogFooter>
         </DialogContent>

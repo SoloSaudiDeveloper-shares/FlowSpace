@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   getFieldsForEntity,
   setFieldValue,
@@ -92,6 +93,7 @@ export function CustomFieldsPanel({
   entityId,
   projectId,
 }: CustomFieldsPanelProps) {
+  const { t } = useT()
   const [fields, setFields] = useState<FieldWithValue[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(true)
@@ -137,7 +139,7 @@ export function CustomFieldsPanel({
         setEditValue("")
         await loadFields()
       } catch {
-        toast.error("Failed to save field value")
+        toast.error(t("shared.customFields.failSaveValue"))
       }
     })
   }
@@ -154,7 +156,7 @@ export function CustomFieldsPanel({
         })
         await loadFields()
       } catch {
-        toast.error("Failed to update field")
+        toast.error(t("shared.customFields.failUpdateField"))
       }
     })
   }
@@ -171,7 +173,7 @@ export function CustomFieldsPanel({
         setEditingField(null)
         await loadFields()
       } catch {
-        toast.error("Failed to save field value")
+        toast.error(t("shared.customFields.failSaveValue"))
       }
     })
   }
@@ -189,7 +191,7 @@ export function CustomFieldsPanel({
         })
         await loadFields()
       } catch {
-        toast.error("Failed to update rating")
+        toast.error(t("shared.customFields.failUpdateRating"))
       }
     })
   }
@@ -210,7 +212,7 @@ export function CustomFieldsPanel({
           <ChevronRight className="size-3.5 text-muted-foreground" />
         )}
         <Settings2 className="size-3.5 text-muted-foreground" />
-        <span className="text-sm font-medium">Custom Fields</span>
+        <span className="text-sm font-medium">{t("shared.customFields.title")}</span>
         <Badge variant="secondary" className="text-[10px] ml-auto">
           {fields.length}
         </Badge>
@@ -328,7 +330,7 @@ export function CustomFieldsPanel({
                               {displayValue}
                             </Badge>
                           ) : (
-                            <span className="text-muted-foreground/50">Select...</span>
+                            <span className="text-muted-foreground/50">{t("shared.customFields.selectPlaceholder")}</span>
                           )}
                         </button>
                       )}
@@ -419,10 +421,10 @@ export function CustomFieldsPanel({
                             ) : (
                               <span className="text-muted-foreground/50">
                                 {field.fieldType === "date" || field.fieldType === "date_range"
-                                  ? "Set date..."
+                                  ? t("shared.customFields.setDate")
                                   : field.fieldType === "number" || field.fieldType === "currency"
                                     ? "0"
-                                    : "Empty"}
+                                    : t("shared.customFields.empty")}
                               </span>
                             )}
                           </button>

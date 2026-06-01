@@ -45,20 +45,21 @@ import {
 } from "@/lib/actions/template-actions"
 import { toast } from "sonner"
 import { MarkdownTemplatesPanel } from "@/components/settings/markdown-templates-panel"
+import { useT } from "@/lib/hooks/use-i18n"
 import type { templates } from "@/lib/db/schema"
 
 type Template = typeof templates.$inferSelect
 
 type TemplateType = Template["type"]
 
-const TEMPLATE_TYPES: { value: TemplateType | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "project", label: "Project" },
-  { value: "task", label: "Task" },
-  { value: "page", label: "Page" },
-  { value: "canvas", label: "Canvas" },
-  { value: "process", label: "Process" },
-  { value: "checklist", label: "Checklist" },
+const TEMPLATE_TYPES: { value: TemplateType | "all"; labelKey: string }[] = [
+  { value: "all", labelKey: "tpl.type.all" },
+  { value: "project", labelKey: "tpl.type.project" },
+  { value: "task", labelKey: "tpl.type.task" },
+  { value: "page", labelKey: "tpl.type.page" },
+  { value: "canvas", labelKey: "tpl.type.canvas" },
+  { value: "process", labelKey: "tpl.type.process" },
+  { value: "checklist", labelKey: "tpl.type.checklist" },
 ]
 
 const TYPE_BADGE_COLORS: Record<string, string> = {
@@ -90,6 +91,7 @@ interface TemplatesContentProps {
 }
 
 export function TemplatesContent({ templates: allTemplates, favorites, recent }: TemplatesContentProps) {
+  const { t } = useT()
   const router = useRouter()
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<TemplateType | "all">("all")
@@ -119,7 +121,7 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
       const result = await createFromTemplate(selectedTemplate.id, {
         title: titleOverride || undefined,
       })
-      toast.success(`Created ${result.type} from template`)
+      toast.success(t("tpl.toast.created").replace("{type}", result.type))
       setUseDialogOpen(false)
       setSelectedTemplate(null)
       setTitleOverride("")
@@ -136,13 +138,13 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
         router.refresh()
       }
     } catch {
-      toast.error("Failed to create from template")
+      toast.error(t("tpl.toast.createFailed"))
     }
   }
 
   async function handleCreateTemplate() {
     if (!newName.trim()) {
-      toast.error("Template name is required")
+      toast.error(t("tpl.toast.nameRequired"))
       return
     }
     try {
@@ -153,7 +155,7 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
         icon: newIcon.trim() || undefined,
         color: newColor.trim() || undefined,
       })
-      toast.success("Template created")
+      toast.success(t("tpl.toast.tplCreated"))
       setCreateDialogOpen(false)
       setNewName("")
       setNewType("project")
@@ -162,7 +164,7 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
       setNewColor("")
       router.refresh()
     } catch {
-      toast.error("Failed to create template")
+      toast.error(t("tpl.toast.tplCreateFailed"))
     }
   }
 
@@ -171,27 +173,27 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
       await toggleTemplateFavorite(id)
       router.refresh()
     } catch {
-      toast.error("Failed to update favorite")
+      toast.error(t("tpl.toast.favFailed"))
     }
   }
 
   async function handleDuplicate(id: string) {
     try {
       await duplicateTemplate(id)
-      toast.success("Template duplicated")
+      toast.success(t("tpl.toast.duplicated"))
       router.refresh()
     } catch {
-      toast.error("Failed to duplicate template")
+      toast.error(t("tpl.toast.dupFailed"))
     }
   }
 
   async function handleDelete(id: string) {
     try {
       await deleteTemplate(id)
-      toast.success("Template deleted")
+      toast.success(t("tpl.toast.deleted"))
       router.refresh()
     } catch {
-      toast.error("Failed to delete template")
+      toast.error(t("tpl.toast.deleteFailed"))
     }
   }
 
@@ -230,7 +232,7 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
                 {template.name}
               </p>
               <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium mt-1 ${badgeColor}`}>
-                {template.type}
+                {t(`tpl.type.${template.type}`)}
               </span>
             </div>
           </div>
@@ -238,7 +240,7 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
             <button
               onClick={() => handleToggleFavorite(template.id)}
               className="p-1 rounded hover:bg-accent transition-colors"
-              title={isFav ? "Remove from favorites" : "Add to favorites"}
+              title={isFav ? t("tpl.card.fav.remove") : t("tpl.card.fav.add")}
             >
               <Star
                 className={`size-3.5 ${isFav ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
@@ -251,14 +253,14 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => handleDuplicate(template.id)}>
                   <Copy className="size-4 mr-2" />
-                  Duplicate
+                  {t("tpl.card.duplicate")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleDelete(template.id)}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="size-4 mr-2" />
-                  Delete
+                  {t("tpl.card.delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -272,10 +274,10 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
         <div className="flex items-center justify-between mt-auto pt-1">
           <span className="text-[11px] text-muted-foreground flex items-center gap-1">
             <Clock className="size-3" />
-            Used {template.usageCount} {template.usageCount === 1 ? "time" : "times"}
+            {t(template.usageCount === 1 ? "tpl.card.used.one" : "tpl.card.used.other").replace("{count}", String(template.usageCount))}
           </span>
           <Button size="sm" className="h-7 text-xs px-3" onClick={() => openUseDialog(template)}>
-            Use Template
+            {t("tpl.card.use")}
           </Button>
         </div>
       </div>
@@ -289,30 +291,30 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
         <div className="relative flex-1 w-full sm:max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search templates..."
+            placeholder={t("tpl.search.ph")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8 h-9"
           />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          {TEMPLATE_TYPES.map((t) => (
+          {TEMPLATE_TYPES.map((typeOpt) => (
             <button
-              key={t.value}
-              onClick={() => setTypeFilter(t.value)}
+              key={typeOpt.value}
+              onClick={() => setTypeFilter(typeOpt.value)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                typeFilter === t.value
+                typeFilter === typeOpt.value
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-accent"
               }`}
             >
-              {t.label}
+              {t(typeOpt.labelKey)}
             </button>
           ))}
         </div>
         <Button size="sm" className="h-9 gap-1.5" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="size-4" />
-          New Template
+          {t("tpl.new")}
         </Button>
       </div>
 
@@ -322,9 +324,9 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
         <details className="rounded-lg border border-border/60 bg-card/40">
           <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 font-medium select-none hover:bg-accent/30 rounded-lg">
             <Sparkles className="size-4 text-primary" />
-            Markdown blueprints
+            {t("tpl.blueprints.title")}
             <span className="text-xs text-muted-foreground font-normal">
-              — paste-to-import starters (Sprint, OKR, Content calendar…)
+              {t("tpl.blueprints.help")}
             </span>
           </summary>
           <div className="px-4 pb-4">
@@ -337,7 +339,7 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
       {recent.length > 0 && typeFilter === "all" && !search && (
         <section>
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Recently Used
+            {t("tpl.section.recent")}
           </h2>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
             {recent.map((t) => (
@@ -353,7 +355,7 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
       {favorites.length > 0 && typeFilter === "all" && !search && (
         <section>
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Favorites
+            {t("tpl.section.favorites")}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {favorites.map((t) => renderTemplateCard(t))}
@@ -364,7 +366,9 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
       {/* All templates grid */}
       <section>
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          {typeFilter === "all" ? "All Templates" : `${TEMPLATE_TYPES.find((t) => t.value === typeFilter)?.label} Templates`}
+          {typeFilter === "all"
+            ? t("tpl.section.all")
+            : t("tpl.section.typed").replace("{type}", t(`tpl.type.${typeFilter}`))}
         </h2>
         {filtered.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -373,8 +377,8 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
         ) : (
           <div className="text-center py-12 text-muted-foreground">
             <Sparkles className="size-8 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">No templates found</p>
-            <p className="text-xs mt-1">Try a different filter or create a new template</p>
+            <p className="text-sm">{t("tpl.empty.title")}</p>
+            <p className="text-xs mt-1">{t("tpl.empty.help")}</p>
           </div>
         )}
       </section>
@@ -383,16 +387,16 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
       <Dialog open={useDialogOpen} onOpenChange={setUseDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Use Template</DialogTitle>
+            <DialogTitle>{t("tpl.use.title")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-muted-foreground">
-              Create a new {selectedTemplate?.type} from <span className="font-medium text-foreground">{selectedTemplate?.name}</span>
+              {t("tpl.use.from").replace("{type}", selectedTemplate?.type ?? "")} <span className="font-medium text-foreground">{selectedTemplate?.name}</span>
             </p>
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Title</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("tpl.use.titleLbl")}</label>
               <Input
-                placeholder="Enter a title..."
+                placeholder={t("tpl.use.title.ph")}
                 value={titleOverride}
                 onChange={(e) => setTitleOverride(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleUseTemplate()}
@@ -401,9 +405,9 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUseDialogOpen(false)}>
-              Cancel
+              {t("tpl.use.cancel")}
             </Button>
-            <Button onClick={handleUseTemplate}>Create</Button>
+            <Button onClick={handleUseTemplate}>{t("tpl.use.create")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -412,55 +416,55 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Template</DialogTitle>
+            <DialogTitle>{t("tpl.create.title")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Name</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("tpl.create.nameLbl")}</label>
               <Input
-                placeholder="Template name"
+                placeholder={t("tpl.create.name.ph")}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Type</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("tpl.create.typeLbl")}</label>
               <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value as TemplateType)}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <option value="project">Project</option>
-                <option value="task">Task</option>
-                <option value="page">Page</option>
-                <option value="canvas">Canvas</option>
-                <option value="process">Process</option>
-                <option value="checklist">Checklist</option>
-                <option value="dashboard">Dashboard</option>
-                <option value="form">Form</option>
+                <option value="project">{t("tpl.type.project")}</option>
+                <option value="task">{t("tpl.type.task")}</option>
+                <option value="page">{t("tpl.type.page")}</option>
+                <option value="canvas">{t("tpl.type.canvas")}</option>
+                <option value="process">{t("tpl.type.process")}</option>
+                <option value="checklist">{t("tpl.type.checklist")}</option>
+                <option value="dashboard">{t("tpl.type.dashboard")}</option>
+                <option value="form">{t("tpl.type.form")}</option>
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Description</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("tpl.create.descLbl")}</label>
               <Input
-                placeholder="Optional description"
+                placeholder={t("tpl.create.desc.ph")}
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-medium mb-1.5 block">Icon</label>
+                <label className="text-sm font-medium mb-1.5 block">{t("tpl.create.iconLbl")}</label>
                 <Input
-                  placeholder="e.g. FolderKanban"
+                  placeholder={t("tpl.create.icon.ph")}
                   value={newIcon}
                   onChange={(e) => setNewIcon(e.target.value)}
                 />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1.5 block">Color</label>
+                <label className="text-sm font-medium mb-1.5 block">{t("tpl.create.colorLbl")}</label>
                 <Input
-                  placeholder="e.g. #6366f1"
+                  placeholder={t("tpl.create.color.ph")}
                   value={newColor}
                   onChange={(e) => setNewColor(e.target.value)}
                 />
@@ -469,9 +473,9 @@ export function TemplatesContent({ templates: allTemplates, favorites, recent }:
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-              Cancel
+              {t("tpl.create.cancel")}
             </Button>
-            <Button onClick={handleCreateTemplate}>Create</Button>
+            <Button onClick={handleCreateTemplate}>{t("tpl.create.create")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -32,6 +32,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import { createBackup, deleteBackup, restoreBackup } from "@/lib/actions/backup-actions"
 import { updateUser, deleteUser } from "@/lib/actions/user-actions"
 import { getTelegramFeatureEnabled, setTelegramFeatureEnabled } from "@/lib/actions/telegram-actions"
@@ -58,21 +59,24 @@ function formatUptime(seconds: number): string {
   return parts.join(" ")
 }
 
-function formatRelativeTime(dateStr: string): string {
+function formatRelativeTime(dateStr: string, t: (key: string) => string): string {
   const date = new Date(dateStr)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffSec = Math.floor(diffMs / 1000)
 
-  if (diffSec < 60) return "just now"
+  if (diffSec < 60) return t("admin.time.justNow")
   const diffMin = Math.floor(diffSec / 60)
-  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`
+  if (diffMin < 60)
+    return (diffMin === 1 ? t("admin.time.minutesAgo") : t("admin.time.minutesAgoPlural")).replace("{count}", String(diffMin))
   const diffHour = Math.floor(diffMin / 60)
-  if (diffHour < 24) return `${diffHour} hour${diffHour === 1 ? "" : "s"} ago`
+  if (diffHour < 24)
+    return (diffHour === 1 ? t("admin.time.hoursAgo") : t("admin.time.hoursAgoPlural")).replace("{count}", String(diffHour))
   const diffDay = Math.floor(diffHour / 24)
-  if (diffDay < 30) return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`
+  if (diffDay < 30)
+    return (diffDay === 1 ? t("admin.time.daysAgo") : t("admin.time.daysAgoPlural")).replace("{count}", String(diffDay))
   const diffMonth = Math.floor(diffDay / 30)
-  return `${diffMonth} month${diffMonth === 1 ? "" : "s"} ago`
+  return (diffMonth === 1 ? t("admin.time.monthsAgo") : t("admin.time.monthsAgoPlural")).replace("{count}", String(diffMonth))
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -131,6 +135,7 @@ export function AdminContent({
   users,
   backups,
 }: AdminContentProps) {
+  const { t } = useT()
   const [activeTab, setActiveTab] = useState<TabId>("overview")
   const [isPending, startTransition] = useTransition()
   const [searchQuery, setSearchQuery] = useState("")
@@ -150,30 +155,30 @@ export function AdminContent({
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success("Backup created successfully")
+        toast.success(t("admin.toast.backupCreated"))
         router.refresh()
       }
     })
   }
 
   async function handleDeleteBackup(id: string, name: string) {
-    if (!confirm(`Delete backup "${name}"? This cannot be undone.`)) return
+    if (!confirm(t("admin.backups.confirmDelete").replace("{name}", name))) return
     startTransition(async () => {
       await deleteBackup(id)
-      toast.success("Backup deleted")
+      toast.success(t("admin.toast.backupDeleted"))
       router.refresh()
     })
   }
 
   async function handleRestoreBackup(id: string, name: string) {
-    if (!confirm(`Restore backup "${name}"? This will replace all current data. A safety backup will be created first.`)) return
+    if (!confirm(t("admin.backups.confirmRestore").replace("{name}", name))) return
     startTransition(async () => {
       const result = await restoreBackup(id)
       if (result.success) {
-        toast.success("Backup restored successfully")
+        toast.success(t("admin.toast.backupRestored"))
         router.refresh()
       } else {
-        toast.error(result.error ?? "Restore failed")
+        toast.error(result.error ?? t("admin.toast.restoreFailed"))
       }
     })
   }
@@ -184,10 +189,10 @@ export function AdminContent({
     startTransition(async () => {
       if (currentlyActive) {
         await deleteUser(id)
-        toast.success("User deactivated")
+        toast.success(t("admin.toast.userDeactivated"))
       } else {
         await updateUser(id, { isActive: true })
-        toast.success("User reactivated")
+        toast.success(t("admin.toast.userReactivated"))
       }
       router.refresh()
     })
@@ -218,7 +223,7 @@ export function AdminContent({
               }`}
             >
               <Icon className="size-3.5" />
-              {tab.label}
+              {t(`admin.tab.${tab.id}`)}
             </button>
           )
         })}
@@ -237,7 +242,7 @@ export function AdminContent({
             </svg>
             <input
               type="search"
-              placeholder="Search this tab…"
+              placeholder={t("admin.search.ph")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-7 w-44 sm:w-56 rounded-md border border-input bg-background pl-7 pr-2 text-xs placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -246,7 +251,7 @@ export function AdminContent({
           {isPending && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />
-              Updating…
+              {t("admin.updating")}
             </div>
           )}
         </div>
@@ -320,6 +325,7 @@ export function AdminContent({
 // is a matter of dropping in another `IntegrationCard`.
 
 function IntegrationsTab() {
+  const { t } = useT()
   const [telegram, setTelegram] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -333,9 +339,9 @@ function IntegrationsTab() {
     try {
       await setTelegramFeatureEnabled(!telegram)
       setTelegram(!telegram)
-      toast.success(!telegram ? "Telegram enabled workspace-wide" : "Telegram disabled")
+      toast.success(!telegram ? t("admin.toast.telegramEnabled") : t("admin.toast.telegramDisabled"))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't update setting")
+      toast.error(err instanceof Error ? err.message : t("admin.toast.settingFailed"))
     } finally {
       setSaving(false)
     }
@@ -349,15 +355,13 @@ function IntegrationsTab() {
         </div>
         <div className="flex-1">
           <p className="text-sm font-medium flex items-center gap-1.5">
-            Telegram bots
+            {t("admin.integrations.telegram.title")}
             {telegram && (
-              <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">on</span>
+              <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">{t("admin.integrations.telegram.on")}</span>
             )}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-            When on, each user can connect their own Telegram bot from
-            Settings → Telegram. Per-user — no sharing between accounts.
-            Inbound webhook traffic is routed via a per-user secret in the URL.
+            {t("admin.integrations.telegram.desc")}
           </p>
         </div>
         <button
@@ -399,6 +403,7 @@ function OverviewTab({
   uploadsPercent: number
   backupsPercent: number
 }) {
+  const { t } = useT()
   const memUsed = health.memoryUsage.heapUsed
   const memTotal = health.memoryUsage.heapTotal
 
@@ -408,18 +413,18 @@ function OverviewTab({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-card border rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Server Status</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("admin.overview.serverStatus")}</span>
             <Server className="size-4 text-muted-foreground" />
           </div>
           <div className="flex items-center gap-2">
             <div className="size-2.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-lg font-semibold">Healthy</span>
+            <span className="text-lg font-semibold">{t("admin.overview.healthy")}</span>
           </div>
         </div>
 
         <div className="bg-card border rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Active Sessions</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("admin.overview.activeSessions")}</span>
             <Users className="size-4 text-muted-foreground" />
           </div>
           <span className="text-lg font-semibold">{sessionCount}</span>
@@ -427,7 +432,7 @@ function OverviewTab({
 
         <div className="bg-card border rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Database Size</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("admin.overview.databaseSize")}</span>
             <Database className="size-4 text-muted-foreground" />
           </div>
           <span className="text-lg font-semibold">{formatBytes(health.dbSize)}</span>
@@ -435,7 +440,7 @@ function OverviewTab({
 
         <div className="bg-card border rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Storage Used</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("admin.overview.storageUsed")}</span>
             <HardDrive className="size-4 text-muted-foreground" />
           </div>
           <span className="text-lg font-semibold">{formatBytes(totalStorage)}</span>
@@ -447,33 +452,33 @@ function OverviewTab({
         <div className="bg-card border rounded-lg p-5">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
             <MonitorCheck className="size-4 text-primary" />
-            Server Health
+            {t("admin.overview.serverHealth")}
           </h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between py-1.5 border-b border-border/50">
-              <span className="text-sm text-muted-foreground">Uptime</span>
+              <span className="text-sm text-muted-foreground">{t("admin.overview.uptime")}</span>
               <span className="text-sm font-medium">{formatUptime(health.uptime)}</span>
             </div>
             <div className="flex items-center justify-between py-1.5 border-b border-border/50">
-              <span className="text-sm text-muted-foreground">Platform</span>
+              <span className="text-sm text-muted-foreground">{t("admin.overview.platform")}</span>
               <span className="text-sm font-medium">{health.platform}</span>
             </div>
             <div className="flex items-center justify-between py-1.5 border-b border-border/50">
-              <span className="text-sm text-muted-foreground">Node Version</span>
+              <span className="text-sm text-muted-foreground">{t("admin.overview.nodeVersion")}</span>
               <span className="text-sm font-medium font-mono">{health.nodeVersion}</span>
             </div>
             <div className="flex items-center justify-between py-1.5 border-b border-border/50">
-              <span className="text-sm text-muted-foreground">Heap Used</span>
+              <span className="text-sm text-muted-foreground">{t("admin.overview.heapUsed")}</span>
               <span className="text-sm font-medium">{formatBytes(memUsed)}</span>
             </div>
             <div className="flex items-center justify-between py-1.5">
-              <span className="text-sm text-muted-foreground">Heap Total</span>
+              <span className="text-sm text-muted-foreground">{t("admin.overview.heapTotal")}</span>
               <span className="text-sm font-medium">{formatBytes(memTotal)}</span>
             </div>
             {/* Memory bar */}
             <div className="pt-1">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-muted-foreground">Memory Usage</span>
+                <span className="text-xs text-muted-foreground">{t("admin.overview.memoryUsage")}</span>
                 <span className="text-xs text-muted-foreground">
                   {Math.round((memUsed / memTotal) * 100)}%
                 </span>
@@ -492,7 +497,7 @@ function OverviewTab({
         <div className="bg-card border rounded-lg p-5">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
             <HardDrive className="size-4 text-primary" />
-            Storage Breakdown
+            {t("admin.overview.storageBreakdown")}
           </h3>
           <div className="space-y-4">
             {/* Database */}
@@ -500,7 +505,7 @@ function OverviewTab({
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <Database className="size-3.5 text-blue-400" />
-                  <span className="text-sm font-medium">Database</span>
+                  <span className="text-sm font-medium">{t("admin.overview.database")}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">{formatBytes(storage.database.size)}</span>
               </div>
@@ -517,8 +522,8 @@ function OverviewTab({
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <Upload className="size-3.5 text-green-400" />
-                  <span className="text-sm font-medium">Uploads</span>
-                  <span className="text-xs text-muted-foreground">({storage.uploads.fileCount} files)</span>
+                  <span className="text-sm font-medium">{t("admin.overview.uploads")}</span>
+                  <span className="text-xs text-muted-foreground">{t("admin.overview.filesCount").replace("{count}", String(storage.uploads.fileCount))}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">{formatBytes(storage.uploads.size)}</span>
               </div>
@@ -535,8 +540,8 @@ function OverviewTab({
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <Archive className="size-3.5 text-amber-400" />
-                  <span className="text-sm font-medium">Backups</span>
-                  <span className="text-xs text-muted-foreground">({storage.backups.fileCount} files)</span>
+                  <span className="text-sm font-medium">{t("admin.overview.backups")}</span>
+                  <span className="text-xs text-muted-foreground">{t("admin.overview.filesCount").replace("{count}", String(storage.backups.fileCount))}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">{formatBytes(storage.backups.size)}</span>
               </div>
@@ -551,7 +556,7 @@ function OverviewTab({
             {/* Total */}
             <div className="pt-2 border-t border-border/50">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Total</span>
+                <span className="text-sm font-medium">{t("admin.overview.total")}</span>
                 <span className="text-sm font-semibold">{formatBytes(totalStorage)}</span>
               </div>
             </div>
@@ -573,26 +578,27 @@ function UsersTab({
   onToggleActive: (id: string, isActive: boolean) => void
   isPending: boolean
 }) {
+  const { t } = useT()
   return (
     <div className="bg-card border rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/30">
-              <th className="text-left font-medium text-muted-foreground px-4 py-3">User</th>
-              <th className="text-left font-medium text-muted-foreground px-4 py-3">Username</th>
-              <th className="text-left font-medium text-muted-foreground px-4 py-3">Email</th>
-              <th className="text-left font-medium text-muted-foreground px-4 py-3">Role</th>
-              <th className="text-left font-medium text-muted-foreground px-4 py-3">Status</th>
-              <th className="text-left font-medium text-muted-foreground px-4 py-3">Last Active</th>
-              <th className="text-right font-medium text-muted-foreground px-4 py-3">Actions</th>
+              <th className="text-left font-medium text-muted-foreground px-4 py-3">{t("admin.users.col.user")}</th>
+              <th className="text-left font-medium text-muted-foreground px-4 py-3">{t("admin.users.col.username")}</th>
+              <th className="text-left font-medium text-muted-foreground px-4 py-3">{t("admin.users.col.email")}</th>
+              <th className="text-left font-medium text-muted-foreground px-4 py-3">{t("admin.users.col.role")}</th>
+              <th className="text-left font-medium text-muted-foreground px-4 py-3">{t("admin.users.col.status")}</th>
+              <th className="text-left font-medium text-muted-foreground px-4 py-3">{t("admin.users.col.lastActive")}</th>
+              <th className="text-right font-medium text-muted-foreground px-4 py-3">{t("admin.users.col.actions")}</th>
             </tr>
           </thead>
           <tbody>
             {users.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                  No users found.
+                  {t("admin.users.empty")}
                 </td>
               </tr>
             ) : (
@@ -614,24 +620,24 @@ function UsersTab({
                         ROLE_COLORS[user.role] ?? ROLE_COLORS.viewer
                       }`}
                     >
-                      {user.role}
+                      {t(`people.role.${user.role}`)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     {user.isActive ? (
                       <span className="inline-flex items-center gap-1 text-xs text-green-400">
                         <span className="size-1.5 rounded-full bg-green-500" />
-                        Active
+                        {t("admin.users.status.active")}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                         <span className="size-1.5 rounded-full bg-muted-foreground/50" />
-                        Inactive
+                        {t("admin.users.status.inactive")}
                       </span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {user.lastActiveAt ? formatRelativeTime(user.lastActiveAt) : "Never"}
+                    {user.lastActiveAt ? formatRelativeTime(user.lastActiveAt, t) : t("admin.users.never")}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {user.role !== "owner" && (
@@ -642,7 +648,7 @@ function UsersTab({
                         onClick={() => onToggleActive(user.id, user.isActive)}
                         className="text-xs"
                       >
-                        {user.isActive ? "Deactivate" : "Reactivate"}
+                        {user.isActive ? t("admin.users.deactivate") : t("admin.users.reactivate")}
                       </Button>
                     )}
                   </td>
@@ -671,6 +677,7 @@ function BackupsTab({
   onRestoreBackup: (id: string, name: string) => void
   isPending: boolean
 }) {
+  const { t } = useT()
   const STATUS_STYLES: Record<string, string> = {
     completed: "bg-green-500/15 text-green-400 border-green-500/30",
     in_progress: "bg-blue-500/15 text-blue-400 border-blue-500/30",
@@ -687,9 +694,9 @@ function BackupsTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold">Backups</h3>
+          <h3 className="text-sm font-semibold">{t("admin.backups.title")}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {backups.length} backup{backups.length !== 1 ? "s" : ""} stored
+            {(backups.length === 1 ? t("admin.backups.stored") : t("admin.backups.storedPlural")).replace("{count}", String(backups.length))}
           </p>
         </div>
         <Button size="sm" onClick={onCreateBackup} disabled={isPending}>
@@ -698,13 +705,13 @@ function BackupsTab({
           ) : (
             <Plus className="size-3.5 mr-1.5" />
           )}
-          Create Backup
+          {t("admin.backups.create")}
         </Button>
       </div>
 
       {backups.length === 0 ? (
         <div className="bg-card border rounded-lg px-4 py-8 text-center text-muted-foreground text-sm">
-          No backups yet. Create your first backup to protect your data.
+          {t("admin.backups.empty")}
         </div>
       ) : (
         <div className="space-y-2">
@@ -723,7 +730,7 @@ function BackupsTab({
                         STATUS_STYLES[backup.status] ?? STATUS_STYLES.completed
                       }`}
                     >
-                      {backup.status === "in_progress" ? "In Progress" : backup.status}
+                      {backup.status === "in_progress" ? t("admin.backups.inProgress") : backup.status}
                     </span>
                     <span
                       className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${
@@ -735,7 +742,7 @@ function BackupsTab({
                   </div>
                   <div className="flex items-center gap-3 mt-0.5">
                     <span className="text-xs text-muted-foreground">
-                      {backup.startedAt ? formatRelativeTime(backup.startedAt) : "--"}
+                      {backup.startedAt ? formatRelativeTime(backup.startedAt, t) : "--"}
                     </span>
                     {backup.fileSize != null && (
                       <span className="text-xs text-muted-foreground">
@@ -754,7 +761,7 @@ function BackupsTab({
                   onClick={() => onRestoreBackup(backup.id, backup.name)}
                 >
                   <RefreshCw className="size-3 mr-1" />
-                  Restore
+                  {t("admin.backups.restore")}
                 </Button>
                 <Button
                   variant="destructive"
@@ -763,7 +770,7 @@ function BackupsTab({
                   onClick={() => onDeleteBackup(backup.id, backup.name)}
                 >
                   <Trash2 className="size-3 mr-1" />
-                  Delete
+                  {t("admin.backups.delete")}
                 </Button>
               </div>
             </div>
@@ -777,21 +784,22 @@ function BackupsTab({
 // ─── Events Tab ─────────────────────────────────────────────────────────
 
 function EventsTab({ events }: { events: any[] }) {
+  const { t } = useT()
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold">Recent Events</h3>
+          <h3 className="text-sm font-semibold">{t("admin.events.title")}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Last {events.length} server events
+            {t("admin.events.subtitle").replace("{count}", String(events.length))}
           </p>
         </div>
-        <SectionHelp guideId="serverEvents" label="What are these?" className="shrink-0" />
+        <SectionHelp guideId="serverEvents" label={t("admin.events.help")} className="shrink-0" />
       </div>
 
       {events.length === 0 ? (
         <div className="bg-card border rounded-lg px-4 py-8 text-center text-muted-foreground text-sm">
-          No events recorded yet.
+          {t("admin.events.empty")}
         </div>
       ) : (
         <div className="bg-card border rounded-lg divide-y divide-border/50 max-h-[600px] overflow-y-auto">
@@ -817,7 +825,7 @@ function EventsTab({ events }: { events: any[] }) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{event.title}</span>
                     <span className="text-xs text-muted-foreground">
-                      {event.createdAt ? formatRelativeTime(event.createdAt) : ""}
+                      {event.createdAt ? formatRelativeTime(event.createdAt, t) : ""}
                     </span>
                   </div>
                   {event.message && (
@@ -836,18 +844,21 @@ function EventsTab({ events }: { events: any[] }) {
 // ─── Database Tab ───────────────────────────────────────────────────────
 
 function DatabaseTab({ dbStats }: { dbStats: any }) {
+  const { t } = useT()
   const sortedTables = [...(dbStats.tables || [])].sort(
     (a: any, b: any) => b.rowCount - a.rowCount
   )
-  const totalRows = sortedTables.reduce((sum: number, t: any) => sum + t.rowCount, 0)
+  const totalRows = sortedTables.reduce((sum: number, tbl: any) => sum + tbl.rowCount, 0)
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold">Database Tables</h3>
+          <h3 className="text-sm font-semibold">{t("admin.database.title")}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {sortedTables.length} tables, {totalRows.toLocaleString()} total rows
+            {t("admin.database.subtitle")
+              .replace("{tables}", String(sortedTables.length))
+              .replace("{rows}", totalRows.toLocaleString())}
           </p>
         </div>
       </div>
@@ -856,9 +867,9 @@ function DatabaseTab({ dbStats }: { dbStats: any }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/30">
-              <th className="text-left font-medium text-muted-foreground px-4 py-3">Table Name</th>
-              <th className="text-right font-medium text-muted-foreground px-4 py-3">Row Count</th>
-              <th className="text-right font-medium text-muted-foreground px-4 py-3">% of Total</th>
+              <th className="text-left font-medium text-muted-foreground px-4 py-3">{t("admin.database.col.tableName")}</th>
+              <th className="text-right font-medium text-muted-foreground px-4 py-3">{t("admin.database.col.rowCount")}</th>
+              <th className="text-right font-medium text-muted-foreground px-4 py-3">{t("admin.database.col.percent")}</th>
             </tr>
           </thead>
           <tbody>

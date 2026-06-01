@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { useAI } from "@/lib/hooks/use-ai"
 import { usePreferences } from "@/lib/hooks/use-preferences"
+import { useT } from "@/lib/hooks/use-i18n"
 import { AIResultPreview, type AIPreviewState } from "@/components/shared/ai-result-preview"
 import {
   type AIAction,
@@ -27,17 +28,17 @@ export type { AIAction } from "@/lib/ai/ai-actions"
 
 interface MenuItem {
   id: AIAction
-  label: string
+  labelKey: string
   icon: typeof Sparkles
 }
 
 const MENU: MenuItem[] = [
-  { id: "summarize", label: "Summarize", icon: FileText },
-  { id: "expand", label: "Expand", icon: Expand },
-  { id: "fix_grammar", label: "Fix Grammar", icon: CheckCheck },
-  { id: "improve", label: "Improve Writing", icon: Wand2 },
-  { id: "continue", label: "Continue Writing", icon: Expand },
-  { id: "generate_todos", label: "Generate Todos", icon: ListTodo },
+  { id: "summarize", labelKey: "shared.ai.summarize", icon: FileText },
+  { id: "expand", labelKey: "shared.ai.expand", icon: Expand },
+  { id: "fix_grammar", labelKey: "shared.ai.fixGrammar", icon: CheckCheck },
+  { id: "improve", labelKey: "shared.ai.improve", icon: Wand2 },
+  { id: "continue", labelKey: "shared.ai.continue", icon: Expand },
+  { id: "generate_todos", labelKey: "shared.ai.generateTodos", icon: ListTodo },
 ]
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ export function AIActionButton({
 }: AIActionButtonProps) {
   const { preferences } = usePreferences()
   const { enabled, generateText } = useAI()
+  const { t } = useT()
   const [loading, setLoading] = useState(false)
   const [activeAction, setActiveAction] = useState<AIAction | null>(null)
   const [open, setOpen] = useState(false)
@@ -173,7 +175,7 @@ export function AIActionButton({
         ref={btnRef}
         type="button"
         disabled={loading || !text.trim()}
-        title={loading ? "AI processing..." : "AI actions"}
+        title={loading ? t("shared.ai.processing") : t("shared.ai.actions")}
         onClick={() => setOpen((v) => !v)}
         className={`
           inline-flex items-center justify-center rounded-full transition-all
@@ -188,7 +190,7 @@ export function AIActionButton({
           }
           ${className}
         `}
-        aria-label="AI actions"
+        aria-label={t("shared.ai.actions")}
       >
         {loading ? (
           <Loader2 className={`${iconSizes[size]} animate-spin`} />
@@ -204,7 +206,7 @@ export function AIActionButton({
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
-            AI Actions
+            {t("shared.ai.menuTitle")}
           </div>
           <div className="my-1 border-t" />
           {visibleActions.map((action) => {
@@ -223,7 +225,7 @@ export function AIActionButton({
                 ) : (
                   <Icon className="size-4" />
                 )}
-                {action.label}
+                {t(action.labelKey)}
               </button>
             )
           })}

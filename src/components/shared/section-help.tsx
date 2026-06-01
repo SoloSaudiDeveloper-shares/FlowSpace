@@ -13,10 +13,11 @@ import { useState } from "react"
 import { HelpCircle } from "lucide-react"
 import { GuideDialog } from "@/components/shared/guide-dialog"
 import { GUIDES, type GuideId } from "@/lib/guides"
+import { useT } from "@/lib/hooks/use-i18n"
 
 export function SectionHelp({
   guideId,
-  label = "How do I use this?",
+  label,
   className = "",
 }: {
   guideId: GuideId
@@ -24,6 +25,7 @@ export function SectionHelp({
   label?: string
   className?: string
 }) {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const guide = GUIDES[guideId]
   return (
@@ -34,7 +36,7 @@ export function SectionHelp({
         className={`inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors ${className}`}
       >
         <HelpCircle className="size-3.5" />
-        {label}
+        {label ?? t("shared.help.label")}
       </button>
       <GuideDialog
         open={open}

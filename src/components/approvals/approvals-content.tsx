@@ -28,6 +28,7 @@ import {
   deleteApproval,
 } from "@/lib/actions/approval-actions"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import type { User } from "@/lib/db/schema"
 
 type ApprovalWithRequester = {
@@ -68,6 +69,10 @@ interface ApprovalsContentProps {
 
 export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsContentProps) {
   const router = useRouter()
+  const { t } = useT()
+  // Localized display labels keyed by status / tab id (logic ids stay as-is).
+  const statusLabel = (id: string) => t(`auto.approval.status.${id}`)
+  const tabLabel = (id: string) => t(`auto.approval.tab.${id}`)
   const [activeTab, setActiveTab] = useState<TabId>("all")
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false)
   const [selectedApproval, setSelectedApproval] = useState<ApprovalWithRequester | null>(null)
@@ -94,18 +99,23 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
     if (!selectedApproval) return
     try {
       await resolveApproval(selectedApproval.approval.id, status, resolveComment || undefined)
-      toast.success(`Approval ${status.replace("_", " ")}`)
+      toast.success(
+        t("auto.approval.toast.resolved").replace(
+          "{status}",
+          t(`auto.approval.resolvedStatus.${status}`)
+        )
+      )
       setResolveDialogOpen(false)
       setSelectedApproval(null)
       router.refresh()
     } catch {
-      toast.error("Failed to resolve approval")
+      toast.error(t("auto.approval.toast.resolveFailed"))
     }
   }
 
   async function handleCreate() {
     if (!newAssignee) {
-      toast.error("Select an assignee")
+      toast.error(t("auto.approval.toast.selectAssignee"))
       return
     }
     try {
@@ -113,23 +123,23 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
         assignedTo: newAssignee,
         comment: newComment || undefined,
       })
-      toast.success("Approval request created")
+      toast.success(t("auto.approval.toast.created"))
       setCreateDialogOpen(false)
       setNewAssignee("")
       setNewComment("")
       router.refresh()
     } catch {
-      toast.error("Failed to create approval")
+      toast.error(t("auto.approval.toast.createFailed"))
     }
   }
 
   async function handleDelete(id: string) {
     try {
       await deleteApproval(id)
-      toast.success("Approval deleted")
+      toast.success(t("auto.approval.toast.deleted"))
       router.refresh()
     } catch {
-      toast.error("Failed to delete")
+      toast.error(t("auto.approval.toast.deleteFailed"))
     }
   }
 
@@ -152,7 +162,7 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tab.label}
+                {tabLabel(tab.id)}
                 {count > 0 && (
                   <span className="bg-primary/10 text-primary text-[10px] rounded-full px-1.5 min-w-[18px] text-center">
                     {count}
@@ -164,7 +174,7 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
         </div>
         <Button size="sm" className="gap-1.5" onClick={() => setCreateDialogOpen(true)}>
           <Send className="size-4" />
-          Request Approval
+          {t("auto.approval.request")}
         </Button>
       </div>
 
@@ -173,7 +183,18 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
         <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <ShieldCheck className="size-5 text-amber-500 shrink-0" />
           <p className="text-sm">
-            You have <span className="font-semibold">{pendingCount}</span> pending approval{pendingCount > 1 ? "s" : ""} to review.
+            {(pendingCount > 1 ? t("auto.approval.banner.many") : t("auto.approval.banner.one"))
+              .split("{count}")
+              .flatMap((part, i) =>
+                i === 0
+                  ? [part]
+                  : [
+                      <span key="count" className="font-semibold">
+                        {pendingCount}
+                      </span>,
+                      part,
+                    ]
+              )}
           </p>
         </div>
       )}
@@ -182,14 +203,15 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <ShieldX className="size-12 mb-3 opacity-30" />
-          <p className="text-sm">No approvals found</p>
-          <p className="text-xs mt-1">Create an approval request to get started</p>
+          <p className="text-sm">{t("auto.approval.empty.title")}</p>
+          <p className="text-xs mt-1">{t("auto.approval.empty.desc")}</p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(({ approval, requester }) => {
             const config = STATUS_CONFIG[approval.status] ?? STATUS_CONFIG.pending
             const Icon = config.icon
+            const labelStatus = STATUS_CONFIG[approval.status] ? approval.status : "pending"
             return (
               <div
                 key={approval.id}
@@ -201,10 +223,10 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium">
-                      Approval from {requester.displayName}
+                      {t("auto.approval.from").replace("{name}", requester.displayName)}
                     </p>
                     <Badge variant="outline" className={`text-[10px] ${config.color}`}>
-                      {config.label}
+                      {statusLabel(labelStatus)}
                     </Badge>
                   </div>
                   {approval.comment && (
@@ -222,11 +244,13 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
                     })}
                     {approval.resolvedAt && (
                       <span>
-                        {" \u2022 Resolved "}
-                        {new Date(approval.resolvedAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
+                        {t("auto.approval.resolved").replace(
+                          "{date}",
+                          new Date(approval.resolvedAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        )}
                       </span>
                     )}
                   </p>
@@ -239,7 +263,7 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
                       className="h-7 text-xs"
                       onClick={() => openResolve({ approval, requester })}
                     >
-                      Review
+                      {t("auto.approval.review")}
                     </Button>
                   )}
                 </div>
@@ -253,11 +277,22 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
       <Dialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Review Approval</DialogTitle>
+            <DialogTitle>{t("auto.approval.reviewTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-muted-foreground">
-              Requested by <span className="font-medium text-foreground">{selectedApproval?.requester.displayName}</span>
+              {t("auto.approval.requestedBy")
+                .split("{name}")
+                .flatMap((part, i) =>
+                  i === 0
+                    ? [part]
+                    : [
+                        <span key="name" className="font-medium text-foreground">
+                          {selectedApproval?.requester.displayName}
+                        </span>,
+                        part,
+                      ]
+                )}
             </p>
             {selectedApproval?.approval.comment && (
               <div className="p-3 rounded-md bg-muted text-sm">
@@ -265,9 +300,9 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
               </div>
             )}
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Comment (optional)</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("auto.approval.commentOptional")}</label>
               <Input
-                placeholder="Add a comment..."
+                placeholder={t("auto.approval.commentPh")}
                 value={resolveComment}
                 onChange={(e) => setResolveComment(e.target.value)}
               />
@@ -280,7 +315,7 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
               className="text-orange-500 border-orange-500/30 hover:bg-orange-500/10"
               onClick={() => handleResolve("changes_requested")}
             >
-              Request Changes
+              {t("auto.approval.requestChanges")}
             </Button>
             <Button
               variant="outline"
@@ -288,13 +323,13 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
               className="text-red-500 border-red-500/30 hover:bg-red-500/10"
               onClick={() => handleResolve("rejected")}
             >
-              Reject
+              {t("auto.approval.reject")}
             </Button>
             <Button
               size="sm"
               onClick={() => handleResolve("approved")}
             >
-              Approve
+              {t("auto.approval.approve")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -304,17 +339,17 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Approval</DialogTitle>
+            <DialogTitle>{t("auto.approval.request")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Assign to</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("auto.approval.assignTo")}</label>
               <select
                 value={newAssignee}
                 onChange={(e) => setNewAssignee(e.target.value)}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <option value="">Select a user...</option>
+                <option value="">{t("auto.approval.selectUser")}</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.displayName} (@{u.username})
@@ -323,9 +358,9 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Comment</label>
+              <label className="text-sm font-medium mb-1.5 block">{t("auto.approval.comment")}</label>
               <Input
-                placeholder="Describe what needs approval..."
+                placeholder={t("auto.approval.createCommentPh")}
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
@@ -334,9 +369,9 @@ export function ApprovalsContent({ approvals: allApprovals, users }: ApprovalsCo
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-              Cancel
+              {t("auto.approval.cancel")}
             </Button>
-            <Button onClick={handleCreate}>Send Request</Button>
+            <Button onClick={handleCreate}>{t("auto.approval.sendRequest")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

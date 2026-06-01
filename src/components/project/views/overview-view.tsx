@@ -23,6 +23,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Button } from "@/components/ui/button"
+import { useT } from "@/lib/hooks/use-i18n"
 import { TaskDetailSheet } from "../task-detail-sheet"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 import { updateElement } from "@/lib/actions/element-actions"
@@ -36,12 +37,13 @@ type TaskStatus = typeof taskStatuses.$inferSelect
 import { PRIORITY_COLOR as PRIORITY_COLORS, PRIORITY_ORDER_LIST as PRIORITY_ORDER } from "@/lib/priority"
 
 // "None" reads as "No Priority" in this view's breakdowns — kept local.
+// Maps each priority to its i18n key; call sites resolve via t().
 const PRIORITY_LABELS: Record<string, string> = {
-  urgent: "Urgent",
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-  none: "No Priority",
+  urgent: "projx.priority.urgent",
+  high: "projx.priority.high",
+  medium: "projx.priority.medium",
+  low: "projx.priority.low",
+  none: "projx.priority.none",
 }
 
 // ─── Card Registry ────────────────────────────────────────────────────────────
@@ -58,13 +60,13 @@ interface CardDef {
 }
 
 const CARD_CATEGORIES = [
-  { id: "overview" as CategoryId, label: "Overview", icon: LayoutDashboard },
-  { id: "statuses" as CategoryId, label: "Statuses", icon: CircleDot },
-  { id: "priorities" as CategoryId, label: "Priorities", icon: Flag },
-  { id: "tasks" as CategoryId, label: "Tasks", icon: List },
-  { id: "tables" as CategoryId, label: "Tables", icon: Table2 },
-  { id: "charts" as CategoryId, label: "Charts", icon: Activity },
-  { id: "embeds" as CategoryId, label: "Embeds", icon: Code2 },
+  { id: "overview" as CategoryId, labelKey: "projx.overview.cat.overview", icon: LayoutDashboard },
+  { id: "statuses" as CategoryId, labelKey: "projx.overview.cat.statuses", icon: CircleDot },
+  { id: "priorities" as CategoryId, labelKey: "projx.overview.cat.priorities", icon: Flag },
+  { id: "tasks" as CategoryId, labelKey: "projx.overview.cat.tasks", icon: List },
+  { id: "tables" as CategoryId, labelKey: "projx.overview.cat.tables", icon: Table2 },
+  { id: "charts" as CategoryId, labelKey: "projx.overview.cat.charts", icon: Activity },
+  { id: "embeds" as CategoryId, labelKey: "projx.overview.cat.embeds", icon: Code2 },
 ]
 
 const CARD_REGISTRY: CardDef[] = [
@@ -106,14 +108,14 @@ const DEFAULT_CARD_IDS = ["progress", "workload", "task_list"]
 const GRID_COLS = 4
 
 const CARD_COLORS = [
-  { label: "Red", value: "#ef4444" },
-  { label: "Orange", value: "#f97316" },
-  { label: "Yellow", value: "#eab308" },
-  { label: "Green", value: "#22c55e" },
-  { label: "Blue", value: "#3b82f6" },
-  { label: "Purple", value: "#8b5cf6" },
-  { label: "Pink", value: "#ec4899" },
-  { label: "Cyan", value: "#06b6d4" },
+  { labelKey: "projx.overview.color.red", value: "#ef4444" },
+  { labelKey: "projx.overview.color.orange", value: "#f97316" },
+  { labelKey: "projx.overview.color.yellow", value: "#eab308" },
+  { labelKey: "projx.overview.color.green", value: "#22c55e" },
+  { labelKey: "projx.overview.color.blue", value: "#3b82f6" },
+  { labelKey: "projx.overview.color.purple", value: "#8b5cf6" },
+  { labelKey: "projx.overview.color.pink", value: "#ec4899" },
+  { labelKey: "projx.overview.color.cyan", value: "#06b6d4" },
 ]
 
 interface CardSize {
@@ -164,6 +166,7 @@ interface OverviewViewProps {
 }
 
 export function OverviewView({ projectId, statuses, tasks, progress, projectDescription }: OverviewViewProps) {
+  const { t } = useT()
   const [layout, setLayout] = useState<CardLayout>({ ids: DEFAULT_CARD_IDS, sizes: {}, colors: {} })
   const [pickerOpen, setPickerOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -241,7 +244,7 @@ export function OverviewView({ projectId, statuses, tasks, progress, projectDesc
     const currentSize = layout.sizes[cardId] ?? getDefaultSize(cardId)
 
     const colorItems: ContextMenuEntry[] = CARD_COLORS.map((c) => ({
-      label: c.label,
+      label: t(c.labelKey),
       icon: Palette,
       onClick: () => setCardColor(cardId, c.value),
     }))
@@ -249,22 +252,22 @@ export function OverviewView({ projectId, statuses, tasks, progress, projectDesc
     const items: ContextMenuEntry[] = [
       // Width presets
       {
-        label: "1 Column",
+        label: t("projx.overview.size.1col"),
         icon: Minimize2,
         onClick: () => setCardSize(cardId, { colSpan: 1 }),
       },
       {
-        label: "2 Columns",
+        label: t("projx.overview.size.2col"),
         icon: Minimize2,
         onClick: () => setCardSize(cardId, { colSpan: 2 }),
       },
       {
-        label: "3 Columns",
+        label: t("projx.overview.size.3col"),
         icon: Maximize2,
         onClick: () => setCardSize(cardId, { colSpan: 3 }),
       },
       {
-        label: "Full Width",
+        label: t("projx.overview.size.full"),
         icon: Maximize2,
         onClick: () => setCardSize(cardId, { colSpan: 4 }),
       },
@@ -274,7 +277,7 @@ export function OverviewView({ projectId, statuses, tasks, progress, projectDesc
       ...(currentColor
         ? [
             {
-              label: "Remove Color",
+              label: t("projx.overview.removeColor"),
               icon: RotateCcw,
               onClick: () => setCardColor(cardId, undefined),
             },
@@ -283,16 +286,16 @@ export function OverviewView({ projectId, statuses, tasks, progress, projectDesc
       { separator: true },
       // Move
       ...(idx > 0
-        ? [{ label: "Move Up", icon: ArrowUp, onClick: () => moveCard(cardId, "up" as const) }]
+        ? [{ label: t("projx.overview.moveUp"), icon: ArrowUp, onClick: () => moveCard(cardId, "up" as const) }]
         : []),
       ...(idx < layout.ids.length - 1
-        ? [{ label: "Move Down", icon: ArrowDown, onClick: () => moveCard(cardId, "down" as const) }]
+        ? [{ label: t("projx.overview.moveDown"), icon: ArrowDown, onClick: () => moveCard(cardId, "down" as const) }]
         : []),
       // Reset
       ...(hasCustomSize
         ? [
             {
-              label: "Reset Size",
+              label: t("projx.overview.resetSize"),
               icon: RotateCcw,
               onClick: () => resetCardSize(cardId),
             },
@@ -300,7 +303,7 @@ export function OverviewView({ projectId, statuses, tasks, progress, projectDesc
         : []),
       { separator: true },
       {
-        label: "Remove Card",
+        label: t("projx.overview.removeCard"),
         icon: Trash2,
         variant: "destructive" as const,
         onClick: () => removeCard(cardId),
@@ -336,7 +339,7 @@ export function OverviewView({ projectId, statuses, tasks, progress, projectDesc
       <div className="flex items-center justify-end mb-5">
         <Button size="sm" onClick={() => setPickerOpen(true)} className="gap-1.5 h-8 text-xs">
           <Plus className="size-3.5" />
-          Card
+          {t("projx.overview.addCard")}
         </Button>
       </div>
 
@@ -375,8 +378,8 @@ export function OverviewView({ projectId, statuses, tasks, progress, projectDesc
 
       {cards.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 text-center border border-dashed rounded-lg">
-          <p className="text-muted-foreground text-sm">No cards added yet</p>
-          <p className="text-muted-foreground text-xs mt-1">Click the &quot;Card&quot; button to add widgets</p>
+          <p className="text-muted-foreground text-sm">{t("projx.overview.empty.title")}</p>
+          <p className="text-muted-foreground text-xs mt-1">{t("projx.overview.empty.hint")}</p>
         </div>
       )}
 
@@ -419,6 +422,7 @@ function SortableCard({
   onContextMenu: (e: React.MouseEvent) => void
   children: React.ReactNode
 }) {
+  const { t } = useT()
   const {
     attributes,
     listeners,
@@ -591,7 +595,7 @@ function SortableCard({
             <GripVertical className="size-3.5 text-muted-foreground" />
           </div>
           <card.icon className="size-3.5 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">{card.title}</h3>
+          <h3 className="text-sm font-semibold">{t(`projx.card.${card.id}.title`)}</h3>
         </div>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
@@ -650,14 +654,15 @@ function CardPicker({
   onAdd: (id: string) => void
   onClose: () => void
 }) {
+  const { t } = useT()
   const [activeCategory, setActiveCategory] = useState<CategoryId>("overview")
   const [search, setSearch] = useState("")
 
   const filteredCards = search
     ? CARD_REGISTRY.filter(
         (c) =>
-          c.title.toLowerCase().includes(search.toLowerCase()) ||
-          c.description.toLowerCase().includes(search.toLowerCase()),
+          t(`projx.card.${c.id}.title`).toLowerCase().includes(search.toLowerCase()) ||
+          t(`projx.card.${c.id}.desc`).toLowerCase().includes(search.toLowerCase()),
       )
     : CARD_REGISTRY.filter((c) => c.category === activeCategory)
 
@@ -671,14 +676,14 @@ function CardPicker({
         <div className="pointer-events-auto w-[700px] max-h-[560px] rounded-xl border bg-card shadow-2xl flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
-            <span className="font-semibold text-sm flex-1">Add Card</span>
+            <span className="font-semibold text-sm flex-1">{t("projx.overview.picker.title")}</span>
             <div className="relative flex-1 max-w-xs">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
               <input
                 autoFocus={false}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search cards..."
+                placeholder={t("projx.overview.picker.search.ph")}
                 className="w-full h-7 pl-8 pr-3 text-xs rounded-md border bg-muted/50 outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
@@ -708,7 +713,7 @@ function CardPicker({
                       }`}
                     >
                       <Icon className="size-3.5 shrink-0" />
-                      {cat.label}
+                      {t(cat.labelKey)}
                     </button>
                   )
                 })}
@@ -719,7 +724,10 @@ function CardPicker({
             <div className="flex-1 overflow-y-auto p-4">
               {!search && (
                 <p className="text-xs font-medium text-muted-foreground mb-3">
-                  {CARD_CATEGORIES.find((c) => c.id === activeCategory)?.label}
+                  {(() => {
+                    const cat = CARD_CATEGORIES.find((c) => c.id === activeCategory)
+                    return cat ? t(cat.labelKey) : ""
+                  })()}
                 </p>
               )}
               <div className="grid grid-cols-3 gap-3">
@@ -741,12 +749,12 @@ function CardPicker({
                         <CardMiniPreview cardId={card.id} />
                       </div>
                       <div className="px-2.5 py-2">
-                        <p className="text-xs font-semibold leading-tight">{card.title}</p>
+                        <p className="text-xs font-semibold leading-tight">{t(`projx.card.${card.id}.title`)}</p>
                         <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight line-clamp-2">
-                          {card.description}
+                          {t(`projx.card.${card.id}.desc`)}
                         </p>
                         {added && (
-                          <span className="text-[10px] text-muted-foreground">Added</span>
+                          <span className="text-[10px] text-muted-foreground">{t("projx.overview.picker.added")}</span>
                         )}
                       </div>
                     </button>
@@ -754,7 +762,7 @@ function CardPicker({
                 })}
               </div>
               {filteredCards.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-8">No cards found</p>
+                <p className="text-xs text-muted-foreground text-center py-8">{t("projx.overview.picker.empty")}</p>
               )}
             </div>
           </div>
@@ -767,6 +775,7 @@ function CardPicker({
 // ─── CardMiniPreview ──────────────────────────────────────────────────────────
 
 function CardMiniPreview({ cardId }: { cardId: string }) {
+  const { t } = useT()
   const colors = ["#6366f1", "#22c55e", "#3b82f6", "#f59e0b", "#ec4899"]
 
   switch (cardId) {
@@ -827,7 +836,7 @@ function CardMiniPreview({ cardId }: { cardId: string }) {
       return (
         <div className="text-center">
           <div className="text-2xl font-bold">24</div>
-          <div className="text-[9px] text-muted-foreground">Total Tasks</div>
+          <div className="text-[9px] text-muted-foreground">{t("projx.preview.totalTasks")}</div>
         </div>
       )
 
@@ -835,7 +844,7 @@ function CardMiniPreview({ cardId }: { cardId: string }) {
       return (
         <div className="text-center">
           <div className="text-2xl font-bold text-green-500">18</div>
-          <div className="text-[9px] text-muted-foreground">Completed</div>
+          <div className="text-[9px] text-muted-foreground">{t("projx.preview.completed")}</div>
         </div>
       )
 
@@ -843,7 +852,7 @@ function CardMiniPreview({ cardId }: { cardId: string }) {
       return (
         <div className="text-center">
           <div className="text-2xl font-bold text-amber-500">6</div>
-          <div className="text-[9px] text-muted-foreground">Incomplete</div>
+          <div className="text-[9px] text-muted-foreground">{t("projx.preview.incomplete")}</div>
         </div>
       )
 
@@ -851,7 +860,7 @@ function CardMiniPreview({ cardId }: { cardId: string }) {
       return (
         <div className="text-center">
           <div className="text-2xl font-bold text-red-500">3</div>
-          <div className="text-[9px] text-muted-foreground">Urgent Tasks</div>
+          <div className="text-[9px] text-muted-foreground">{t("projx.preview.urgentTasks")}</div>
         </div>
       )
 
@@ -859,7 +868,7 @@ function CardMiniPreview({ cardId }: { cardId: string }) {
       return (
         <div className="text-center">
           <div className="text-2xl font-bold text-orange-500">5</div>
-          <div className="text-[9px] text-muted-foreground">High Tasks</div>
+          <div className="text-[9px] text-muted-foreground">{t("projx.preview.highTasks")}</div>
         </div>
       )
 
@@ -1033,7 +1042,7 @@ function CardMiniPreview({ cardId }: { cardId: string }) {
       return (
         <div className="flex flex-col items-center justify-center gap-1">
           <Code2 className="size-8 text-muted-foreground" />
-          <span className="text-[9px] text-muted-foreground">Paste URL</span>
+          <span className="text-[9px] text-muted-foreground">{t("projx.preview.pasteUrl")}</span>
         </div>
       )
 
@@ -1061,6 +1070,7 @@ function CardBody({
   projectDescription?: string | null
   onTaskClick: (task: Task) => void
 }) {
+  const { t } = useT()
   switch (cardId) {
     case "progress":
       return <ProgressCard statuses={statuses} tasks={tasks} progress={progress} />
@@ -1069,19 +1079,19 @@ function CardBody({
     case "status_pie":
       return <StatusPieCard statuses={statuses} tasks={tasks} />
     case "total_tasks":
-      return <BigNumberCard value={tasks.length} label="Total Tasks" color="hsl(var(--foreground))" />
+      return <BigNumberCard value={tasks.length} label={t("projx.num.totalTasks")} color="hsl(var(--foreground))" />
     case "completed_tasks":
-      return <BigNumberCard value={tasks.filter((t) => t.isCompleted).length} label="Completed Tasks" color="#22c55e" />
+      return <BigNumberCard value={tasks.filter((t) => t.isCompleted).length} label={t("projx.num.completedTasks")} color="#22c55e" />
     case "incomplete_tasks":
-      return <BigNumberCard value={tasks.filter((t) => !t.isCompleted).length} label="Incomplete Tasks" color="#f59e0b" />
+      return <BigNumberCard value={tasks.filter((t) => !t.isCompleted).length} label={t("projx.num.incompleteTasks")} color="#f59e0b" />
     case "priority_bar":
       return <PriorityBarCard tasks={tasks} />
     case "priority_pie":
       return <PriorityPieCard tasks={tasks} />
     case "urgent_tasks":
-      return <BigNumberCard value={tasks.filter((t) => t.priority === "urgent").length} label="Urgent Tasks" color="#ef4444" />
+      return <BigNumberCard value={tasks.filter((t) => t.priority === "urgent").length} label={t("projx.num.urgentTasks")} color="#ef4444" />
     case "high_tasks":
-      return <BigNumberCard value={tasks.filter((t) => t.priority === "high").length} label="High Tasks" color="#f97316" />
+      return <BigNumberCard value={tasks.filter((t) => t.priority === "high").length} label={t("projx.num.highTasks")} color="#f97316" />
     case "priority_list":
       return <PriorityListCard tasks={tasks} statuses={statuses} onTaskClick={onTaskClick} />
     case "task_list":
@@ -1122,6 +1132,7 @@ function ProgressCard({
   tasks: Task[]
   progress: number
 }) {
+  const { t } = useT()
   const total = tasks.length
   const completed = tasks.filter((t) => t.isCompleted).length
 
@@ -1129,7 +1140,7 @@ function ProgressCard({
     <div className="space-y-4">
       <div className="space-y-1.5">
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{completed} / {total} tasks complete</span>
+          <span>{t("projx.progress.complete").replace("{completed}", String(completed)).replace("{total}", String(total))}</span>
           <span className="font-semibold">{progress}%</span>
         </div>
         <div className="h-2.5 rounded-full bg-muted overflow-hidden">
@@ -1161,7 +1172,7 @@ function ProgressCard({
       )}
 
       {total === 0 && (
-        <p className="text-xs text-muted-foreground text-center py-2">No tasks yet</p>
+        <p className="text-xs text-muted-foreground text-center py-2">{t("projx.empty.noTasksYet")}</p>
       )}
     </div>
   )
@@ -1170,10 +1181,11 @@ function ProgressCard({
 // ─── Card: Workload by Status ─────────────────────────────────────────────────
 
 function WorkloadCard({ statuses, tasks }: { statuses: TaskStatus[]; tasks: Task[] }) {
+  const { t } = useT()
   const total = tasks.length
 
   if (total === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No tasks yet</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noTasksYet")}</p>
   }
 
   return (
@@ -1210,9 +1222,10 @@ function PieChartSVG({
 }: {
   segments: { value: number; color: string; label: string }[]
 }) {
+  const { t } = useT()
   const total = segments.reduce((s, seg) => s + seg.value, 0)
   if (total === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No data</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noData")}</p>
   }
 
   const cx = 50, cy = 50, r = 40, innerR = 22
@@ -1256,7 +1269,7 @@ function PieChartSVG({
           {total}
         </text>
         <text x={cx} y={cy + 10} textAnchor="middle" fontSize="7" fill="gray">
-          tasks
+          {t("projx.pie.tasks")}
         </text>
       </svg>
       <div className="space-y-1.5 flex-1 min-w-0">
@@ -1277,8 +1290,9 @@ function PieChartSVG({
 // ─── Card: Tasks by Status (Pie) ──────────────────────────────────────────────
 
 function StatusPieCard({ statuses, tasks }: { statuses: TaskStatus[]; tasks: Task[] }) {
+  const { t } = useT()
   if (tasks.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No tasks yet</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noTasksYet")}</p>
   }
 
   const segments = statuses.map((status) => ({
@@ -1314,10 +1328,11 @@ function BigNumberCard({
 // ─── Card: Priority Breakdown (Bar) ──────────────────────────────────────────
 
 function PriorityBarCard({ tasks }: { tasks: Task[] }) {
+  const { t } = useT()
   const total = tasks.length
 
   if (total === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No tasks yet</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noTasksYet")}</p>
   }
 
   const rows = PRIORITY_ORDER
@@ -1333,7 +1348,7 @@ function PriorityBarCard({ tasks }: { tasks: Task[] }) {
             <div className="flex justify-between items-center text-xs">
               <div className="flex items-center gap-1.5">
                 <Flag className="size-2.5 shrink-0" style={{ color: PRIORITY_COLORS[priority] }} />
-                <span className="text-muted-foreground truncate">{PRIORITY_LABELS[priority]}</span>
+                <span className="text-muted-foreground truncate">{t(PRIORITY_LABELS[priority])}</span>
               </div>
               <span className="font-semibold tabular-nums">{count}</span>
             </div>
@@ -1353,15 +1368,16 @@ function PriorityBarCard({ tasks }: { tasks: Task[] }) {
 // ─── Card: Priority Distribution (Pie) ───────────────────────────────────────
 
 function PriorityPieCard({ tasks }: { tasks: Task[] }) {
+  const { t } = useT()
   if (tasks.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No tasks yet</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noTasksYet")}</p>
   }
 
   const segments = PRIORITY_ORDER
     .map((p) => ({
       value: tasks.filter((t) => t.priority === p).length,
       color: PRIORITY_COLORS[p],
-      label: PRIORITY_LABELS[p],
+      label: t(PRIORITY_LABELS[p]),
     }))
     .filter((s) => s.value > 0)
 
@@ -1379,6 +1395,7 @@ function PriorityListCard({
   statuses: TaskStatus[]
   onTaskClick: (task: Task) => void
 }) {
+  const { t } = useT()
   const statusMap = Object.fromEntries(statuses.map((s) => [s.id, s]))
   const priorityOrder: Record<string, number> = { urgent: 0, high: 1 }
 
@@ -1392,7 +1409,7 @@ function PriorityListCard({
   if (filtered.length === 0) {
     return (
       <p className="text-xs text-muted-foreground text-center py-4">
-        No urgent or high priority tasks
+        {t("projx.empty.noPriority")}
       </p>
     )
   }
@@ -1444,11 +1461,12 @@ function TaskListCard({
   statuses: TaskStatus[]
   onTaskClick: (task: Task) => void
 }) {
+  const { t } = useT()
   const statusMap = Object.fromEntries(statuses.map((s) => [s.id, s]))
   const sorted = [...tasks].sort((a, b) => a.sortOrder - b.sortOrder).slice(0, 10)
 
   if (sorted.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No tasks</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noTasks")}</p>
   }
 
   return (
@@ -1498,25 +1516,26 @@ function RecentTasksCard({
   statuses: TaskStatus[]
   onTaskClick: (task: Task) => void
 }) {
+  const { t } = useT()
   const statusMap = Object.fromEntries(statuses.map((s) => [s.id, s]))
   const recent = [...tasks]
     .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))
     .slice(0, 6)
 
   if (recent.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No tasks yet</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noTasksYet")}</p>
   }
 
   return (
     <div className="space-y-1 -mx-1">
       <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-2 pb-1 border-b">
-        <span className="text-xs text-muted-foreground">Name</span>
-        <span className="text-xs text-muted-foreground w-20 text-right">Status</span>
-        <span className="text-xs text-muted-foreground w-14 text-right">Updated</span>
+        <span className="text-xs text-muted-foreground">{t("projx.tbl.name")}</span>
+        <span className="text-xs text-muted-foreground w-20 text-right">{t("projx.tbl.status")}</span>
+        <span className="text-xs text-muted-foreground w-14 text-right">{t("projx.tbl.updated")}</span>
       </div>
       {recent.map((task) => {
         const status = statusMap[task.statusId]
-        const updated = task.updatedAt ? getTimeAgo(new Date(task.updatedAt)) : "—"
+        const updated = task.updatedAt ? getTimeAgo(new Date(task.updatedAt), t) : "—"
         return (
           <button
             key={task.id}
@@ -1559,6 +1578,7 @@ function OverdueTasksCard({
   statuses: TaskStatus[]
   onTaskClick: (task: Task) => void
 }) {
+  const { t } = useT()
   const statusMap = Object.fromEntries(statuses.map((s) => [s.id, s]))
   const today = new Date()
 
@@ -1568,15 +1588,15 @@ function OverdueTasksCard({
     .slice(0, 8)
 
   if (overdue.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No overdue tasks</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noOverdue")}</p>
   }
 
   return (
     <div className="space-y-1 -mx-1">
       <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-2 pb-1 border-b">
-        <span className="text-xs text-muted-foreground">Name</span>
-        <span className="text-xs text-muted-foreground w-20 text-right">Status</span>
-        <span className="text-xs text-muted-foreground w-20 text-right">Due</span>
+        <span className="text-xs text-muted-foreground">{t("projx.tbl.name")}</span>
+        <span className="text-xs text-muted-foreground w-20 text-right">{t("projx.tbl.status")}</span>
+        <span className="text-xs text-muted-foreground w-20 text-right">{t("projx.tbl.due")}</span>
       </div>
       {overdue.map((task) => {
         const status = statusMap[task.statusId]
@@ -1614,19 +1634,20 @@ function OverdueTasksCard({
 // ─── Card: Status Table ───────────────────────────────────────────────────────
 
 function StatusTableCard({ statuses, tasks }: { statuses: TaskStatus[]; tasks: Task[] }) {
+  const { t } = useT()
   const total = tasks.length
 
   if (total === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No tasks yet</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noTasksYet")}</p>
   }
 
   return (
     <table className="w-full text-xs">
       <thead>
         <tr className="border-b">
-          <th className="text-left pb-2 text-muted-foreground font-medium">Status</th>
-          <th className="text-right pb-2 text-muted-foreground font-medium w-16">Tasks</th>
-          <th className="text-right pb-2 text-muted-foreground font-medium w-12">%</th>
+          <th className="text-left pb-2 text-muted-foreground font-medium">{t("projx.table.status")}</th>
+          <th className="text-right pb-2 text-muted-foreground font-medium w-16">{t("projx.table.tasks")}</th>
+          <th className="text-right pb-2 text-muted-foreground font-medium w-12">{t("projx.table.pct")}</th>
         </tr>
       </thead>
       <tbody>
@@ -1654,19 +1675,20 @@ function StatusTableCard({ statuses, tasks }: { statuses: TaskStatus[]; tasks: T
 // ─── Card: Priority Table ─────────────────────────────────────────────────────
 
 function PriorityTableCard({ tasks }: { tasks: Task[] }) {
+  const { t } = useT()
   const total = tasks.length
 
   if (total === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No tasks yet</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noTasksYet")}</p>
   }
 
   return (
     <table className="w-full text-xs">
       <thead>
         <tr className="border-b">
-          <th className="text-left pb-2 text-muted-foreground font-medium">Priority</th>
-          <th className="text-right pb-2 text-muted-foreground font-medium w-16">Tasks</th>
-          <th className="text-right pb-2 text-muted-foreground font-medium w-12">%</th>
+          <th className="text-left pb-2 text-muted-foreground font-medium">{t("projx.table.priority")}</th>
+          <th className="text-right pb-2 text-muted-foreground font-medium w-16">{t("projx.table.tasks")}</th>
+          <th className="text-right pb-2 text-muted-foreground font-medium w-12">{t("projx.table.pct")}</th>
         </tr>
       </thead>
       <tbody>
@@ -1679,7 +1701,7 @@ function PriorityTableCard({ tasks }: { tasks: Task[] }) {
               <td className="py-2">
                 <div className="flex items-center gap-1.5">
                   <Flag className="size-2.5 shrink-0" style={{ color: PRIORITY_COLORS[p] }} />
-                  <span>{PRIORITY_LABELS[p]}</span>
+                  <span>{t(PRIORITY_LABELS[p])}</span>
                 </div>
               </td>
               <td className="py-2 text-right tabular-nums font-semibold">{count}</td>
@@ -1695,12 +1717,13 @@ function PriorityTableCard({ tasks }: { tasks: Task[] }) {
 // ─── Card: Line Chart (Tasks Over Time) ──────────────────────────────────────
 
 function LineChartCard({ tasks }: { tasks: Task[] }) {
+  const { t } = useT()
   const dated = tasks
     .filter((t) => t.createdAt)
     .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""))
 
   if (dated.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-4">No tasks yet</p>
+    return <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noTasksYet")}</p>
   }
 
   const counts: Record<string, number> = {}
@@ -1817,10 +1840,11 @@ function LineChartCard({ tasks }: { tasks: Task[] }) {
 // ─── Card: Burndown Chart ────────────────────────────────────────────────────
 
 function BurndownCard({ tasks }: { tasks: Task[] }) {
+  const { t } = useT()
   if (tasks.length === 0) {
     return (
       <p className="text-xs text-muted-foreground text-center py-4">
-        No tasks yet
+        {t("projx.empty.noTasksYet")}
       </p>
     )
   }
@@ -1843,7 +1867,7 @@ function BurndownCard({ tasks }: { tasks: Task[] }) {
   const dates = Object.keys(eventMap).sort()
   if (dates.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground text-center py-4">No data</p>
+      <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noData")}</p>
     )
   }
 
@@ -1971,7 +1995,7 @@ function BurndownCard({ tasks }: { tasks: Task[] }) {
           strokeWidth="2"
         />
         <text x={W - 65} y={11} fontSize="7" fill="gray">
-          Actual
+          {t("projx.burndown.actual")}
         </text>
         <line
           x1={W - 80}
@@ -1983,7 +2007,7 @@ function BurndownCard({ tasks }: { tasks: Task[] }) {
           strokeDasharray="4 3"
         />
         <text x={W - 65} y={21} fontSize="7" fill="gray">
-          Ideal
+          {t("projx.burndown.ideal")}
         </text>
       </svg>
     </div>
@@ -1999,12 +2023,13 @@ function BatteryCard({
   statuses: TaskStatus[]
   tasks: Task[]
 }) {
+  const { t } = useT()
   const total = tasks.length
 
   if (total === 0) {
     return (
       <p className="text-xs text-muted-foreground text-center py-4">
-        No tasks yet
+        {t("projx.empty.noTasksYet")}
       </p>
     )
   }
@@ -2016,7 +2041,7 @@ function BatteryCard({
     <div className="h-full flex flex-col justify-center gap-4 min-h-[100px]">
       <div className="space-y-2">
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>Overall Completion</span>
+          <span>{t("projx.battery.overallCompletion")}</span>
           <span className="font-semibold">{pct}%</span>
         </div>
         <div className="flex items-center gap-1">
@@ -2091,10 +2116,11 @@ function CumulativeFlowCard({
   statuses: TaskStatus[]
   tasks: Task[]
 }) {
+  const { t } = useT()
   if (tasks.length === 0) {
     return (
       <p className="text-xs text-muted-foreground text-center py-4">
-        No tasks yet
+        {t("projx.empty.noTasksYet")}
       </p>
     )
   }
@@ -2105,7 +2131,7 @@ function CumulativeFlowCard({
 
   if (dated.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground text-center py-4">No data</p>
+      <p className="text-xs text-muted-foreground text-center py-4">{t("projx.empty.noData")}</p>
     )
   }
 
@@ -2265,6 +2291,7 @@ function CumulativeFlowCard({
 // ─── Card: Notes ──────────────────────────────────────────────────────────────
 
 function NotesCard({ projectId, initialValue }: { projectId: string; initialValue: string }) {
+  const { t } = useT()
   const [value, setValue] = useState(initialValue)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -2280,7 +2307,7 @@ function NotesCard({ projectId, initialValue }: { projectId: string; initialValu
     <textarea
       value={value}
       onChange={(e) => handleChange(e.target.value)}
-      placeholder="Add notes about this project..."
+      placeholder={t("projx.notes.ph")}
       className="w-full h-32 bg-transparent text-sm resize-none outline-none placeholder:text-muted-foreground/40 leading-relaxed"
     />
   )
@@ -2289,6 +2316,7 @@ function NotesCard({ projectId, initialValue }: { projectId: string; initialValu
 // ─── Card: Embed ──────────────────────────────────────────────────────────────
 
 function EmbedCard({ projectId }: { projectId: string }) {
+  const { t } = useT()
   const storageKey = `embed-url-${projectId}`
   const [savedUrl, setSavedUrl] = useState<string>("")
   const [inputVal, setInputVal] = useState("")
@@ -2331,7 +2359,7 @@ function EmbedCard({ projectId }: { projectId: string }) {
     return (
       <div className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Paste a URL to embed content (Google Docs, Sheets, Figma, YouTube, etc.)
+          {t("projx.embed.prompt")}
         </p>
         <div className="flex gap-2">
           <input
@@ -2343,11 +2371,11 @@ function EmbedCard({ projectId }: { projectId: string }) {
             className="flex-1 h-8 px-3 text-xs rounded-md border bg-transparent outline-none focus:ring-1 focus:ring-ring"
           />
           <Button size="sm" className="h-8 text-xs" onClick={save}>
-            Embed
+            {t("projx.embed.button")}
           </Button>
         </div>
         <p className="text-[10px] text-muted-foreground/60">
-          Some websites block embedding for security. Google Docs, YouTube, Figma, and CodePen work best.
+          {t("projx.embed.note")}
         </p>
       </div>
     )
@@ -2363,7 +2391,7 @@ function EmbedCard({ projectId }: { projectId: string }) {
         sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         referrerPolicy="no-referrer-when-downgrade"
-        title="Embedded content"
+        title={t("projx.embed.iframeTitle")}
         onLoad={() => { setLoaded(true); setShowWarning(false) }}
       />
 
@@ -2372,7 +2400,7 @@ function EmbedCard({ projectId }: { projectId: string }) {
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/90 backdrop-blur-sm rounded z-10">
           <AlertTriangle className="size-8 text-muted-foreground" />
           <p className="text-xs text-muted-foreground text-center px-6 max-w-sm">
-            This website may have blocked embedding. Many sites (including claude.ai) prevent being shown inside other pages for security.
+            {t("projx.embed.blocked")}
           </p>
           <div className="flex gap-2">
             <a
@@ -2382,10 +2410,10 @@ function EmbedCard({ projectId }: { projectId: string }) {
               className="inline-flex items-center gap-1.5 h-7 px-3 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Code2 className="size-3" />
-              Open in New Tab
+              {t("projx.embed.openNewTab")}
             </a>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={clear}>
-              Change URL
+              {t("projx.embed.changeUrl")}
             </Button>
           </div>
         </div>
@@ -2397,7 +2425,7 @@ function EmbedCard({ projectId }: { projectId: string }) {
           target="_blank"
           rel="noopener noreferrer"
           className="bg-background/90 border rounded px-2 py-0.5 text-xs hover:bg-muted inline-block"
-          title="Open in new tab"
+          title={t("projx.embed.openNewTab.title")}
         >
           ↗
         </a>
@@ -2405,7 +2433,7 @@ function EmbedCard({ projectId }: { projectId: string }) {
           onClick={clear}
           className="bg-background/90 border rounded px-2 py-0.5 text-xs hover:bg-muted"
         >
-          Change
+          {t("projx.embed.change")}
         </button>
       </div>
     </div>
@@ -2414,13 +2442,13 @@ function EmbedCard({ projectId }: { projectId: string }) {
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
-function getTimeAgo(date: Date): string {
+function getTimeAgo(date: Date, t: (key: string) => string): string {
   const diff = Date.now() - date.getTime()
   const mins = Math.floor(diff / 60000)
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins}m ago`
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
+  if (mins < 1) return t("projx.ago.justNow")
+  if (mins < 60) return t("projx.ago.minutes").replace("{n}", String(mins))
+  if (hours < 24) return t("projx.ago.hours").replace("{n}", String(hours))
+  return t("projx.ago.days").replace("{n}", String(days))
 }

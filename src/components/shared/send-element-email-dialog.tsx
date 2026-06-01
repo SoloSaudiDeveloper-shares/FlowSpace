@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Mail, Send, Loader2, Check, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   getElementEmailTemplates,
   sendElementAsEmail,
@@ -36,6 +37,7 @@ interface TemplateInfo {
 }
 
 export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props) {
+  const { t } = useT()
   const [to, setTo] = useState("")
   const [message, setMessage] = useState("")
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
@@ -61,7 +63,7 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
   }, [open, elementId])
 
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)
-  const selectedTemplate = templates.find((t) => t.id === templateId)
+  const selectedTemplate = templates.find((tpl) => tpl.id === templateId)
 
   async function handleSend() {
     if (!validEmail || !templateId || sending) return
@@ -74,7 +76,7 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
         customMessage: message.trim() || undefined,
       })
       if (r.ok) {
-        toast.success(`Email sent to ${to.trim()}`)
+        toast.success(t("shared.email.sentTo").replace("{to}", to.trim()))
         onOpenChange(false)
       } else {
         toast.error(r.error)
@@ -90,11 +92,10 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="size-4 text-primary" />
-            Send as email
+            {t("shared.email.title")}
           </DialogTitle>
           <DialogDescription>
-            Email <strong>{elementTitle}</strong> using one of the built-in
-            templates. The template fills in details automatically.
+            {t("shared.email.descriptionPrefix")} <strong>{elementTitle}</strong> {t("shared.email.descriptionSuffix")}
           </DialogDescription>
         </DialogHeader>
 
@@ -102,9 +103,9 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
           <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-amber-500/40 bg-amber-500/5 text-xs">
             <AlertCircle className="size-3.5 text-amber-500 shrink-0 mt-0.5" />
             <div className="text-amber-200/90 leading-relaxed">
-              Email isn&apos;t configured on the server. Ask an admin to set
+              {t("shared.email.notConfiguredPrefix")}
               <code className="px-1 py-0.5 rounded bg-amber-500/15 mx-0.5">RESEND_API_KEY</code>
-              or Gmail SMTP creds.
+              {t("shared.email.notConfiguredSuffix")}
             </div>
           </div>
         )}
@@ -113,11 +114,11 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
           {/* Recipient */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Recipient email
+              {t("shared.email.recipientEmail")}
             </label>
             <Input
               type="email"
-              placeholder="name@example.com"
+              placeholder={t("shared.email.emailPlaceholder")}
               value={to}
               onChange={(e) => setTo(e.target.value)}
               autoFocus
@@ -127,16 +128,16 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
           {/* Template picker */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Template
+              {t("shared.email.templateLabel")}
             </label>
             <div className="space-y-1.5">
-              {templates.map((t) => {
-                const active = t.id === templateId
+              {templates.map((tpl) => {
+                const active = tpl.id === templateId
                 return (
                   <button
-                    key={t.id}
+                    key={tpl.id}
                     type="button"
-                    onClick={() => setTemplateId(t.id)}
+                    onClick={() => setTemplateId(tpl.id)}
                     className={`w-full text-left px-3 py-2 rounded-md border-2 transition-colors ${
                       active
                         ? "border-primary bg-primary/5"
@@ -150,8 +151,8 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
                         <div className="size-3.5 shrink-0" />
                       )}
                       <div>
-                        <p className="text-sm font-medium">{t.label}</p>
-                        <p className="text-[11px] text-muted-foreground leading-snug">{t.description}</p>
+                        <p className="text-sm font-medium">{tpl.label}</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug">{tpl.description}</p>
                       </div>
                     </div>
                   </button>
@@ -159,7 +160,7 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
               })}
               {templates.length === 0 && (
                 <p className="text-xs text-muted-foreground italic py-2">
-                  No templates available for this element type.
+                  {t("shared.email.noTemplates")}
                 </p>
               )}
             </div>
@@ -168,10 +169,10 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
           {/* Optional message */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-              Add a note <span className="text-muted-foreground/50">(optional)</span>
+              {t("shared.email.addNote")} <span className="text-muted-foreground/50">{t("shared.email.optional")}</span>
             </label>
             <textarea
-              placeholder="Anything you want to say in addition to the template content"
+              placeholder={t("shared.email.notePlaceholder")}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={3}
@@ -183,7 +184,7 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
 
         <div className="flex items-center justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={sending}>
-            Cancel
+            {t("shared.email.cancel")}
           </Button>
           <Button
             onClick={handleSend}
@@ -194,7 +195,7 @@ export function SendElementEmailDialog({ open, onOpenChange, elementId }: Props)
             ) : (
               <Send className="size-3.5 mr-1.5" />
             )}
-            {sending ? "Sending…" : "Send"}
+            {sending ? t("shared.email.sending") : t("shared.email.send")}
           </Button>
         </div>
       </DialogContent>

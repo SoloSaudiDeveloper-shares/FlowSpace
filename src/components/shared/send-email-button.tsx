@@ -15,6 +15,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Mail } from "lucide-react"
 import { Hint } from "@/components/shared/hint"
+import { useT } from "@/lib/hooks/use-i18n"
 import { SendElementEmailDialog } from "@/components/shared/send-element-email-dialog"
 
 interface SendEmailButtonProps {
@@ -30,10 +31,11 @@ export function SendEmailButton({
   variant = "ghost",
   showLabel = false,
 }: SendEmailButtonProps) {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Hint label="Send as email" delay={350}>
+      <Hint label={t("shared.emailBtn.hint")} delay={350}>
         <Button
           variant={variant}
           size={showLabel ? "sm" : "icon"}
@@ -41,7 +43,7 @@ export function SendEmailButton({
           className={showLabel ? "gap-1.5" : "size-8"}
         >
           <Mail className="size-3.5" />
-          {showLabel && <span className="text-xs">Email</span>}
+          {showLabel && <span className="text-xs">{t("shared.emailBtn.label")}</span>}
         </Button>
       </Hint>
       <SendElementEmailDialog

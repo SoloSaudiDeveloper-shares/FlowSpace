@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import { useT } from "@/lib/hooks/use-i18n"
 import {
   createUser,
   createTeam,
@@ -87,6 +88,7 @@ function stringToColor(str: string) {
 // ─── Invite User Modal ────────────────────────────────────────────────
 
 function InviteUserModal({ onClose }: { onClose: () => void }) {
+  const { t } = useT()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
@@ -100,7 +102,7 @@ function InviteUserModal({ onClose }: { onClose: () => void }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.username.trim() || !form.displayName.trim() || !form.password.trim()) {
-      toast.error("Username, display name, and password are required")
+      toast.error(t("people.toast.fieldsRequired"))
       return
     }
     setLoading(true)
@@ -115,12 +117,12 @@ function InviteUserModal({ onClose }: { onClose: () => void }) {
       if (result.error) {
         toast.error(result.error)
       } else {
-        toast.success("User created successfully")
+        toast.success(t("people.toast.userCreated"))
         router.refresh()
         onClose()
       }
     } catch {
-      toast.error("Failed to create user")
+      toast.error(t("people.toast.userCreateFailed"))
     } finally {
       setLoading(false)
     }
@@ -130,7 +132,7 @@ function InviteUserModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-xl border bg-popover p-6 shadow-lg">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold">Invite User</h2>
+          <h2 className="text-base font-semibold">{t("people.invite.title")}</h2>
           <button
             onClick={onClose}
             className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -141,55 +143,55 @@ function InviteUserModal({ onClose }: { onClose: () => void }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Username *
+              {t("people.invite.username")}
             </label>
             <input
               type="text"
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
-              placeholder="johndoe"
+              placeholder={t("people.invite.username.ph")}
               className="mt-1 w-full bg-background border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Display Name *
+              {t("people.invite.displayName")}
             </label>
             <input
               type="text"
               value={form.displayName}
               onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-              placeholder="John Doe"
+              placeholder={t("people.invite.displayName.ph")}
               className="mt-1 w-full bg-background border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Email
+              {t("people.invite.email")}
             </label>
             <input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="john@example.com"
+              placeholder={t("people.invite.email.ph")}
               className="mt-1 w-full bg-background border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Password *
+              {t("people.invite.password")}
             </label>
             <input
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="Enter a password"
+              placeholder={t("people.invite.password.ph")}
               className="mt-1 w-full bg-background border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Role
+              {t("people.invite.role")}
             </label>
             <select
               value={form.role}
@@ -198,18 +200,18 @@ function InviteUserModal({ onClose }: { onClose: () => void }) {
               }
               className="mt-1 w-full bg-background border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="viewer">Viewer</option>
-              <option value="commenter">Commenter</option>
-              <option value="editor">Editor</option>
-              <option value="admin">Admin</option>
+              <option value="viewer">{t("people.role.viewer")}</option>
+              <option value="commenter">{t("people.role.commenter")}</option>
+              <option value="editor">{t("people.role.editor")}</option>
+              <option value="admin">{t("people.role.admin")}</option>
             </select>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {t("people.invite.cancel")}
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create User"}
+              {loading ? t("people.invite.submitting") : t("people.invite.submit")}
             </Button>
           </div>
         </form>
@@ -221,6 +223,7 @@ function InviteUserModal({ onClose }: { onClose: () => void }) {
 // ─── Create Team Modal ────────────────────────────────────────────────
 
 function CreateTeamModal({ onClose }: { onClose: () => void }) {
+  const { t } = useT()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
@@ -233,7 +236,7 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) {
-      toast.error("Team name is required")
+      toast.error(t("people.toast.teamNameRequired"))
       return
     }
     setLoading(true)
@@ -244,11 +247,11 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
         color: form.color,
         icon: form.icon,
       })
-      toast.success("Team created successfully")
+      toast.success(t("people.toast.teamCreated"))
       router.refresh()
       onClose()
     } catch {
-      toast.error("Failed to create team")
+      toast.error(t("people.toast.teamCreateFailed"))
     } finally {
       setLoading(false)
     }
@@ -258,7 +261,7 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-xl border bg-popover p-6 shadow-lg">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold">Create Team</h2>
+          <h2 className="text-base font-semibold">{t("people.team.title")}</h2>
           <button
             onClick={onClose}
             className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -269,31 +272,31 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Team Name *
+              {t("people.team.name")}
             </label>
             <input
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Engineering"
+              placeholder={t("people.team.name.ph")}
               className="mt-1 w-full bg-background border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Description
+              {t("people.team.description")}
             </label>
             <input
               type="text"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="What does this team do?"
+              placeholder={t("people.team.description.ph")}
               className="mt-1 w-full bg-background border rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <div>
             <label className="text-sm font-medium text-muted-foreground">
-              Color
+              {t("people.team.color")}
             </label>
             <div className="mt-2 flex flex-wrap gap-2">
               {presetColors.map((color) => (
@@ -313,10 +316,10 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {t("people.team.cancel")}
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Team"}
+              {loading ? t("people.team.submitting") : t("people.team.submit")}
             </Button>
           </div>
         </form>
@@ -328,6 +331,7 @@ function CreateTeamModal({ onClose }: { onClose: () => void }) {
 // ─── User Card ────────────────────────────────────────────────────────
 
 function UserCard({ user }: { user: User }) {
+  const { t } = useT()
   const colorClass = stringToColor(user.displayName)
   const initials = getInitials(user.displayName)
 
@@ -351,7 +355,7 @@ function UserCard({ user }: { user: User }) {
             roleBadgeClasses[user.role] ?? roleBadgeClasses.viewer
           }`}
         >
-          {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+          {t(`people.role.${user.role}`)}
         </span>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <span
@@ -359,7 +363,7 @@ function UserCard({ user }: { user: User }) {
               user.isActive ? "bg-green-500" : "bg-gray-400"
             }`}
           />
-          {user.isActive ? "Active" : "Inactive"}
+          {user.isActive ? t("people.status.active") : t("people.status.inactive")}
         </span>
       </div>
     </div>
@@ -380,6 +384,7 @@ function TeamCard({
   team: Team
   allUsers: User[]
 }) {
+  const { t } = useT()
   const router = useRouter()
   const [expanded, setExpanded] = useState(false)
   const [members, setMembers] = useState<TeamMemberRow[]>([])
@@ -400,7 +405,7 @@ function TeamCard({
       const data = await getTeamMembers(team.id)
       setMembers(data)
     } catch {
-      toast.error("Failed to load team members")
+      toast.error(t("people.toast.membersLoadFailed"))
     } finally {
       setLoadingMembers(false)
     }
@@ -411,12 +416,12 @@ function TeamCard({
     setAddingUser(true)
     try {
       await addTeamMember(team.id, selectedUserId)
-      toast.success("Member added")
+      toast.success(t("people.toast.memberAdded"))
       setSelectedUserId("")
       await loadMembers()
       router.refresh()
     } catch {
-      toast.error("Failed to add member")
+      toast.error(t("people.toast.memberAddFailed"))
     } finally {
       setAddingUser(false)
     }
@@ -425,11 +430,11 @@ function TeamCard({
   async function handleRemoveMember(userId: string) {
     try {
       await removeTeamMember(team.id, userId)
-      toast.success("Member removed")
+      toast.success(t("people.toast.memberRemoved"))
       setMembers((prev) => prev.filter((m) => m.user.id !== userId))
       router.refresh()
     } catch {
-      toast.error("Failed to remove member")
+      toast.error(t("people.toast.memberRemoveFailed"))
     }
   }
 
@@ -459,8 +464,11 @@ function TeamCard({
         <span className="text-xs text-muted-foreground flex items-center gap-1">
           <Users className="size-3" />
           {members.length > 0
-            ? `${members.length} member${members.length !== 1 ? "s" : ""}`
-            : "No members yet"}
+            ? (members.length === 1
+                ? t("people.team.memberCount")
+                : t("people.team.memberCountPlural")
+              ).replace("{count}", String(members.length))
+            : t("people.team.noMembers")}
         </span>
         <Button
           variant="outline"
@@ -470,12 +478,12 @@ function TeamCard({
           {expanded ? (
             <>
               <ChevronUp className="size-3" />
-              Hide
+              {t("people.team.hide")}
             </>
           ) : (
             <>
               <ChevronDown className="size-3" />
-              Manage
+              {t("people.team.manage")}
             </>
           )}
         </Button>
@@ -490,7 +498,7 @@ function TeamCard({
               onChange={(e) => setSelectedUserId(e.target.value)}
               className="flex-1 bg-background border rounded-md px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">Select a user to add...</option>
+              <option value="">{t("people.team.selectUser")}</option>
               {availableUsers.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.displayName} (@{u.username})
@@ -503,18 +511,18 @@ function TeamCard({
               onClick={handleAddMember}
             >
               <Plus className="size-3" />
-              Add
+              {t("people.team.add")}
             </Button>
           </div>
 
           {/* Members list */}
           {loadingMembers ? (
             <p className="text-xs text-muted-foreground text-center py-2">
-              Loading members...
+              {t("people.team.loadingMembers")}
             </p>
           ) : members.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-2">
-              No members in this team yet
+              {t("people.team.emptyMembers")}
             </p>
           ) : (
             <div className="space-y-1">
@@ -534,7 +542,7 @@ function TeamCard({
                     </p>
                   </div>
                   <span className="text-[10px] text-muted-foreground capitalize">
-                    {member.role}
+                    {t(`people.role.${member.role}`)}
                   </span>
                   <button
                     onClick={() => handleRemoveMember(user.id)}
@@ -555,6 +563,7 @@ function TeamCard({
 // ─── Main Content ─────────────────────────────────────────────────────
 
 export function PeopleContent({ users, teams }: PeopleContentProps) {
+  const { t } = useT()
   const [tab, setTab] = useState<"people" | "teams">("people")
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false)
@@ -572,7 +581,7 @@ export function PeopleContent({ users, teams }: PeopleContentProps) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            People
+            {t("people.tab.people")}
           </button>
           <button
             onClick={() => setTab("teams")}
@@ -582,19 +591,19 @@ export function PeopleContent({ users, teams }: PeopleContentProps) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Teams
+            {t("people.tab.teams")}
           </button>
         </div>
 
         {tab === "people" ? (
           <Button onClick={() => setShowInviteModal(true)}>
             <UserPlus className="size-4" />
-            Invite User
+            {t("people.inviteUser")}
           </Button>
         ) : (
           <Button onClick={() => setShowCreateTeamModal(true)}>
             <Plus className="size-4" />
-            Create Team
+            {t("people.createTeam")}
           </Button>
         )}
       </div>
@@ -606,7 +615,7 @@ export function PeopleContent({ users, teams }: PeopleContentProps) {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Users className="size-10 text-muted-foreground mb-3" />
               <p className="text-sm text-muted-foreground">
-                No users yet. Invite someone to get started.
+                {t("people.empty.users")}
               </p>
             </div>
           ) : (
@@ -626,7 +635,7 @@ export function PeopleContent({ users, teams }: PeopleContentProps) {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Users className="size-10 text-muted-foreground mb-3" />
               <p className="text-sm text-muted-foreground">
-                No teams yet. Create one to organize your workspace.
+                {t("people.empty.teams")}
               </p>
             </div>
           ) : (

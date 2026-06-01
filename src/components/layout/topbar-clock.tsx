@@ -23,22 +23,23 @@ import {
   useContextMenu,
   type ContextMenuEntry,
 } from "@/components/shared/context-menu"
+import { useT } from "@/lib/hooks/use-i18n"
 
 const CLOCK_COLORS = [
-  { value: "#ffffff", label: "Default" },
-  { value: "#3b82f6", label: "Blue" },
-  { value: "#8b5cf6", label: "Violet" },
-  { value: "#f43f5e", label: "Rose" },
-  { value: "#10b981", label: "Green" },
-  { value: "#f97316", label: "Orange" },
-  { value: "#14b8a6", label: "Teal" },
+  { value: "#ffffff", labelKey: "layout.clock.color.default" },
+  { value: "#3b82f6", labelKey: "layout.clock.color.blue" },
+  { value: "#8b5cf6", labelKey: "layout.clock.color.violet" },
+  { value: "#f43f5e", labelKey: "layout.clock.color.rose" },
+  { value: "#10b981", labelKey: "layout.clock.color.green" },
+  { value: "#f97316", labelKey: "layout.clock.color.orange" },
+  { value: "#14b8a6", labelKey: "layout.clock.color.teal" },
 ]
 
-const DATE_FORMAT_LABELS: Record<ClockDateFormat, string> = {
-  short: "Short — Wed 27 May",
-  long: "Long — Wednesday, May 27 2026",
-  iso: "ISO — 2026-05-27",
-  weekday: "Weekday only — Wednesday",
+const DATE_FORMAT_LABEL_KEYS: Record<ClockDateFormat, string> = {
+  short: "layout.clock.dateFormat.short",
+  long: "layout.clock.dateFormat.long",
+  iso: "layout.clock.dateFormat.iso",
+  weekday: "layout.clock.dateFormat.weekday",
 }
 
 /**
@@ -48,6 +49,7 @@ const DATE_FORMAT_LABELS: Record<ClockDateFormat, string> = {
  */
 export function TopbarClock() {
   const { preferences, updatePreference } = usePreferences()
+  const { t } = useT()
   const clock = { ...DEFAULT_PREFERENCES.clock, ...preferences.clock }
   const [now, setNow] = useState<Date | null>(null)
   const drag = useDraggableWidget({
@@ -73,35 +75,35 @@ export function TopbarClock() {
     const timeNow = formatTime(now, clock.format24, clock.showSeconds)
     const colorRow: ContextMenuEntry = {
       colors: true,
-      options: CLOCK_COLORS,
+      options: CLOCK_COLORS.map((c) => ({ value: c.value, label: t(c.labelKey) })),
       selected: clock.accentColor,
       onPick: (val) => update({ accentColor: val || undefined }),
     }
     const items: ContextMenuEntry[] = [
-      { header: true, title: "Clock", subtitle: timeNow, icon: ClockIcon },
+      { header: true, title: t("layout.clock.header"), subtitle: timeNow, icon: ClockIcon },
       { separator: true },
       colorRow,
       { separator: true },
       {
-        label: clock.format24 ? "Switch to 12-hour" : "Switch to 24-hour",
+        label: clock.format24 ? t("layout.clock.to12") : t("layout.clock.to24"),
         icon: ClockIcon,
         hint: clock.format24 ? "24h" : "12h",
         onClick: () => update({ format24: !clock.format24 }),
       },
       {
-        label: clock.showSeconds ? "Hide seconds" : "Show seconds",
+        label: clock.showSeconds ? t("layout.clock.hideSeconds") : t("layout.clock.showSeconds"),
         icon: Hourglass,
         onClick: () => update({ showSeconds: !clock.showSeconds }),
       },
       {
-        label: clock.showDate ? "Hide date" : "Show date",
+        label: clock.showDate ? t("layout.clock.hideDate") : t("layout.clock.showDate"),
         icon: CalendarDays,
         onClick: () => update({ showDate: !clock.showDate }),
       },
       { separator: true },
       // Date format — flat list with checkmarks
-      ...(Object.entries(DATE_FORMAT_LABELS).map(([key, label]) => ({
-        label,
+      ...(Object.entries(DATE_FORMAT_LABEL_KEYS).map(([key, labelKey]) => ({
+        label: t(labelKey),
         icon: clock.dateFormat === key ? Check : CalendarDays,
         disabled: !clock.showDate,
         onClick: () => update({ dateFormat: key as ClockDateFormat }),
@@ -109,19 +111,19 @@ export function TopbarClock() {
       { separator: true },
       // Mode toggle
       {
-        label: clock.mode === "analog" ? "Switch to digital" : "Switch to analog face",
+        label: clock.mode === "analog" ? t("layout.clock.toDigital") : t("layout.clock.toAnalog"),
         icon: clock.mode === "analog" ? Sparkles : Layers,
         hint: clock.mode === "analog" ? "analog" : "digital",
         onClick: () => update({ mode: clock.mode === "analog" ? "digital" : "analog" }),
       },
       { separator: true },
       {
-        label: "Reset position",
+        label: t("layout.clock.resetPosition"),
         icon: Move,
         onClick: () => drag.resetPosition(),
       },
       {
-        label: "Hide clock",
+        label: t("layout.clock.hide"),
         icon: EyeOff,
         variant: "destructive" as const,
         onClick: () => update({ show: false }),
@@ -171,7 +173,7 @@ export function TopbarClock() {
           onPointerLeave={longPress.onPointerLeave}
           onContextMenu={handleContextMenu}
           className={wrapperCls}
-          aria-label="Current time (drag to reposition, long-press for options)"
+          aria-label={t("layout.clock.ariaAnalog")}
           data-slot="topbar-clock"
         >
           <div className="group inline-flex items-center gap-2 rounded-full border border-border/30 bg-background/50 backdrop-blur-md p-1 md:p-1.5 hover:bg-background/80 hover:border-border/60 transition-all">
@@ -203,12 +205,12 @@ export function TopbarClock() {
         onPointerDown={drag.onPointerDown}
         onContextMenu={handleContextMenu}
         className={wrapperCls}
-        aria-label="Current time (drag to reposition, right-click for options)"
+        aria-label={t("layout.clock.ariaDigital")}
         data-slot="topbar-clock"
       >
         <div className="group inline-flex items-stretch gap-0 rounded-lg border border-border/30 bg-background/50 backdrop-blur-md supports-[backdrop-filter]:bg-background/30 shadow-[0_1px_2px_rgb(0_0_0/0.04)] overflow-hidden transition-[background,border-color,box-shadow] duration-300 hover:bg-background/80 hover:border-border/60 hover:shadow-[0_4px_16px_-4px_rgb(0_0_0/0.15)]">
           {/* Drag-grip — hidden on phones; we use long-press there. */}
-          <span className="hidden md:flex items-center px-1.5 text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors" title="Drag to move, right-click for options">
+          <span className="hidden md:flex items-center px-1.5 text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors" title={t("layout.clock.dragGrip")}>
             <GripVertical className="size-3" />
           </span>
           <span

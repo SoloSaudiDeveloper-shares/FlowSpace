@@ -37,6 +37,7 @@ import {
   deleteLink,
   searchElements,
 } from "@/lib/actions/link-actions"
+import { useT } from "@/lib/hooks/use-i18n"
 import type { Element, ElementType } from "@/lib/db/schema"
 
 const TYPE_ICONS: Record<ElementType, React.ComponentType<{ className?: string }>> = {
@@ -52,20 +53,20 @@ const TYPE_ICONS: Record<ElementType, React.ComponentType<{ className?: string }
  * Tailwind tints per relationship type — keeps the chips readable while still
  * signalling what kind of link this is at a glance.
  */
-const LINK_TYPE_STYLES: Record<string, { dot: string; label: string }> = {
-  reference:   { dot: "bg-blue-400",   label: "Reference" },
-  dependency:  { dot: "bg-amber-400",  label: "Dependency" },
-  contains:    { dot: "bg-violet-400", label: "Contains" },
-  blocks:      { dot: "bg-rose-400",   label: "Blocks" },
-  relates_to:  { dot: "bg-teal-400",   label: "Relates to" },
+const LINK_TYPE_STYLES: Record<string, { dot: string; labelKey: string }> = {
+  reference:   { dot: "bg-blue-400",   labelKey: "shared.linker.type.reference" },
+  dependency:  { dot: "bg-amber-400",  labelKey: "shared.linker.type.dependency" },
+  contains:    { dot: "bg-violet-400", labelKey: "shared.linker.type.contains" },
+  blocks:      { dot: "bg-rose-400",   labelKey: "shared.linker.type.blocks" },
+  relates_to:  { dot: "bg-teal-400",   labelKey: "shared.linker.type.relatesTo" },
 }
 
 const LINK_TYPES = [
-  { value: "reference"  as const, label: "Reference"  },
-  { value: "dependency" as const, label: "Dependency" },
-  { value: "contains"   as const, label: "Contains"   },
-  { value: "blocks"     as const, label: "Blocks"     },
-  { value: "relates_to" as const, label: "Relates to" },
+  { value: "reference"  as const, labelKey: "shared.linker.type.reference"  },
+  { value: "dependency" as const, labelKey: "shared.linker.type.dependency" },
+  { value: "contains"   as const, labelKey: "shared.linker.type.contains"   },
+  { value: "blocks"     as const, labelKey: "shared.linker.type.blocks"     },
+  { value: "relates_to" as const, labelKey: "shared.linker.type.relatesTo" },
 ]
 
 interface LinkInfo {
@@ -93,6 +94,7 @@ interface ElementLinkerProps {
  */
 export function ElementLinker({ elementId, links }: ElementLinkerProps) {
   const router = useRouter()
+  const { t } = useT()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<Element[]>([])
@@ -136,7 +138,7 @@ export function ElementLinker({ elementId, links }: ElementLinkerProps) {
       {links.length > 0 && (
         <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium mr-1 shrink-0">
           <Link2 className="size-3" />
-          Linked
+          {t("shared.linker.linked")}
         </div>
       )}
 
@@ -145,27 +147,28 @@ export function ElementLinker({ elementId, links }: ElementLinkerProps) {
         if (!link.relatedElement) return null
         const Icon = TYPE_ICONS[link.relatedElement.type]
         const tint = LINK_TYPE_STYLES[link.linkType] ?? LINK_TYPE_STYLES.reference
+        const tintLabel = t(tint.labelKey)
         const ArrowIcon = link.direction === "outgoing" ? ArrowRight : ArrowLeft
         return (
           <div
             key={link.id}
             className="group/chip inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full text-xs bg-card border border-border/60 hover:border-border hover:bg-accent/60 transition-colors cursor-pointer max-w-xs shrink-0"
             onClick={() => router.push(getElementHref(link.relatedElement!))}
-            title={`${tint.label} — click to open`}
+            title={t("shared.linker.openHint").replace("{label}", tintLabel)}
           >
             <ArrowIcon className="size-3 text-muted-foreground/60 shrink-0" />
             <span className={`size-1.5 rounded-full shrink-0 ${tint.dot}`} aria-hidden />
             <Icon className="size-3 text-muted-foreground shrink-0" />
             <span className="truncate font-medium text-foreground/90">{link.relatedElement.title}</span>
             <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider shrink-0">
-              {tint.label}
+              {tintLabel}
             </span>
             <button
               type="button"
               className="size-4 inline-flex items-center justify-center rounded-full opacity-0 group-hover/chip:opacity-100 hover:bg-destructive/15 hover:text-destructive transition-colors shrink-0 ml-0.5"
               onClick={(e) => { e.stopPropagation(); deleteLink(link.id) }}
-              title="Remove link"
-              aria-label="Remove link"
+              title={t("shared.linker.removeLink")}
+              aria-label={t("shared.linker.removeLink")}
             >
               <Trash2 className="size-2.5" />
             </button>
@@ -177,7 +180,7 @@ export function ElementLinker({ elementId, links }: ElementLinkerProps) {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-accent/60 border border-dashed border-border/60 hover:border-border transition-colors shrink-0">
           <Plus className="size-3" />
-          {links.length === 0 ? "Add a link" : "Add"}
+          {links.length === 0 ? t("shared.linker.addALink") : t("shared.linker.add")}
         </DialogTrigger>
         <LinkDialog
           query={query}
@@ -202,18 +205,19 @@ function LinkDialog({
   setLinkType: (t: typeof LINK_TYPES[number]["value"]) => void
   onSelect: (id: string) => void
 }) {
+  const { t } = useT()
   return (
     <DialogContent className="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>Link Element</DialogTitle>
-        <DialogDescription>Search for an element to link to.</DialogDescription>
+        <DialogTitle>{t("shared.linker.dialogTitle")}</DialogTitle>
+        <DialogDescription>{t("shared.linker.dialogDescription")}</DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
             <Input
-              placeholder="Search elements..."
+              placeholder={t("shared.linker.searchPlaceholder")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-8"
@@ -223,13 +227,16 @@ function LinkDialog({
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md border px-3 text-xs hover:bg-accent shrink-0">
               <span className={`size-1.5 rounded-full ${LINK_TYPE_STYLES[linkType]?.dot ?? "bg-muted-foreground"}`} />
-              {LINK_TYPES.find((t) => t.value === linkType)?.label}
+              {(() => {
+                const lt = LINK_TYPES.find((x) => x.value === linkType)
+                return lt ? t(lt.labelKey) : null
+              })()}
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              {LINK_TYPES.map((t) => (
-                <DropdownMenuItem key={t.value} onClick={() => setLinkType(t.value)} className="gap-2">
-                  <span className={`size-1.5 rounded-full ${LINK_TYPE_STYLES[t.value]?.dot ?? "bg-muted-foreground"}`} />
-                  {t.label}
+              {LINK_TYPES.map((lt) => (
+                <DropdownMenuItem key={lt.value} onClick={() => setLinkType(lt.value)} className="gap-2">
+                  <span className={`size-1.5 rounded-full ${LINK_TYPE_STYLES[lt.value]?.dot ?? "bg-muted-foreground"}`} />
+                  {t(lt.labelKey)}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -253,7 +260,7 @@ function LinkDialog({
             )
           })}
           {query.length > 0 && results.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">No elements found</p>
+            <p className="text-sm text-muted-foreground text-center py-4">{t("shared.linker.noResults")}</p>
           )}
         </div>
       </div>

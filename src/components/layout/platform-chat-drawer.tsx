@@ -27,16 +27,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SpeechButton } from "@/components/shared/speech-button"
 import { chatWithPlatform, type ChatMessage } from "@/lib/actions/platform-chat-actions"
+import { useT } from "@/lib/hooks/use-i18n"
 
-const SUGGESTIONS = [
-  "What should I focus on today?",
-  "Summarise my AGE project",
-  "What's overdue and why?",
-  "Which projects haven't moved this week?",
-  "Draft a weekly status update I can email out",
+const SUGGESTION_KEYS = [
+  "layout.chat.suggestion.focus",
+  "layout.chat.suggestion.summarise",
+  "layout.chat.suggestion.overdue",
+  "layout.chat.suggestion.stalled",
+  "layout.chat.suggestion.status",
 ]
 
 export function PlatformChatDrawer() {
+  const { t } = useT()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
@@ -79,7 +81,7 @@ export function PlatformChatDrawer() {
       }
       setMessages((m) => [...m, { role: "assistant", content: r.reply }])
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unexpected error")
+      setError(err instanceof Error ? err.message : t("layout.chat.unexpectedError"))
     } finally {
       setSending(false)
     }
@@ -96,7 +98,7 @@ export function PlatformChatDrawer() {
           type="button"
           onClick={() => setOpen(true)}
           className="fixed bottom-4 right-4 z-50 size-12 rounded-full shadow-lg border border-primary/30 backdrop-blur-md transition-all flex items-center justify-center bg-card/80 text-primary hover:bg-card hover:scale-105"
-          aria-label="Open assistant"
+          aria-label={t("layout.chat.open")}
         >
           <MessageCircle className="size-5" />
         </button>
@@ -124,9 +126,9 @@ export function PlatformChatDrawer() {
           <div className="flex items-center gap-2 px-4 py-3 border-b">
             <Sparkles className="size-4 text-primary" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Assistant</p>
+              <p className="text-sm font-semibold">{t("layout.chat.title")}</p>
               <p className="text-[11px] text-muted-foreground leading-tight">
-                Asks your AI provider about your workspace
+                {t("layout.chat.subtitle")}
               </p>
             </div>
             {messages.length > 0 && (
@@ -140,14 +142,14 @@ export function PlatformChatDrawer() {
                 }}
               >
                 <Trash2 className="size-3" />
-                Clear
+                {t("layout.chat.clear")}
               </Button>
             )}
             <button
               type="button"
               onClick={() => setOpen(false)}
               className="size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent flex items-center justify-center shrink-0"
-              aria-label="Close assistant"
+              aria-label={t("layout.chat.close")}
             >
               <X className="size-4" />
             </button>
@@ -159,26 +161,28 @@ export function PlatformChatDrawer() {
               <div className="space-y-3">
                 <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
                   <p className="text-xs text-primary/90 leading-relaxed">
-                    Ask me anything about your workspace. I see your
-                    elements, your open tasks, and what's overdue.
+                    {t("layout.chat.emptyIntro")}
                   </p>
                 </div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium">
-                  Try
+                  {t("layout.chat.try")}
                 </p>
                 <ul className="space-y-1">
-                  {SUGGESTIONS.map((s) => (
-                    <li key={s}>
-                      <button
-                        type="button"
-                        onClick={() => send(s)}
-                        disabled={sending}
-                        className="w-full text-left px-3 py-2 rounded-md border border-border/60 text-xs hover:border-primary/40 hover:bg-accent/30 transition-colors"
-                      >
-                        {s}
-                      </button>
-                    </li>
-                  ))}
+                  {SUGGESTION_KEYS.map((key) => {
+                    const s = t(key)
+                    return (
+                      <li key={key}>
+                        <button
+                          type="button"
+                          onClick={() => send(s)}
+                          disabled={sending}
+                          className="w-full text-left px-3 py-2 rounded-md border border-border/60 text-xs hover:border-primary/40 hover:bg-accent/30 transition-colors"
+                        >
+                          {s}
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             )}
@@ -202,7 +206,7 @@ export function PlatformChatDrawer() {
               <div className="flex justify-start">
                 <div className="bg-muted/60 rounded-2xl px-3 py-2 text-sm flex items-center gap-2">
                   <Loader2 className="size-3.5 animate-spin" />
-                  <span className="text-muted-foreground">Thinking…</span>
+                  <span className="text-muted-foreground">{t("layout.chat.thinking")}</span>
                 </div>
               </div>
             )}
@@ -219,7 +223,7 @@ export function PlatformChatDrawer() {
           <div className="border-t p-3 space-y-2">
             <div className="relative">
               <Input
-                placeholder="Ask anything…"
+                placeholder={t("layout.chat.inputPh")}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -236,7 +240,7 @@ export function PlatformChatDrawer() {
                   onTranscript={(t) => setInput((p) => (p ? `${p} ${t}` : t))}
                   size="sm"
                   showPulse={false}
-                  tooltip="Speak your question"
+                  tooltip={t("layout.chat.speakTooltip")}
                   preferAccuracy
                 />
                 <Button
@@ -245,15 +249,14 @@ export function PlatformChatDrawer() {
                   className="size-7"
                   onClick={() => void send(input)}
                   disabled={!input.trim() || sending}
-                  aria-label="Send"
+                  aria-label={t("layout.chat.send")}
                 >
                   <Send className="size-3.5" />
                 </Button>
               </div>
             </div>
             <p className="text-[10px] text-muted-foreground/70 text-center">
-              Uses your AI provider (Settings → AI features). Workspace
-              context refreshed every turn.
+              {t("layout.chat.footer")}
             </p>
           </div>
         </div>
