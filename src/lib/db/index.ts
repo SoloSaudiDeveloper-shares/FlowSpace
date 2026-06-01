@@ -16,6 +16,11 @@ const sqlite = new Database(dbPath)
 
 sqlite.pragma("journal_mode = WAL")
 sqlite.pragma("foreign_keys = ON")
+// Wait up to 5s for a contended write instead of throwing SQLITE_BUSY — the
+// every-minute cron and request handlers share one connection. NORMAL sync is
+// safe under WAL and much faster than the FULL default.
+sqlite.pragma("busy_timeout = 5000")
+sqlite.pragma("synchronous = NORMAL")
 
 // Bootstrap the drizzle-defined tables (elements, tasks, projects, ...) so a
 // fresh install can boot without `drizzle-kit push`. All statements use
@@ -1328,6 +1333,37 @@ sqlite.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `)
+
+// ─── Indexes on hot query paths ─────────────────────────────────────────
+// Idempotent (IF NOT EXISTS). Each is wrapped so a missing table on an odd
+// install can't abort the rest. These back the board/list load, the per-user
+// notification badge poll, the feed, and the ubiquitous ownership joins.
+const INDEX_STATEMENTS = [
+  `CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date)`,
+  `CREATE INDEX IF NOT EXISTS idx_ttl_task ON task_to_labels(task_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_ttl_label ON task_to_labels(label_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_task_attachments_task ON task_attachments(task_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_task_deps_task ON task_dependencies(task_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_task_checklists_task ON task_checklists(task_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_task_checklist_items_cl ON task_checklist_items(checklist_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_statuses_project ON task_statuses(project_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_elements_created_by ON elements(created_by)`,
+  `CREATE INDEX IF NOT EXISTS idx_elements_parent ON elements(parent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_feed_events_created ON feed_events(created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_feed_events_project ON feed_events(project_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_todo_items_list ON todo_items(list_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_activity_log_element ON activity_log(element_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON reminders(remind_at)`,
+]
+for (const stmt of INDEX_STATEMENTS) {
+  try { sqlite.exec(stmt) } catch (err) { console.error("[index]", stmt, err) }
+}
 
 export const db = drizzle(sqlite, { schema })
 

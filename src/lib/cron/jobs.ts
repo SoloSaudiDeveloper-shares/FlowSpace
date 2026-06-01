@@ -122,25 +122,26 @@ registerJob({
 })
 
 async function buildDigest(userId: string): Promise<string> {
-  const todayIso = new Date().toISOString()
-  const cutoff = new Date(Date.now() + 24 * 3600 * 1000).toISOString()
-
+  // Compare on date boundaries: task due dates are stored date-only
+  // ("YYYY-MM-DD") in most paths, so a raw string compare against a full ISO
+  // timestamp mis-classifies "due today" as overdue. date(...) normalizes both.
   const overdue = sqlite
     .prepare(
       `SELECT COUNT(*) AS n FROM tasks t INNER JOIN elements e ON e.id = t.project_id
-       WHERE e.created_by = ? AND t.due_date < ?
+       WHERE e.created_by = ? AND t.due_date IS NOT NULL
+         AND date(t.due_date) < date('now','localtime')
          AND t.status_id NOT IN (SELECT id FROM task_statuses WHERE is_done_state = 1)`,
     )
-    .get(userId, todayIso) as { n: number }
+    .get(userId) as { n: number }
 
   const dueToday = sqlite
     .prepare(
       `SELECT t.title, e.title AS project_title FROM tasks t INNER JOIN elements e ON e.id = t.project_id
-       WHERE e.created_by = ? AND t.due_date >= ? AND t.due_date < ?
+       WHERE e.created_by = ? AND date(t.due_date) = date('now','localtime')
          AND t.status_id NOT IN (SELECT id FROM task_statuses WHERE is_done_state = 1)
        ORDER BY t.priority DESC LIMIT 10`,
     )
-    .all(userId, todayIso, cutoff) as { title: string; project_title: string }[]
+    .all(userId) as { title: string; project_title: string }[]
 
   const lines = [
     "🌅 *Good morning — your day at a glance*",
@@ -206,10 +207,9 @@ registerJob({
 
 async function buildEveningDigest(userId: string): Promise<string> {
   const startOfTodayIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
-  const startOfTomorrowIso = new Date(new Date().setHours(24, 0, 0, 0)).toISOString()
-  const endOfTomorrowIso = new Date(new Date().setHours(48, 0, 0, 0)).toISOString()
 
-  // Today's completions
+  // Today's completions (completed_at is a full ISO timestamp, so a timestamp
+  // compare is correct here).
   const completed = sqlite
     .prepare(
       `SELECT COUNT(*) AS n FROM tasks t INNER JOIN elements e ON e.id = t.project_id
@@ -223,23 +223,23 @@ async function buildEveningDigest(userId: string): Promise<string> {
        WHERE e.created_by = ? AND ti.is_completed = 1 AND ti.completed_at >= ?`,
     )
     .get(userId, startOfTodayIso) as { n: number }
-  // What slipped — tasks that were due today and are not done
+  // What slipped — tasks that were due today and are not done (date-normalized)
   const slipped = sqlite
     .prepare(
       `SELECT COUNT(*) AS n FROM tasks t INNER JOIN elements e ON e.id = t.project_id
-       WHERE e.created_by = ? AND t.due_date >= ? AND t.due_date < ?
+       WHERE e.created_by = ? AND date(t.due_date) = date('now','localtime')
          AND t.status_id NOT IN (SELECT id FROM task_statuses WHERE is_done_state = 1)`,
     )
-    .get(userId, startOfTodayIso, startOfTomorrowIso) as { n: number }
-  // Tomorrow's load
+    .get(userId) as { n: number }
+  // Tomorrow's load (date-normalized)
   const tomorrow = sqlite
     .prepare(
       `SELECT t.title, e.title AS project_title FROM tasks t INNER JOIN elements e ON e.id = t.project_id
-       WHERE e.created_by = ? AND t.due_date >= ? AND t.due_date < ?
+       WHERE e.created_by = ? AND date(t.due_date) = date('now','localtime','+1 day')
          AND t.status_id NOT IN (SELECT id FROM task_statuses WHERE is_done_state = 1)
        ORDER BY t.priority DESC LIMIT 10`,
     )
-    .all(userId, startOfTomorrowIso, endOfTomorrowIso) as { title: string; project_title: string }[]
+    .all(userId) as { title: string; project_title: string }[]
 
   const lines = [
     "🌙 *Day wrap-up*",

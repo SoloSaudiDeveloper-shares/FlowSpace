@@ -64,16 +64,19 @@ export async function getMyNotificationCount(): Promise<NotificationCounts> {
     )
     .get(uid) as { n: number }
 
+  // Overdue = strictly before today. Task due dates are stored date-only, so
+  // normalize both sides with date() (a raw string compare against a full ISO
+  // "now" would wrongly count tasks due *today* as overdue).
   const overdueTasksRow = sqlite
     .prepare(
       `SELECT COUNT(*) AS n FROM tasks t
        INNER JOIN elements e ON e.id = t.project_id
        WHERE e.created_by = ?
          AND t.due_date IS NOT NULL
-         AND t.due_date < ?
+         AND date(t.due_date) < date('now','localtime')
          AND t.status_id NOT IN (SELECT id FROM task_statuses WHERE is_done_state = 1)`,
     )
-    .get(uid, nowIso) as { n: number }
+    .get(uid) as { n: number }
 
   const overdueRemindersRow = sqlite
     .prepare(

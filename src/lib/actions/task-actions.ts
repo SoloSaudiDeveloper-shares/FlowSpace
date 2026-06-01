@@ -662,7 +662,18 @@ export async function getTaskCardMetadata(projectId: string) {
     .select()
     .from(tasks)
     .where(eq(tasks.projectId, projectId))
-  const taskIdSet = new Set(allTasks.map((t) => t.id))
+  const taskIds = allTasks.map((t) => t.id)
+  // Empty project → nothing else to fetch.
+  if (taskIds.length === 0) {
+    return {
+      subtaskCounts: {} as Record<string, { total: number; done: number }>,
+      labelsByTask: {} as Record<string, typeof taskLabels.$inferSelect[]>,
+      checklistByTask: {} as Record<string, { total: number; done: number }>,
+      attachmentCounts: {} as Record<string, number>,
+      dependencyCounts: {} as Record<string, number>,
+      commentCounts: {} as Record<string, number>,
+    }
+  }
 
   const subtaskCounts: Record<string, { total: number; done: number }> = {}
   for (const t of allTasks) {
@@ -675,11 +686,12 @@ export async function getTaskCardMetadata(projectId: string) {
     }
   }
 
-  // Get all labels mapped by task
+  // Get the labels for this project's tasks, mapped by task
   const allTaskLabels = await db
     .select({ taskId: taskToLabels.taskId, label: taskLabels })
     .from(taskToLabels)
     .innerJoin(taskLabels, eq(taskToLabels.labelId, taskLabels.id))
+    .where(inArray(taskToLabels.taskId, taskIds))
 
   const labelsByTask: Record<string, typeof taskLabels.$inferSelect[]> = {}
   for (const row of allTaskLabels) {
@@ -687,13 +699,13 @@ export async function getTaskCardMetadata(projectId: string) {
     labelsByTask[row.taskId].push(row.label)
   }
 
-  // Get all checklist item counts grouped by task
-  const allChecklists = await db.select().from(taskChecklists)
+  // Checklist item counts for this project's tasks, grouped by task
+  const allChecklists = await db.select().from(taskChecklists).where(inArray(taskChecklists.taskId, taskIds))
   const clIds = allChecklists.map((c) => c.id)
 
   const itemsByChecklist: Record<string, { total: number; done: number }> = {}
   if (clIds.length > 0) {
-    const allItems = await db.select().from(taskChecklistItems)
+    const allItems = await db.select().from(taskChecklistItems).where(inArray(taskChecklistItems.checklistId, clIds))
     for (const item of allItems) {
       if (!itemsByChecklist[item.checklistId]) {
         itemsByChecklist[item.checklistId] = { total: 0, done: 0 }
@@ -715,18 +727,19 @@ export async function getTaskCardMetadata(projectId: string) {
     }
   }
 
-  // Attachment / dependency / comment counts (scoped to this project's tasks).
+  // Attachment / dependency / comment counts (scoped to this project's tasks
+  // at the DB level via IN (...), not by scanning every table).
   const attachmentCounts: Record<string, number> = {}
-  for (const r of await db.select({ taskId: taskAttachments.taskId }).from(taskAttachments)) {
-    if (taskIdSet.has(r.taskId)) attachmentCounts[r.taskId] = (attachmentCounts[r.taskId] ?? 0) + 1
+  for (const r of await db.select({ taskId: taskAttachments.taskId }).from(taskAttachments).where(inArray(taskAttachments.taskId, taskIds))) {
+    attachmentCounts[r.taskId] = (attachmentCounts[r.taskId] ?? 0) + 1
   }
   const dependencyCounts: Record<string, number> = {}
-  for (const r of await db.select({ taskId: taskDependencies.taskId }).from(taskDependencies)) {
-    if (taskIdSet.has(r.taskId)) dependencyCounts[r.taskId] = (dependencyCounts[r.taskId] ?? 0) + 1
+  for (const r of await db.select({ taskId: taskDependencies.taskId }).from(taskDependencies).where(inArray(taskDependencies.taskId, taskIds))) {
+    dependencyCounts[r.taskId] = (dependencyCounts[r.taskId] ?? 0) + 1
   }
   const commentCounts: Record<string, number> = {}
-  for (const r of await db.select({ taskId: taskComments.taskId }).from(taskComments)) {
-    if (taskIdSet.has(r.taskId)) commentCounts[r.taskId] = (commentCounts[r.taskId] ?? 0) + 1
+  for (const r of await db.select({ taskId: taskComments.taskId }).from(taskComments).where(inArray(taskComments.taskId, taskIds))) {
+    commentCounts[r.taskId] = (commentCounts[r.taskId] ?? 0) + 1
   }
 
   return { subtaskCounts, labelsByTask, checklistByTask, attachmentCounts, dependencyCounts, commentCounts }
