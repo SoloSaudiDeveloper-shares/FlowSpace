@@ -1,6 +1,6 @@
 "use server"
 
-import { db } from "@/lib/db"
+import { db, sqlite } from "@/lib/db"
 import {
   tasks,
   taskStatuses,
@@ -272,7 +272,10 @@ export async function updateTask(
 
   // Recurrence: completing a repeating task spawns its next occurrence with
   // the date(s) rolled forward. The completed copy stays in Done.
-  if (data.isCompleted === true && cur) {
+  // Guard on `!cur.isCompleted` so only the incomplete→complete transition
+  // spawns — a double-submit (or re-completing an already-done task) won't
+  // create duplicate occurrences.
+  if (data.isCompleted === true && cur && !cur.isCompleted) {
     const rule = cur.repeatRule
     const curDue = data.dueDate !== undefined ? data.dueDate : cur.dueDate
     const curStart = data.startDate !== undefined ? data.startDate : cur.startDate
@@ -376,20 +379,27 @@ export async function bulkUpdateTasks(
   await requireProjectAccess(projectId)
   const ids = await idsInProject(taskIds, projectId)
   const now = new Date().toISOString()
-  for (const id of ids) {
-    const updateData: Record<string, unknown> = { ...data, updatedAt: now }
-    if (data.isCompleted !== undefined) {
-      updateData.completedAt = data.isCompleted ? now : null
-    }
-    if (data.isCompleted === true) {
-      const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
-      if (cur[0]?.timeTrackingStartedAt) {
-        const elapsed = Math.max(0, Math.floor((Date.now() - new Date(cur[0].timeTrackingStartedAt).getTime()) / 1000))
-        updateData.timeTracked = (cur[0].timeTracked ?? 0) + elapsed
-        updateData.timeTrackingStartedAt = null
+  sqlite.exec("BEGIN")
+  try {
+    for (const id of ids) {
+      const updateData: Record<string, unknown> = { ...data, updatedAt: now }
+      if (data.isCompleted !== undefined) {
+        updateData.completedAt = data.isCompleted ? now : null
       }
+      if (data.isCompleted === true) {
+        const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+        if (cur[0]?.timeTrackingStartedAt) {
+          const elapsed = Math.max(0, Math.floor((Date.now() - new Date(cur[0].timeTrackingStartedAt).getTime()) / 1000))
+          updateData.timeTracked = (cur[0].timeTracked ?? 0) + elapsed
+          updateData.timeTrackingStartedAt = null
+        }
+      }
+      await db.update(tasks).set(updateData).where(eq(tasks.id, id))
     }
-    await db.update(tasks).set(updateData).where(eq(tasks.id, id))
+    sqlite.exec("COMMIT")
+  } catch (e) {
+    sqlite.exec("ROLLBACK")
+    throw e
   }
   await db.update(elements).set({ updatedAt: now }).where(eq(elements.id, projectId))
   revalidatePath(`/projects/${projectId}`)
@@ -434,10 +444,18 @@ export async function bulkDeleteTasks(taskIds: string[], projectId: string): Pro
   await requireProjectAccess(projectId)
   const ids = await idsInProject(taskIds, projectId)
   const snaps: TaskSnapshot[] = []
-  for (const id of ids) {
-    const snap = await snapshotTask(id)
-    if (snap) snaps.push(snap)
-    await db.delete(tasks).where(eq(tasks.id, id))
+  // Snapshot + delete the whole batch atomically.
+  sqlite.exec("BEGIN")
+  try {
+    for (const id of ids) {
+      const snap = await snapshotTask(id)
+      if (snap) snaps.push(snap)
+      await db.delete(tasks).where(eq(tasks.id, id))
+    }
+    sqlite.exec("COMMIT")
+  } catch (e) {
+    sqlite.exec("ROLLBACK")
+    throw e
   }
   await db.update(elements).set({ updatedAt: new Date().toISOString() }).where(eq(elements.id, projectId))
   revalidatePath(`/projects/${projectId}`)

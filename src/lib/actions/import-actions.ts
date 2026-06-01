@@ -12,7 +12,7 @@
  * to the new element.
  */
 
-import { db } from "@/lib/db"
+import { db, sqlite } from "@/lib/db"
 import {
   elements,
   projects,
@@ -101,6 +101,12 @@ export async function importFromAIAs(
   const now = new Date().toISOString()
   const dbType = DB_TYPE[parsed.type]
 
+  // Build the whole element (+ project board, tasks, subtasks, checklists,
+  // reminders, …) atomically so a mid-build failure can't leave a
+  // half-constructed project. better-sqlite3 is synchronous, so the awaited
+  // Drizzle inserts execute inline between BEGIN and COMMIT.
+  sqlite.exec("BEGIN")
+  try {
   // ── 1. Create the element row ─────────────────────────────────────
   await db.insert(elements).values({
     id,
@@ -266,6 +272,11 @@ export async function importFromAIAs(
       await db.insert(processes).values({ id })
       // Steps not yet first-class — they'll show up in the description.
       break
+  }
+    sqlite.exec("COMMIT")
+  } catch (e) {
+    sqlite.exec("ROLLBACK")
+    return { ok: false, error: e instanceof Error ? e.message : "Import failed" }
   }
 
   // ── 3. Feed event so it surfaces in the ticker + activity heatmap ─
