@@ -22,6 +22,7 @@ import {
   FileText,
   Square,
   CheckSquare,
+  Repeat,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SpeechButton } from "@/components/shared/speech-button"
@@ -644,11 +645,14 @@ function TaskRow({
       </button>
 
       {/* Name */}
-      <span className={`flex-1 min-w-0 text-sm truncate ${
-        task.isCompleted ? "line-through text-muted-foreground" : isSubtask ? "text-muted-foreground" : ""
-      }`}>
-        {task.title}
-      </span>
+      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+        <span className={`text-sm truncate ${
+          task.isCompleted ? "line-through text-muted-foreground" : isSubtask ? "text-muted-foreground" : ""
+        }`}>
+          {task.title}
+        </span>
+        {task.repeatRule && <Repeat className="size-3 text-muted-foreground shrink-0" aria-label="Repeats" />}
+      </div>
 
       {/* Time */}
       {cols.time && (

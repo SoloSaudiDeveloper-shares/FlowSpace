@@ -107,6 +107,9 @@ export const tasks = sqliteTable("tasks", {
     .default("none"),
   startDate: text("start_date"),
   dueDate: text("due_date"),
+  /** Recurrence rule (daily/weekdays/weekly/biweekly/monthly/yearly). Null =
+   *  does not repeat. On completion a fresh occurrence is spawned. */
+  repeatRule: text("repeat_rule"),
   sortOrder: real("sort_order").notNull().default(0),
   parentTaskId: text("parent_task_id"),
   timeEstimate: integer("time_estimate"),

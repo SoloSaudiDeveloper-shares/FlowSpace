@@ -49,7 +49,9 @@ import {
   Download,
   File,
   Mail,
+  Repeat,
 } from "lucide-react"
+import { REPEAT_OPTIONS } from "@/lib/recurrence"
 import { SpeechButton } from "@/components/shared/speech-button"
 import { SendTaskEmailDialog } from "@/components/project/send-task-email-dialog"
 import { TTSButton } from "@/components/shared/tts-button"
@@ -224,6 +226,7 @@ export function TaskDetailSheet({
   const [startDate, setStartDate] = useState("")
   const [dueDate, setDueDate] = useState("")
   const [timeEstimate, setTimeEstimate] = useState<number | null>(null)
+  const [repeatRule, setRepeatRule] = useState("")
 
   // Subtasks
   const [subtasks, setSubtasks] = useState<Task[]>([])
@@ -287,6 +290,7 @@ export function TaskDetailSheet({
       setStartDate(task.startDate?.split("T")[0] ?? "")
       setDueDate(task.dueDate?.split("T")[0] ?? "")
       setTimeEstimate(task.timeEstimate ?? null)
+      setRepeatRule(task.repeatRule ?? "")
       committedRef.current = task.timeTracked ?? 0
       setRightTab(initialTab ?? "details")
       // Derive running state from the server (the timer may have been started
@@ -780,6 +784,36 @@ export function TaskDetailSheet({
                       aria-label="Due date"
                     />
                   </div>
+                </div>
+
+                {/* Repeat */}
+                <div className="flex items-center h-9">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground w-36 shrink-0">
+                    <Repeat className="size-3.5" />
+                    Repeat
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="inline-flex items-center gap-1.5 text-sm rounded px-2 py-1 hover:bg-accent">
+                      {REPEAT_OPTIONS.find((o) => o.value === repeatRule)?.label ?? "Does not repeat"}
+                      <ChevronDown className="size-3 text-muted-foreground" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {REPEAT_OPTIONS.map((o) => (
+                        <DropdownMenuItem
+                          key={o.value || "none"}
+                          onClick={() => {
+                            setRepeatRule(o.value)
+                            updateTask(task.id, task.projectId, { repeatRule: o.value || null })
+                          }}
+                        >
+                          {o.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  {repeatRule && !dueDate && (
+                    <span className="ml-2 text-[11px] text-amber-500">Set a due date so it can repeat</span>
+                  )}
                 </div>
 
                 {/* Tags */}

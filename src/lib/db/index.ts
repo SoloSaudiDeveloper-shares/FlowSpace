@@ -368,10 +368,14 @@ sqlite.exec(`
 
 // Migration: persistent (server-side) task timer — when set, the task's timer
 // is running and accrues until stopped/completed. Idempotent.
+// Also: task recurrence rule — completing a recurring task spawns the next one.
 {
   const taskCols = sqlite.prepare(`PRAGMA table_info(tasks)`).all() as { name: string }[]
   if (taskCols.length && !taskCols.some((c) => c.name === "time_tracking_started_at")) {
     sqlite.exec(`ALTER TABLE tasks ADD COLUMN time_tracking_started_at TEXT`)
+  }
+  if (taskCols.length && !taskCols.some((c) => c.name === "repeat_rule")) {
+    sqlite.exec(`ALTER TABLE tasks ADD COLUMN repeat_rule TEXT`)
   }
 }
 

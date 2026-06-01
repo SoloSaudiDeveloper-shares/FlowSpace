@@ -17,6 +17,7 @@ import {
   Paperclip,
   Link2,
   MessageCircle,
+  Repeat,
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -229,6 +230,10 @@ export function TaskCard({
 
             {hasDescription && (
               <FileText className="size-3 text-muted-foreground" aria-label="Has description" />
+            )}
+
+            {task.repeatRule && (
+              <Repeat className="size-3 text-muted-foreground" aria-label="Repeats" />
             )}
 
             {subtaskCount > 0 && (

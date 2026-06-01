@@ -19,6 +19,7 @@ import { eq, and, asc, desc, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { currentUserId } from "@/lib/auth/scope"
 import { createFeedEvent } from "./feed-actions"
+import { advanceDate, isRepeatRule } from "@/lib/recurrence"
 
 /**
  * Returns true iff the current authenticated user owns the given project
@@ -104,6 +105,7 @@ export async function createTask(
   opts?: {
     priority?: "urgent" | "high" | "medium" | "low" | "none"
     dueDate?: string | null
+    repeatRule?: string | null
   }
 ) {
   const existing = await db
@@ -125,6 +127,7 @@ export async function createTask(
     title,
     priority: opts?.priority ?? "none",
     dueDate: opts?.dueDate ?? null,
+    repeatRule: opts?.repeatRule ?? null,
     sortOrder: maxOrder + 1,
     createdAt: now,
     updatedAt: now,
@@ -154,6 +157,7 @@ export async function updateTask(
     parentTaskId?: string | null
     timeEstimate?: number | null
     timeTracked?: number
+    repeatRule?: string | null
   }
 ) {
   const now = new Date().toISOString()
@@ -163,18 +167,61 @@ export async function updateTask(
     updateData.completedAt = data.isCompleted ? now : null
   }
 
-  // Completing a task stops its running timer (and banks the elapsed time).
+  // Fetch the current row once when completing — used to bank the timer and
+  // to spawn the next occurrence of a recurring task.
+  let cur: typeof tasks.$inferSelect | undefined
   if (data.isCompleted === true) {
-    const cur = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
-    const startedAt = cur[0]?.timeTrackingStartedAt
+    const rows = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1)
+    cur = rows[0]
+    const startedAt = cur?.timeTrackingStartedAt
     if (startedAt) {
       const elapsed = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000))
-      updateData.timeTracked = (cur[0]?.timeTracked ?? 0) + elapsed
+      updateData.timeTracked = (cur?.timeTracked ?? 0) + elapsed
       updateData.timeTrackingStartedAt = null
     }
   }
 
   await db.update(tasks).set(updateData).where(eq(tasks.id, id))
+
+  // Recurrence: completing a repeating task spawns its next occurrence with
+  // the date(s) rolled forward. The completed copy stays in Done.
+  if (data.isCompleted === true && cur) {
+    const rule = cur.repeatRule
+    const curDue = data.dueDate !== undefined ? data.dueDate : cur.dueDate
+    const curStart = data.startDate !== undefined ? data.startDate : cur.startDate
+    if (isRepeatRule(rule) && (curDue || curStart)) {
+      const statusRows = await db
+        .select()
+        .from(taskStatuses)
+        .where(eq(taskStatuses.projectId, projectId))
+        .orderBy(asc(taskStatuses.sortOrder))
+      const target = statusRows.find((s) => !s.isDoneState) ?? statusRows[0]
+      if (target) {
+        const siblings = await db
+          .select({ sortOrder: tasks.sortOrder })
+          .from(tasks)
+          .where(and(eq(tasks.projectId, projectId), eq(tasks.statusId, target.id)))
+        const maxOrder = siblings.length > 0 ? Math.max(...siblings.map((t) => t.sortOrder)) : -1
+        await db.insert(tasks).values({
+          id: createId(),
+          projectId,
+          statusId: target.id,
+          title: cur.title,
+          description: cur.description ?? null,
+          priority: cur.priority,
+          startDate: curStart ? advanceDate(curStart, rule) : null,
+          dueDate: curDue ? advanceDate(curDue, rule) : null,
+          repeatRule: rule,
+          timeEstimate: cur.timeEstimate ?? null,
+          parentTaskId: cur.parentTaskId ?? null,
+          sortOrder: maxOrder + 1,
+          createdAt: now,
+          updatedAt: now,
+        })
+      }
+    }
+  }
+
   await db
     .update(elements)
     .set({ updatedAt: now })
