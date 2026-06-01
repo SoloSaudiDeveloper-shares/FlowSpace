@@ -155,7 +155,13 @@ async function pushEvent(
       }),
     },
   )
-  if (!res.ok) return null
+  if (!res.ok) {
+    // Surface the failure so a revoked token (401) / quota (403) / rate-limit
+    // (429) isn't silently indistinguishable from "nothing to do".
+    const body = await res.text().catch(() => "")
+    console.error(`[gcal-sync] push event failed: HTTP ${res.status} ${body.slice(0, 200)}`)
+    return null
+  }
   const data = (await res.json()) as { id?: string }
   return data.id ?? null
 }
@@ -173,6 +179,9 @@ async function deleteEvent(
     },
   )
   // 410 Gone is fine — already deleted.
+  if (!res.ok && res.status !== 410) {
+    console.error(`[gcal-sync] delete event failed: HTTP ${res.status}`)
+  }
   return res.ok || res.status === 410
 }
 

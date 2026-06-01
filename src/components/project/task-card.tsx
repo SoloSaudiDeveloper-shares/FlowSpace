@@ -123,7 +123,11 @@ export function TaskCard({
         label: "Delete",
         icon: Trash2,
         variant: "destructive",
-        onClick: () => deleteTask(task.id, task.projectId),
+        onClick: () => {
+          if (confirm(`Delete "${task.title}"? This cannot be undone.`)) {
+            deleteTask(task.id, task.projectId)
+          }
+        },
       },
     ]
     openCtx(e, items)

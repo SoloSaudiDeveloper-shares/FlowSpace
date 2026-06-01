@@ -57,6 +57,8 @@ export async function openaiGenerate(
         ...authHeader(config.apiKey),
       },
       body: JSON.stringify(body),
+      // Don't let a hung/slow provider block the server action forever.
+      signal: AbortSignal.timeout(90_000),
     })
     if (!res.ok) {
       const errText = await res.text()
@@ -79,6 +81,8 @@ export async function openaiGenerate(
       ...authHeader(config.apiKey),
     },
     body: JSON.stringify(body),
+    // Generous cap for long generations, but still bounded.
+    signal: AbortSignal.timeout(180_000),
   })
   if (!res.ok || !res.body) {
     const errText = await res.text().catch(() => "")
@@ -134,6 +138,7 @@ export async function openaiEmbeddings(
       model: config.model,
       input: options.texts,
     }),
+    signal: AbortSignal.timeout(30_000),
   })
   if (!res.ok) {
     const errText = await res.text()
@@ -159,6 +164,7 @@ export async function openaiPing(config: OpenAIConfig): Promise<{ ok: true; mode
   try {
     const res = await fetch(`${base}/models`, {
       headers: authHeader(config.apiKey),
+      signal: AbortSignal.timeout(15_000),
     })
     if (!res.ok) {
       const text = await res.text().catch(() => "")

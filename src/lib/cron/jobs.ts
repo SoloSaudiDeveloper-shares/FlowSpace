@@ -20,6 +20,7 @@ import {
   inlineKeyboard,
 } from "@/lib/telegram/client"
 import { dispatchTelegramMessage } from "@/lib/telegram/agent"
+import { advanceDate, isRepeatRule } from "@/lib/recurrence"
 
 // ─── Job 1: fire due reminders as Telegram DMs ──────────────────────────
 
@@ -32,47 +33,63 @@ registerJob({
     // already fired this specific reminder.
     const rows = sqlite
       .prepare(
-        `SELECT r.id, e.title, r.remind_at, tb.bot_token, tb.chat_id
+        `SELECT r.id, e.title, r.remind_at, r.repeat_rule, tb.bot_token, tb.chat_id
          FROM reminders r
          INNER JOIN elements e ON e.id = r.id
          INNER JOIN telegram_bots tb ON tb.user_id = e.created_by
          WHERE r.is_dismissed = 0
            AND r.bot_fired_at IS NULL
            AND r.remind_at <= ?
+           AND (r.snoozed_until IS NULL OR r.snoozed_until <= ?)
            AND tb.is_active = 1
            AND tb.chat_id IS NOT NULL
            AND e.is_deleted = 0
            AND e.is_archived = 0
          LIMIT 50`,
       )
-      .all(now) as {
+      .all(now, now) as {
         id: string
         title: string
         remind_at: string
+        repeat_rule: string | null
         bot_token: string
         chat_id: string
       }[]
 
     for (const r of rows) {
-      // Mark fired BEFORE sending so a crash mid-flight doesn't re-DM.
-      sqlite
-        .prepare(`UPDATE reminders SET bot_fired_at = datetime('now') WHERE id = ?`)
-        .run(r.id)
-      const text = [
-        `🔔 *Reminder*`,
-        ``,
-        `_${escMd(r.title)}_`,
-      ].join("\n")
-      await sendMessage(r.bot_token, r.chat_id, text, {
-        parseMode: "Markdown",
-        replyMarkup: inlineKeyboard([
-          [
-            { text: "Snooze 1h", callback_data: `r:s:${r.id.slice(0, 12)}:1h` },
-            { text: "Snooze 1d", callback_data: `r:s:${r.id.slice(0, 12)}:1d` },
-          ],
-          [{ text: "✅ Dismiss", callback_data: `r:d:${r.id.slice(0, 12)}` }],
-        ]),
-      }).catch(() => undefined) // best-effort; the user will see it next time if Telegram is down
+      try {
+        // Mark fired BEFORE sending so a crash mid-flight doesn't re-DM.
+        sqlite
+          .prepare(`UPDATE reminders SET bot_fired_at = datetime('now') WHERE id = ?`)
+          .run(r.id)
+        const text = [
+          `🔔 *Reminder*`,
+          ``,
+          `_${escMd(r.title)}_`,
+        ].join("\n")
+        await sendMessage(r.bot_token, r.chat_id, text, {
+          parseMode: "Markdown",
+          replyMarkup: inlineKeyboard([
+            [
+              { text: "Snooze 1h", callback_data: `r:s:${r.id.slice(0, 12)}:1h` },
+              { text: "Snooze 1d", callback_data: `r:s:${r.id.slice(0, 12)}:1d` },
+            ],
+            [{ text: "✅ Dismiss", callback_data: `r:d:${r.id.slice(0, 12)}` }],
+          ]),
+        }).catch(() => undefined) // best-effort; the user will see it next time if Telegram is down
+
+        // Repeating reminder: re-arm for the next occurrence instead of leaving
+        // it fired forever. Advances remind_at and clears bot_fired_at.
+        if (isRepeatRule(r.repeat_rule)) {
+          const next = advanceDate(r.remind_at, r.repeat_rule)
+          sqlite
+            .prepare(`UPDATE reminders SET remind_at = ?, bot_fired_at = NULL WHERE id = ?`)
+            .run(next, r.id)
+        }
+      } catch (err) {
+        // Isolate one reminder's failure from the rest of the batch.
+        console.error("[telegram:remind]", r.id, err)
+      }
     }
   },
 })
@@ -108,15 +125,20 @@ registerJob({
       }[]
 
     for (const b of due) {
-      // Mark sent BEFORE doing the work to prevent dupes.
-      sqlite
-        .prepare(`UPDATE telegram_bots SET digest_last_sent = datetime('now') WHERE user_id = ?`)
-        .run(b.user_id)
-      const text = await buildDigest(b.user_id)
-      await sendMessage(b.bot_token, b.chat_id, text, {
-        parseMode: "Markdown",
-        replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
-      }).catch(() => undefined)
+      try {
+        // Mark sent BEFORE doing the work to prevent dupes.
+        sqlite
+          .prepare(`UPDATE telegram_bots SET digest_last_sent = datetime('now') WHERE user_id = ?`)
+          .run(b.user_id)
+        const text = await buildDigest(b.user_id)
+        await sendMessage(b.bot_token, b.chat_id, text, {
+          parseMode: "Markdown",
+          replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+        }).catch(() => undefined)
+      } catch (err) {
+        // One user's malformed data must not starve the rest of the batch.
+        console.error("[telegram:digest]", b.user_id, err)
+      }
     }
   },
 })
@@ -193,14 +215,18 @@ registerJob({
       }[]
 
     for (const b of due) {
-      sqlite
-        .prepare(`UPDATE telegram_bots SET digest_evening_last_sent = datetime('now') WHERE user_id = ?`)
-        .run(b.user_id)
-      const text = await buildEveningDigest(b.user_id)
-      await sendMessage(b.bot_token, b.chat_id, text, {
-        parseMode: "Markdown",
-        replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
-      }).catch(() => undefined)
+      try {
+        sqlite
+          .prepare(`UPDATE telegram_bots SET digest_evening_last_sent = datetime('now') WHERE user_id = ?`)
+          .run(b.user_id)
+        const text = await buildEveningDigest(b.user_id)
+        await sendMessage(b.bot_token, b.chat_id, text, {
+          parseMode: "Markdown",
+          replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+        }).catch(() => undefined)
+      } catch (err) {
+        console.error("[telegram:digest-evening]", b.user_id, err)
+      }
     }
   },
 })
