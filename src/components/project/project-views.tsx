@@ -23,6 +23,7 @@ import {
 import { usePreferences, type SavedView } from "@/lib/hooks/use-preferences"
 import { createTask } from "@/lib/actions/task-actions"
 import { parseQuickAdd } from "@/lib/quick-add"
+import { PRIORITY_ORDER, PRIORITY_COLOR as PRIORITY_COLORS } from "@/lib/priority"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,22 +90,6 @@ interface ProjectViewsProps {
   projectDescription?: string | null
   parentId?: string
   taskMeta?: TaskCardMeta
-}
-
-const PRIORITY_ORDER: Record<string, number> = {
-  urgent: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-  none: 4,
-}
-
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "#ef4444",
-  high: "#f97316",
-  medium: "#eab308",
-  low: "#3b82f6",
-  none: "#94a3b8",
 }
 
 export function ProjectViews({ projectId, statuses, tasks: rawTasks, progress, projectDescription, parentId, taskMeta }: ProjectViewsProps) {

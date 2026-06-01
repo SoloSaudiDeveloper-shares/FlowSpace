@@ -212,13 +212,7 @@ function QuickCaptureWidget() {
 
 type TaskWithProject = { task: Task; project: Element }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "text-red-500",
-  high: "text-orange-500",
-  medium: "text-yellow-500",
-  low: "text-blue-400",
-  none: "text-muted-foreground",
-}
+import { PRIORITY_TEXT_CLASS as PRIORITY_COLORS } from "@/lib/priority"
 
 function MyTasksWidget({ tasks: taskList }: { tasks: TaskWithProject[] }) {
   const router = useRouter()

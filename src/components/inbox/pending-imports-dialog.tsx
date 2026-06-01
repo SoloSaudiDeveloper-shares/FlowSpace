@@ -239,13 +239,7 @@ export function PendingImportsDialog({
 
 // ─── Preview pane ─────────────────────────────────────────────────────────
 
-const PRIORITY_META: Record<string, { color: string; label: string }> = {
-  urgent: { color: "#ef4444", label: "Urgent" },
-  high:   { color: "#f97316", label: "High" },
-  medium: { color: "#eab308", label: "Medium" },
-  low:    { color: "#3b82f6", label: "Low" },
-  none:   { color: "#94a3b8", label: "" },
-}
+import { PRIORITY_BY_VALUE as PRIORITY_META } from "@/lib/priority"
 
 function Preview({ parsed }: { parsed: ParsedImport }) {
   const meta = TYPE_META[parsed.type]

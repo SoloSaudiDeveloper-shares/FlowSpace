@@ -26,19 +26,7 @@ interface TodoListEditorProps {
   items: TodoItem[]
 }
 
-const PRIORITY_COLORS: Record<NonNullable<TodoItem["priority"]>, string> = {
-  urgent: "#ef4444",
-  high:   "#f97316",
-  medium: "#eab308",
-  low:    "#94a3b8",
-}
-
-const PRIORITY_LABEL: Record<NonNullable<TodoItem["priority"]>, string> = {
-  urgent: "Urgent",
-  high:   "High",
-  medium: "Medium",
-  low:    "Low",
-}
+import { PRIORITY_COLOR as PRIORITY_COLORS, PRIORITY_LABEL } from "@/lib/priority"
 
 export function TodoListEditor({ listId, items }: TodoListEditorProps) {
   const [newTitle, setNewTitle] = useState("")

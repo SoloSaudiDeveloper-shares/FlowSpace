@@ -33,14 +33,9 @@ type TaskStatus = typeof taskStatuses.$inferSelect
 
 // ─── Priority Constants ───────────────────────────────────────────────────────
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "#ef4444",
-  high: "#f97316",
-  medium: "#eab308",
-  low: "#3b82f6",
-  none: "#94a3b8",
-}
+import { PRIORITY_COLOR as PRIORITY_COLORS, PRIORITY_ORDER_LIST as PRIORITY_ORDER } from "@/lib/priority"
 
+// "None" reads as "No Priority" in this view's breakdowns — kept local.
 const PRIORITY_LABELS: Record<string, string> = {
   urgent: "Urgent",
   high: "High",
@@ -48,8 +43,6 @@ const PRIORITY_LABELS: Record<string, string> = {
   low: "Low",
   none: "No Priority",
 }
-
-const PRIORITY_ORDER = ["urgent", "high", "medium", "low", "none"]
 
 // ─── Card Registry ────────────────────────────────────────────────────────────
 

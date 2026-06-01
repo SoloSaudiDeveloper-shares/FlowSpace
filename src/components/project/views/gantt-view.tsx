@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PRIORITY_COLOR as PRIORITY_COLORS, PRIORITY_LABEL as PRIORITY_LABELS } from "@/lib/priority"
 import { TaskDetailSheet } from "../task-detail-sheet"
 import {
   ContextMenu,
@@ -114,22 +115,6 @@ const ZOOM: Record<ZoomLevel, { colW: number; days: number; label: string }> = {
 
 const ROW_H = 40
 const INDENT_PX = 20
-
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "#ef4444",
-  high: "#f97316",
-  medium: "#eab308",
-  low: "#3b82f6",
-  none: "#94a3b8",
-}
-
-const PRIORITY_LABELS: Record<string, string> = {
-  urgent: "Urgent",
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-  none: "None",
-}
 
 // ─── Component ──────────────────────────────────────────────────────────────
 

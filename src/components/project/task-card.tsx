@@ -27,17 +27,10 @@ import { toast } from "sonner"
 import type { tasks, taskLabels } from "@/lib/db/schema"
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from "@/components/shared/context-menu"
 import { TaskMetaPopover, type MetaKind } from "./task-meta-popover"
+import { PRIORITY_BY_VALUE } from "@/lib/priority"
 
 type Task = typeof tasks.$inferSelect
 type TaskLabel = typeof taskLabels.$inferSelect
-
-const PRIORITY_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  urgent: { label: "Urgent", color: "bg-red-500/20 text-red-400 border-red-500/30", icon: "#ef4444" },
-  high: { label: "High", color: "bg-orange-500/20 text-orange-400 border-orange-500/30", icon: "#f97316" },
-  medium: { label: "Medium", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30", icon: "#eab308" },
-  low: { label: "Low", color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: "#3b82f6" },
-  none: { label: "", color: "", icon: "#94a3b8" },
-}
 
 function formatTimeShort(seconds: number) {
   if (seconds === 0) return null
@@ -99,7 +92,7 @@ export function TaskCard({
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.none
+  const priority = PRIORITY_BY_VALUE[task.priority] ?? PRIORITY_BY_VALUE.none
   const timeStr = formatTimeShort(task.timeTracked ?? 0)
   const hasDescription = !!task.description?.trim()
 
@@ -224,7 +217,7 @@ export function TaskCard({
           {/* Bottom indicators row */}
           <div className="flex items-center gap-2.5 mt-2 flex-wrap">
             {task.priority !== "none" && (
-              <Flag className="size-3" style={{ color: priority.icon }} aria-label={`Priority: ${priority.label}`} />
+              <Flag className="size-3" style={{ color: priority.color }} aria-label={`Priority: ${priority.label}`} />
             )}
 
             {task.dueDate && (

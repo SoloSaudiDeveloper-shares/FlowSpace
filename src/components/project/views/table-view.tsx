@@ -5,26 +5,20 @@ import { Plus, Flag, ChevronDown, ChevronRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SpeechButton } from "@/components/shared/speech-button"
 import { createTask, updateTask } from "@/lib/actions/task-actions"
+import { PRIORITY_TEXT_CLASS as PRIORITY_COLORS } from "@/lib/priority"
 import { TaskDetailSheet } from "../task-detail-sheet"
 import type { tasks, taskStatuses } from "@/lib/db/schema"
 
 type Task = typeof tasks.$inferSelect
 type TaskStatus = typeof taskStatuses.$inferSelect
 
+// This view shows an em-dash for "none" in the Priority column \u2014 kept local.
 const PRIORITY_LABELS: Record<string, string> = {
   urgent: "Urgent",
   high: "High",
   medium: "Medium",
   low: "Low",
   none: "\u2014",
-}
-
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "text-red-400",
-  high: "text-orange-400",
-  medium: "text-yellow-400",
-  low: "text-blue-400",
-  none: "text-muted-foreground/30",
 }
 
 const INDENT_PX = 20

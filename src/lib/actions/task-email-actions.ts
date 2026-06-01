@@ -25,13 +25,7 @@ import { sendEmail, isEmailConfigured } from "@/lib/email/send"
 import { createFeedEvent } from "@/lib/actions/feed-actions"
 import { escapeHtml, escapeAttr } from "@/lib/utils"
 
-const PRIORITY_TONE: Record<string, { label: string; color: string }> = {
-  urgent: { label: "Urgent", color: "#ef4444" },
-  high: { label: "High", color: "#f97316" },
-  medium: { label: "Medium", color: "#eab308" },
-  low: { label: "Low", color: "#3b82f6" },
-  none: { label: "Normal", color: "#94a3b8" },
-}
+import { PRIORITY_BY_VALUE as PRIORITY_TONE } from "@/lib/priority"
 
 export interface SendTaskEmailInput {
   taskId: string

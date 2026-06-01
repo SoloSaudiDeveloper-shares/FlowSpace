@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner"
 import { TaskDetailSheet } from "../task-detail-sheet"
 import { parseQuickAdd } from "@/lib/quick-add"
+import { PRIORITY_TEXT_CLASS, PRIORITY_COLOR, PRIORITIES, colorToPriority } from "@/lib/priority"
 import {
   ContextMenu,
   useContextMenu,
@@ -49,33 +50,14 @@ type Task = typeof tasks.$inferSelect
 type TaskStatus = typeof taskStatuses.$inferSelect
 type TaskLabel = typeof taskLabels.$inferSelect
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "text-red-400",
-  high: "text-orange-400",
-  medium: "text-yellow-400",
-  low: "text-blue-400",
-  none: "text-muted-foreground/30",
-}
-
+const PRIORITY_COLORS = PRIORITY_TEXT_CLASS
+// The left-accent bar shows nothing for "none" (transparent), so this one map
+// stays local rather than using the shared grey.
 const PRIORITY_BAR: Record<string, string> = {
-  urgent: "#ef4444",
-  high: "#f97316",
-  medium: "#eab308",
-  low: "#3b82f6",
+  ...PRIORITY_COLOR,
   none: "transparent",
 }
-
-/** Priority picker (value + swatch colour) for the right-click colour row. */
-const PRIORITY_PICKER = [
-  { value: "urgent" as const, color: "#ef4444", label: "Urgent" },
-  { value: "high" as const, color: "#f97316", label: "High" },
-  { value: "medium" as const, color: "#eab308", label: "Medium" },
-  { value: "low" as const, color: "#3b82f6", label: "Low" },
-  { value: "none" as const, color: "#94a3b8", label: "None" },
-]
-function colorToPriority(color: string): Task["priority"] {
-  return PRIORITY_PICKER.find((p) => p.color === color)?.value ?? "none"
-}
+const PRIORITY_PICKER = PRIORITIES
 
 const INDENT_PX = 20
 

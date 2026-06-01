@@ -31,6 +31,7 @@ import {
   inlineKeyboard,
   type InlineKeyboardMarkup,
 } from "@/lib/telegram/client"
+import { PRIORITIES } from "@/lib/priority"
 
 export interface MenuResponse {
   text: string
@@ -167,13 +168,9 @@ export function tasksMenu(userId: string): MenuResponse {
 
 // ── Drill: single task with full action menu ──────────────────────────
 
-const PRIORITY_DISPLAY: Record<string, string> = {
-  urgent: "🔥 Urgent",
-  high:   "🟠 High",
-  medium: "🟡 Medium",
-  low:    "🔵 Low",
-  none:   "⚪ None",
-}
+const PRIORITY_DISPLAY: Record<string, string> = Object.fromEntries(
+  PRIORITIES.map((p) => [p.value, `${p.emoji} ${p.label}`]),
+)
 
 export function taskDrillMenu(userId: string, taskPrefix: string): MenuResponse {
   const row = sqlite
@@ -261,14 +258,14 @@ export function priorityMenu(taskPrefix: string): MenuResponse {
     text: "⚡ *Priority*",
     markup: inlineKeyboard([
       [
-        { text: "🔥 Urgent", callback_data: `t:pr:${p}:urgent` },
-        { text: "🟠 High", callback_data: `t:pr:${p}:high` },
+        { text: PRIORITY_DISPLAY.urgent, callback_data: `t:pr:${p}:urgent` },
+        { text: PRIORITY_DISPLAY.high, callback_data: `t:pr:${p}:high` },
       ],
       [
-        { text: "🟡 Medium", callback_data: `t:pr:${p}:medium` },
-        { text: "🔵 Low", callback_data: `t:pr:${p}:low` },
+        { text: PRIORITY_DISPLAY.medium, callback_data: `t:pr:${p}:medium` },
+        { text: PRIORITY_DISPLAY.low, callback_data: `t:pr:${p}:low` },
       ],
-      [{ text: "⚪ None", callback_data: `t:pr:${p}:none` }],
+      [{ text: PRIORITY_DISPLAY.none, callback_data: `t:pr:${p}:none` }],
       [{ text: "⬅️ Back", callback_data: `t:o:${p}` }],
     ]),
   }
