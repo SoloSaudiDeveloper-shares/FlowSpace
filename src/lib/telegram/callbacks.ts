@@ -821,9 +821,98 @@ function moveTodoToList(userId: string, todoId: string, listId: string): { ok: b
   return { ok: true, listTitle: target.title }
 }
 
-/** Convert a captured to-do into a brand-new Page (title from the note, body =
- *  its notes/transcript), then delete the to-do. Ownership verified via the
- *  to-do's list. */
+// ── BlockNote helpers (build a structured page document) ────────────────
+
+type BNBlock = {
+  id: string
+  type: string
+  props: Record<string, unknown>
+  content: { type: string; text: string; styles: Record<string, unknown> }[]
+  children: BNBlock[]
+}
+
+function bnParagraph(text: string): BNBlock {
+  return { id: createId(), type: "paragraph", props: {}, content: [{ type: "text", text, styles: {} }], children: [] }
+}
+function bnHeading(text: string): BNBlock {
+  return {
+    id: createId(),
+    type: "heading",
+    props: { level: 2, textColor: "default", backgroundColor: "default", textAlignment: "left" },
+    content: [{ type: "text", text, styles: {} }],
+    children: [],
+  }
+}
+function bnDivider(): BNBlock {
+  // Core BlockNote has no divider block, so use a thin em-dash rule paragraph.
+  return { id: createId(), type: "paragraph", props: {}, content: [{ type: "text", text: "———", styles: {} }], children: [] }
+}
+/** Turn a blob of prose into readable paragraph blocks: split on blank lines,
+ *  and break any very long run at sentence boundaries (~800 chars). */
+function bnProse(text: string): BNBlock[] {
+  const out: BNBlock[] = []
+  for (const part of text.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean)) {
+    if (part.length <= 1200) { out.push(bnParagraph(part)); continue }
+    let buf = ""
+    for (const sentence of part.split(/(?<=[.!?؟])\s+/)) {
+      if (buf && buf.length + sentence.length > 800) { out.push(bnParagraph(buf.trim())); buf = "" }
+      buf += (buf ? " " : "") + sentence
+    }
+    if (buf.trim()) out.push(bnParagraph(buf.trim()))
+  }
+  return out
+}
+
+/** Recover the clean summary + full transcript for a captured to-do. Prefers
+ *  the transcription_jobs row (full, untruncated columns); falls back to
+ *  parsing the to-do's notes (which media captures format with a
+ *  "— Transcript —" delimiter); else treats the note as plain text. */
+function splitCapture(
+  userId: string,
+  todoId: string,
+  todo: { title: string; notes: string | null },
+): { summary: string | null; transcript: string | null; sourceUrl: string | null; fallback: string } {
+  const job = sqlite
+    .prepare(
+      `SELECT summary, transcript, source_url FROM transcription_jobs
+       WHERE result_todo_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(todoId, userId) as { summary: string | null; transcript: string | null; source_url: string | null } | undefined
+  if (job?.transcript?.trim()) {
+    return {
+      summary: job.summary?.trim() || null,
+      transcript: job.transcript.trim(),
+      sourceUrl: job.source_url?.trim() || null,
+      fallback: "",
+    }
+  }
+  const notes = todo.notes ?? ""
+  if (notes.includes("— Transcript —")) {
+    const idx = notes.indexOf("— Transcript —")
+    const head = notes.slice(0, idx)
+    const transcript = notes.slice(idx + "— Transcript —".length).trim()
+    let sourceUrl: string | null = null
+    const summaryLines: string[] = []
+    for (const line of head.split(/\r?\n/)) {
+      const m = line.match(/^Source:\s*(\S+)/)
+      if (m) { sourceUrl = m[1]; continue }
+      if (/^From:\s*/.test(line)) continue
+      summaryLines.push(line)
+    }
+    return {
+      summary: summaryLines.join("\n").trim() || null,
+      transcript: transcript || null,
+      sourceUrl,
+      fallback: "",
+    }
+  }
+  return { summary: null, transcript: null, sourceUrl: null, fallback: notes.trim() || todo.title }
+}
+
+/** Convert a captured to-do into a brand-new Page, then delete the to-do.
+ *  When the capture has a transcript, the page is structured: the AI summary
+ *  on top, a "Transcript" heading separating it, then the full transcript
+ *  below. Ownership verified via the to-do's list. */
 function convertTodoToPage(userId: string, todoId: string): { ok: boolean; pageId: string; title: string } {
   const todo = sqlite
     .prepare(
@@ -834,17 +923,24 @@ function convertTodoToPage(userId: string, todoId: string): { ok: boolean; pageI
     .get(todoId, userId) as { title: string; notes: string | null } | undefined
   if (!todo) return { ok: false, pageId: "", title: "" }
   const title = (todo.title || "Untitled note").slice(0, 200)
-  const body = todo.notes && todo.notes.trim() ? todo.notes : todo.title
-  // BlockNote document = one paragraph block holding the captured text.
-  const content = JSON.stringify([
-    {
-      id: createId(),
-      type: "paragraph",
-      props: {},
-      content: body ? [{ type: "text", text: body, styles: {} }] : [],
-      children: [],
-    },
-  ])
+
+  const { summary, transcript, sourceUrl, fallback } = splitCapture(userId, todoId, todo)
+  const blocks: BNBlock[] = []
+  if (sourceUrl) blocks.push(bnParagraph(`Source: ${sourceUrl}`))
+  if (transcript) {
+    if (summary) {
+      blocks.push(bnHeading("✨ Summary"))
+      blocks.push(...bnProse(summary))
+      blocks.push(bnDivider())
+    }
+    blocks.push(bnHeading("📄 Transcript"))
+    blocks.push(...bnProse(transcript))
+  } else {
+    blocks.push(...bnProse(fallback))
+  }
+  if (blocks.length === 0) blocks.push(bnParagraph(title))
+  const content = JSON.stringify(blocks)
+
   const pageId = createId()
   const now = new Date().toISOString()
   sqlite.transaction(() => {
