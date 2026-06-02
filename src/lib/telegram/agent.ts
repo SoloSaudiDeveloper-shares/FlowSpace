@@ -59,6 +59,7 @@ export async function dispatchTelegramMessage(
       case "/deadlines": return listDeadlines(bot, parseDays(args))
       case "/projects": return listProjects(bot)
       case "/lists":    return listTodoLists(bot)
+      case "/default":  return setDefaultList(bot, args)
       case "/add":      return addToDefaultList(bot, args)
       case "/todo":     return addToNamedList(bot, args)
       case "/task":     return addTaskToProject(bot, args)
@@ -125,6 +126,7 @@ function helpText(): string {
     "  • `/deadlines [days]` — what's due in the next N days",
     "  • `/projects` — projects + completion %",
     "  • `/lists` — your todo lists (⭐ marks default)",
+    "  • `/default [name]` — show or set your default capture list",
     "",
     "✅ *Update*",
     "  • `/done <id-prefix>` — complete a task or todo by 8-char prefix",
@@ -869,6 +871,37 @@ function getDefaultTodoListId(userId: string): string | null {
 function getElementTitle(id: string): string | null {
   const row = sqlite.prepare(`SELECT title FROM elements WHERE id = ?`).get(id) as { title: string } | undefined
   return row?.title ?? null
+}
+
+/**
+ * Show or change the default capture destination (telegram_bots.target_list_id).
+ *   /default            → show the current default + usage
+ *   /default <name>     → set the default to the matching list
+ *   /default clear      → clear it (fall back to most-recent list)
+ */
+function setDefaultList(bot: BotRow, args: string): string {
+  const a = args.trim()
+  if (!a) {
+    const current = bot.target_list_id ? getElementTitle(bot.target_list_id) : null
+    return [
+      current
+        ? `⭐ Your default list is *${escapeMd(current)}*.`
+        : "⭐ No default list set — captures land in your most-recently-used list.",
+      "",
+      "Change it with `/default <list name>`, or `/default clear` to unset.",
+      "See your lists with `/lists`.",
+    ].join("\n")
+  }
+  if (a.toLowerCase() === "clear") {
+    sqlite.prepare(`UPDATE telegram_bots SET target_list_id = NULL WHERE user_id = ?`).run(bot.user_id)
+    return "⭐ Default list cleared. Captures now go to your most-recently-used list."
+  }
+  const list = findListByName(bot.user_id, a)
+  if (!list) {
+    return `No list matching "${escapeMd(a)}". Try \`/lists\` to see them, or create one first.`
+  }
+  sqlite.prepare(`UPDATE telegram_bots SET target_list_id = ? WHERE user_id = ?`).run(list.id, bot.user_id)
+  return `⭐ Default list set to *${escapeMd(list.title)}*. New captures land here.`
 }
 
 function findListByName(userId: string, name: string) {

@@ -146,6 +146,9 @@ export interface Preferences {
   /** Which home-dashboard sections this user wants visible. Missing keys
    * default to true. */
   homeSections: Partial<Record<HomeSectionKey, boolean>>
+  /** User-defined order of the home-dashboard cards (drag to reorder).
+   * Missing keys are appended in default order. */
+  homeSectionOrder: HomeSectionKey[]
   /** Hex colors that show up in the right-click "Color" submenu. The user
    * can curate this list in Settings. Empty = use platform defaults. */
   rightClickPalette: string[]
@@ -177,11 +180,23 @@ export interface Preferences {
 export type HomeSectionKey =
   | "hero"
   | "kpi"
+  | "aiFocus"
   | "pulse"
   | "today"
   | "activity"
   | "quickCapture"
   | "recent"
+
+/** Draggable home cards, in default order. `hero` is pinned (not draggable). */
+export const HOME_DRAGGABLE_ORDER: HomeSectionKey[] = [
+  "kpi",
+  "aiFocus",
+  "pulse",
+  "today",
+  "activity",
+  "quickCapture",
+  "recent",
+]
 
 // ─── Defaults ─────────────────────────────────────────────────────────────
 
@@ -261,12 +276,14 @@ export const DEFAULT_PREFERENCES: Preferences = {
   homeSections: {
     hero: true,
     kpi: true,
+    aiFocus: true,
     pulse: true,
     today: true,
     activity: true,
     quickCapture: true,
     recent: true,
   },
+  homeSectionOrder: ["kpi", "aiFocus", "pulse", "today", "activity", "quickCapture", "recent"],
   // Curated right-click palette — soft, dark-mode friendly, distinct hues.
   // The first entry is the "default" by convention; users can curate this
   // list and pick which one is default separately.
@@ -293,6 +310,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 export const HOME_SECTION_LABELS: Record<HomeSectionKey, string> = {
   hero: "Greeting & quick actions",
   kpi: "KPI stat cards",
+  aiFocus: "AI focus suggestion",
   pulse: "Project pulse (charts)",
   today: "Today & upcoming",
   activity: "Activity heatmap",

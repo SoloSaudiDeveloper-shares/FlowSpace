@@ -188,6 +188,7 @@ sqlite.exec(`
     chat_id           TEXT NOT NULL,
     message_id        INTEGER NOT NULL DEFAULT 0,
     source_url        TEXT,
+    file_id           TEXT,
     platform          TEXT,
     title             TEXT,
     duration_sec      INTEGER,
@@ -205,6 +206,9 @@ sqlite.exec(`
 `)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_txjobs_status ON transcription_jobs(status, created_at);`)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_txjobs_user ON transcription_jobs(user_id);`)
+// file_id is used by the 'audio_upload' source (long/large uploaded audio).
+// Silent: duplicate-column on an already-migrated DB is expected and benign.
+try { sqlite.exec(`ALTER TABLE transcription_jobs ADD COLUMN file_id TEXT`) } catch {}
 
 // ─── Reminder bot-fired tracking ────────────────────────────────────────
 // `bot_fired_at` so the cron doesn't re-DM the same reminder forever.

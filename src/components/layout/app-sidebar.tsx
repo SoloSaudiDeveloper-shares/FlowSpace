@@ -1068,9 +1068,28 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
 
   function handleSectionContextMenu(e: React.MouseEvent, key: SidebarSectionKey, label: string) {
     const currentColor = preferences.sidebarSectionColors?.[key]
+    // Map a section to the element type it creates. Favorites/Platform have
+    // no single creatable type, so they get no "New" action.
+    const createType: ElementType | null =
+      key === "projects" ? "project"
+      : key.startsWith("type:") ? (key.replace("type:", "") as ElementType)
+      : null
+    const singular = createType
+      ? (ELEMENT_TYPE_CONFIG[createType]?.label.replace(/s$/, "") ?? createType.replace("_", " "))
+      : ""
     const items: ContextMenuEntry[] = [
-      { header: true, title: label, subtitle: "Section appearance", icon: Palette },
+      { header: true, title: label, subtitle: createType ? `Create or recolor` : "Section appearance", icon: Palette },
       { separator: true },
+      ...(createType
+        ? [
+            {
+              label: `New ${singular}`,
+              icon: Plus,
+              onClick: () => handleCreate(createType),
+            },
+            { separator: true as const },
+          ]
+        : []),
       {
         colors: true,
         options: SIDEBAR_SECTION_COLOR_OPTIONS,

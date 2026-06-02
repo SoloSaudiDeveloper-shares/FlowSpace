@@ -87,6 +87,33 @@ export async function handleCallback(
       }
     }
 
+    // Move a captured todo to a different list. `move:todo:<id>` opens a
+    // list picker; `mtl:<todoId>:<listId>` performs the move.
+    if (data.startsWith("move:todo:")) {
+      const todoId = data.slice("move:todo:".length)
+      return { edit: moveListPickerMenu(userId, todoId) }
+    }
+    if (data.startsWith("mtl:")) {
+      const [, todoId, listId] = data.split(":")
+      const moved = moveTodoToList(userId, todoId, listId)
+      if (!moved.ok) return { toast: "Couldn't move that." }
+      return {
+        toast: "Moved",
+        edit: {
+          text: `📂 *Moved to ${escMd(moved.listTitle)}*`,
+          markup: {
+            inline_keyboard: [
+              [
+                { text: "↩️ Undo", callback_data: `undo:todo:${todoId}` },
+                { text: "📂 Move again", callback_data: `move:todo:${todoId}` },
+              ],
+              [{ text: "🏠 Menu", callback_data: "menu:main" }],
+            ],
+          },
+        },
+      }
+    }
+
     // View routes
     if (data === "v:tasks")      return { edit: tasksMenu(userId) }
     if (data === "v:projects")   return { edit: projectsMenu(userId, 0) }
@@ -682,14 +709,75 @@ async function captureToList(v: PendingVoice, listId: string): Promise<CallbackR
   sqlite.prepare(`DELETE FROM pending_voices WHERE id = ?`).run(v.id)
   return {
     toast: "Added",
-    replace: {
+    edit: {
       text: [
         `✅ *Added to ${escMd(list?.title ?? "Inbox")}*`,
         "",
         `_"${escMd(captured.title)}"_${captureHits(captured)}`,
       ].join("\n"),
+      markup: {
+        inline_keyboard: [
+          [
+            { text: "↩️ Undo", callback_data: `undo:todo:${itemId}` },
+            { text: "📂 Move to…", callback_data: `move:todo:${itemId}` },
+          ],
+          [{ text: "🏠 Menu", callback_data: "menu:main" }],
+        ],
+      },
     },
   }
+}
+
+/** List picker shown when the user taps "Move to…" on a capture. Lists the
+ *  user's todo lists as buttons that move the given todo. */
+function moveListPickerMenu(userId: string, todoId: string): { text: string; markup: { inline_keyboard: { text: string; callback_data: string }[][] } } {
+  const lists = sqlite
+    .prepare(
+      `SELECT id, title FROM elements
+       WHERE created_by = ? AND type = 'todo_list'
+         AND is_archived = 0 AND is_deleted = 0
+       ORDER BY updated_at DESC LIMIT 8`,
+    )
+    .all(userId) as { id: string; title: string }[]
+  const rows = lists.map((l) => [
+    { text: `📝 ${l.title.slice(0, 30)}`, callback_data: `mtl:${todoId}:${l.id}` },
+  ])
+  return {
+    text: "📂 *Move to which list?*",
+    markup: {
+      inline_keyboard: [
+        ...rows,
+        [{ text: "🏠 Menu", callback_data: "menu:main" }],
+      ],
+    },
+  }
+}
+
+/** Move a captured todo into another list, verifying the user owns both the
+ *  todo (via its current list) and the target list. */
+function moveTodoToList(userId: string, todoId: string, listId: string): { ok: boolean; listTitle: string } {
+  // Target list must belong to the user.
+  const target = sqlite
+    .prepare(`SELECT title FROM elements WHERE id = ? AND created_by = ? AND type = 'todo_list'`)
+    .get(listId, userId) as { title: string } | undefined
+  if (!target) return { ok: false, listTitle: "" }
+  // The todo's current list must also belong to the user.
+  const owns = sqlite
+    .prepare(
+      `SELECT 1 FROM todo_items ti
+       INNER JOIN elements e ON e.id = ti.list_id
+       WHERE ti.id = ? AND e.created_by = ?`,
+    )
+    .get(todoId, userId) as { 1: number } | undefined
+  if (!owns) return { ok: false, listTitle: "" }
+  const max = sqlite
+    .prepare(`SELECT COALESCE(MAX(sort_order), -1) AS m FROM todo_items WHERE list_id = ?`)
+    .get(listId) as { m: number }
+  sqlite
+    .prepare(`UPDATE todo_items SET list_id = ?, sort_order = ? WHERE id = ?`)
+    .run(listId, max.m + 1, todoId)
+  sqlite.prepare(`UPDATE elements SET updated_at = datetime('now') WHERE id = ?`).run(listId)
+  return { ok: true, listTitle: target.title }
 }
 
 async function addAsTask(v: PendingVoice, projectId: string): Promise<CallbackResult> {

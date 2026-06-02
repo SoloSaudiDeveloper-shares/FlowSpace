@@ -47,7 +47,7 @@ import {
 import { parseAIImport } from "@/lib/import/ai-import-parser"
 import { createId } from "@/lib/utils/ids"
 import { detectMediaUrl } from "@/lib/telegram/media-url"
-import { enqueueMediaJob, kickMediaWorker } from "@/lib/telegram/media-jobs"
+import { enqueueMediaJob, enqueueAudioJob, kickMediaWorker } from "@/lib/telegram/media-jobs"
 
 interface BotRow {
   user_id: string
@@ -174,6 +174,38 @@ export async function POST(
   const voiceFileId =
     msg.voice?.file_id ?? msg.audio?.file_id ?? msg.video_note?.file_id
   if (voiceFileId) {
+    // ── Long/large audio → async worker ──────────────────────────────
+    // The inline picker transcribes synchronously inside the button-tap
+    // callback, which is bound by Telegram's ~30s callback deadline and the
+    // engine's 60s/180s fetch timeouts — a 15-min recording busts all of
+    // them and silently fails. Route anything long or large through the
+    // background transcription_jobs worker instead: ack instantly, skip the
+    // picker (use the user's default language + list), transcribe with a
+    // generous timeout, then capture + DM with Undo / Move buttons.
+    const audioDuration =
+      msg.voice?.duration ?? msg.audio?.duration ?? msg.video_note?.duration ?? 0
+    const audioSize =
+      msg.voice?.file_size ?? msg.audio?.file_size ?? msg.video_note?.file_size ?? 0
+    if (audioDuration >= 150 || audioSize > 18 * 1024 * 1024) {
+      logMessage(bot.user_id, "in", "[🎙 long recording received]")
+      enqueueAudioJob({
+        userId: bot.user_id,
+        botToken: bot.bot_token,
+        chatId: String(msg.chat.id),
+        messageId: msg.message_id,
+        fileId: voiceFileId,
+        durationSec: audioDuration,
+      })
+      kickMediaWorker()
+      const mins = Math.max(1, Math.round(audioDuration / 60))
+      const ack = `⏳ Transcribing your ${mins}-min recording — this runs in the background. I'll send the result here when it's ready.`
+      logMessage(bot.user_id, "out", ack)
+      await sendMessage(bot.bot_token, msg.chat.id, ack, {
+        replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+      })
+      return new NextResponse("ok", { status: 200 })
+    }
+
     logMessage(bot.user_id, "in", "[🎙 voice received]")
     const pid = createId()
     sqlite
@@ -368,6 +400,7 @@ export async function POST(
     const keyboardRow: { text: string; callback_data: string }[] = []
     if (undoTodoId) {
       keyboardRow.push({ text: "↩️ Undo", callback_data: `undo:todo:${undoTodoId}` })
+      keyboardRow.push({ text: "📂 Move to…", callback_data: `move:todo:${undoTodoId}` })
     }
     keyboardRow.push({ text: "🏠 Menu", callback_data: "menu:main" })
     await sendMessage(bot.bot_token, msg.chat.id, reply, {

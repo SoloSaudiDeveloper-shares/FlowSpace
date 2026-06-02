@@ -36,7 +36,25 @@ import {
   Sparkles,
   TrendingUp,
   Mic,
+  GripVertical,
 } from "lucide-react"
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -52,8 +70,10 @@ import { useAuth } from "@/lib/hooks/use-auth"
 import {
   usePreferences,
   HOME_SECTION_LABELS,
+  HOME_DRAGGABLE_ORDER,
   type HomeSectionKey,
 } from "@/lib/hooks/use-preferences"
+import { FocusCard } from "@/components/home/focus-card"
 import { SpeechButton } from "@/components/shared/speech-button"
 import { FileIngestDropzone } from "@/components/shared/file-ingest-dropzone"
 import { createElement } from "@/lib/actions/element-actions"
@@ -701,6 +721,35 @@ function CustomizeDialog({
   )
 }
 
+// ─── Draggable card wrapper ───────────────────────────────────────────────
+
+/** Wraps a dashboard block so it can be dragged to reorder. A grip handle
+ *  fades in on hover (top-left corner), mirroring the sidebar's drag affordance. */
+function SortableBlock({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+    zIndex: isDragging ? 20 : undefined,
+    position: "relative",
+  }
+  return (
+    <div ref={setNodeRef} style={style} className="group/card">
+      <button
+        {...attributes}
+        {...listeners}
+        className="absolute left-1 top-1 z-20 cursor-grab active:cursor-grabbing opacity-0 group-hover/card:opacity-70 hover:!opacity-100 p-1 rounded-md bg-card border shadow-sm transition-opacity"
+        title="Drag to reorder"
+        aria-label="Drag card"
+      >
+        <GripVertical className="size-3.5 text-muted-foreground" />
+      </button>
+      {children}
+    </div>
+  )
+}
+
 // ─── Root ─────────────────────────────────────────────────────────────────
 
 export function HomeDashboard({
@@ -717,9 +766,58 @@ export function HomeDashboard({
   const [importing, setImporting] = useState(false)
   const [inboxOpen, setInboxOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
-  const { preferences } = usePreferences()
+  const { preferences, updatePreference } = usePreferences()
   const sections = preferences.homeSections ?? {}
   const show = (k: HomeSectionKey) => isSectionVisible(sections, k)
+
+  // ── Draggable card order ──────────────────────────────────────────────
+  // Gate dnd-kit until after hydration (it generates incrementing aria IDs
+  // that mismatch between SSR and CSR).
+  const [dndReady, setDndReady] = useState(false)
+  useEffect(() => setDndReady(true), [])
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  // Full order = stored order, sanitised to known keys, with any missing
+  // appended in default order (so a newly-added card still shows up).
+  const fullOrder: HomeSectionKey[] = (() => {
+    const stored = (preferences.homeSectionOrder ?? HOME_DRAGGABLE_ORDER).filter(
+      (k): k is HomeSectionKey => HOME_DRAGGABLE_ORDER.includes(k as HomeSectionKey),
+    )
+    for (const k of HOME_DRAGGABLE_ORDER) if (!stored.includes(k)) stored.push(k)
+    return stored
+  })()
+  const visibleOrder = fullOrder.filter((k) => show(k))
+
+  function handleCardDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const from = fullOrder.indexOf(active.id as HomeSectionKey)
+    const to = fullOrder.indexOf(over.id as HomeSectionKey)
+    if (from === -1 || to === -1) return
+    updatePreference("homeSectionOrder", arrayMove(fullOrder, from, to))
+  }
+
+  function renderBlock(key: HomeSectionKey): React.ReactNode {
+    switch (key) {
+      case "kpi": return <KpiRow counts={summary.counts} />
+      case "aiFocus": return <FocusCard />
+      case "pulse":
+        return (
+          <ProjectPulse
+            projectStatus={summary.projectStatus}
+            avgProgress={summary.avgProgress}
+            taskTotals={summary.taskTotals}
+          />
+        )
+      case "today": return <TodayBlock upcoming={summary.upcoming} />
+      case "activity": return <ActivityHeatmap days={summary.activityByDay} />
+      case "quickCapture": return <QuickCaptureCompact />
+      case "recent": return <RecentRow recent={recent} favorites={favorites} />
+      default: return null
+    }
+  }
 
   // Poll for pending imports so a fresh Telegram payload shows up without
   // a manual refresh. 30s feels live enough without spamming the server.
@@ -771,43 +869,27 @@ export function HomeDashboard({
         </button>
       )}
 
-      {show("kpi") && <KpiRow counts={summary.counts} />}
-
-      {(show("pulse") || show("today")) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {show("pulse") && (
-            <div className="lg:col-span-2">
-              <ProjectPulse
-                projectStatus={summary.projectStatus}
-                avgProgress={summary.avgProgress}
-                taskTotals={summary.taskTotals}
-              />
+      {/* Draggable dashboard cards — reorder by dragging the grip handle.
+          Order persists in preferences.homeSectionOrder. */}
+      {dndReady ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCardDragEnd}>
+          <SortableContext items={visibleOrder} strategy={verticalListSortingStrategy}>
+            <div className="space-y-4">
+              {visibleOrder.map((key) => (
+                <SortableBlock key={key} id={key}>
+                  {renderBlock(key)}
+                </SortableBlock>
+              ))}
             </div>
-          )}
-          {show("today") && (
-            <div className={show("pulse") ? "" : "lg:col-span-3"}>
-              <TodayBlock upcoming={summary.upcoming} />
-            </div>
-          )}
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <div className="space-y-4">
+          {visibleOrder.map((key) => (
+            <div key={key}>{renderBlock(key)}</div>
+          ))}
         </div>
       )}
-
-      {(show("activity") || show("quickCapture")) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {show("activity") && (
-            <div className={show("quickCapture") ? "lg:col-span-2" : "lg:col-span-3"}>
-              <ActivityHeatmap days={summary.activityByDay} />
-            </div>
-          )}
-          {show("quickCapture") && (
-            <div className={show("activity") ? "" : "lg:col-span-3"}>
-              <QuickCaptureCompact />
-            </div>
-          )}
-        </div>
-      )}
-
-      {show("recent") && <RecentRow recent={recent} favorites={favorites} />}
 
       <CustomizeDialog open={customizing} onOpenChange={setCustomizing} />
       <AIImportDialog open={importing} onOpenChange={setImporting} />

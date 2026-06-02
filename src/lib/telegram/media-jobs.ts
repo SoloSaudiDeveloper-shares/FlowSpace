@@ -27,8 +27,8 @@ import { mkdir, rm } from "node:fs/promises"
 import { sqlite } from "@/lib/db"
 import { createId } from "@/lib/utils/ids"
 import { getDataDir } from "@/lib/utils/data-dir"
-import { sendMessage, inlineKeyboard } from "@/lib/telegram/client"
-import { resolveGroqKey, transcribeAudioFile } from "@/lib/telegram/voice"
+import { sendMessage, inlineKeyboard, getFile, fileDownloadUrl } from "@/lib/telegram/client"
+import { resolveGroqKey, transcribeAudioFile, transcribeAudioBytes } from "@/lib/telegram/voice"
 import { checkBinaries, downloadMediaAudio } from "@/lib/telegram/media-download"
 import { summarizeTranscript } from "@/lib/telegram/summarize"
 
@@ -49,7 +49,9 @@ interface JobRow {
   user_id: string
   bot_token: string
   chat_id: string
+  source: string
   source_url: string | null
+  file_id: string | null
   platform: string | null
   language: string
 }
@@ -77,6 +79,36 @@ export function enqueueMediaJob(args: {
        VALUES (?, ?, 'media_url', ?, ?, ?, ?, ?, ?, 'queued')`,
     )
     .run(id, args.userId, args.botToken, args.chatId, args.messageId, args.url, args.platform, language)
+  return id
+}
+
+/** Enqueue a long/large UPLOADED audio file (voice note, audio, video note)
+ *  for async transcription — the inline picker path can't handle these
+ *  (Telegram callback deadline + tight engine timeouts). */
+export function enqueueAudioJob(args: {
+  userId: string
+  botToken: string
+  chatId: string
+  messageId: number
+  fileId: string
+  durationSec?: number | null
+  language?: string | null
+}): string {
+  const id = createId()
+  let language = args.language || null
+  if (!language) {
+    const pref = sqlite
+      .prepare(`SELECT voice_language FROM telegram_bots WHERE user_id = ?`)
+      .get(args.userId) as { voice_language: string | null } | undefined
+    language = pref?.voice_language || "en"
+  }
+  sqlite
+    .prepare(
+      `INSERT INTO transcription_jobs
+         (id, user_id, source, bot_token, chat_id, message_id, file_id, platform, duration_sec, language, status)
+       VALUES (?, ?, 'audio_upload', ?, ?, ?, ?, 'recording', ?, ?, 'queued')`,
+    )
+    .run(id, args.userId, args.botToken, args.chatId, args.messageId, args.fileId, args.durationSec ?? null, language)
   return id
 }
 
@@ -170,85 +202,142 @@ async function failJob(job: JobRow, userMessage: string, errorDetail: string): P
   await sendMessage(job.bot_token, job.chat_id, userMessage).catch(() => undefined)
 }
 
+/** Download an uploaded Telegram file to bytes. Bound by Telegram's 20 MB
+ *  getFile cap unless a self-hosted Bot API server is configured. */
+async function downloadTelegramFile(
+  botToken: string,
+  fileId: string,
+): Promise<{ ok: true; bytes: ArrayBuffer } | { ok: false; code: "too_large" | "download_failed"; error: string }> {
+  const f = await getFile(botToken, fileId)
+  if (!f.ok) {
+    const tooBig = /too big/i.test(f.description || "")
+    return { ok: false, code: tooBig ? "too_large" : "download_failed", error: f.description }
+  }
+  const p = f.result.file_path
+  if (!p) return { ok: false, code: "download_failed", error: "No file_path returned by Telegram." }
+  try {
+    const res = await fetch(fileDownloadUrl(botToken, p), { signal: AbortSignal.timeout(120_000) })
+    if (!res.ok) return { ok: false, code: "download_failed", error: `Download failed: ${res.status}` }
+    return { ok: true, bytes: await res.arrayBuffer() }
+  } catch (err) {
+    return { ok: false, code: "download_failed", error: err instanceof Error ? err.message : "Download error" }
+  }
+}
+
 async function processMediaJob(id: string): Promise<void> {
   const job = sqlite
     .prepare(
-      `SELECT id, user_id, bot_token, chat_id, source_url, platform, language FROM transcription_jobs WHERE id = ?`,
+      `SELECT id, user_id, bot_token, chat_id, source, source_url, file_id, platform, language FROM transcription_jobs WHERE id = ?`,
     )
     .get(id) as JobRow | undefined
-  if (!job || !job.source_url) return
+  if (!job) return
 
-  const platform = job.platform ?? "media"
+  const isUpload = job.source === "audio_upload"
+  const platform = job.platform ?? (isUpload ? "recording" : "media")
   const workDir = path.join(getDataDir(), "uploads", "media-tmp", job.id)
 
   try {
-    // 0) binaries present?
-    const bins = await checkBinaries()
-    if (!bins.ytdlp || !bins.ffmpeg) {
-      const missing = [!bins.ytdlp && "yt-dlp", !bins.ffmpeg && "ffmpeg"].filter(Boolean).join(" + ")
-      await failJob(
-        job,
-        `⚠️ Can't process media links yet — ${missing} isn't installed on the server. Ask the admin to install it (see TRANSCRIPTION.md).`,
-        `missing_binary: ${missing}`,
-      )
-      return
-    }
-
-    // 1) download + extract audio
-    await mkdir(workDir, { recursive: true })
-    const dl = await downloadMediaAudio(job.source_url, {
-      workDir,
-      maxDurationSec: MAX_DURATION_SEC,
-      maxFileSizeMb: MAX_FILESIZE_MB,
-      timeoutMs: DOWNLOAD_TIMEOUT_MS,
-    })
-    if (!dl.ok) {
-      const userMsg =
-        dl.code === "too_long"
-          ? `⚠️ That ${platform} clip is too long to transcribe (limit ${Math.round(MAX_DURATION_SEC / 60)} min).`
-          : dl.code === "too_large"
-            ? `⚠️ That ${platform} clip's audio is too large to transcribe (limit ${MAX_FILESIZE_MB} MB).`
-            : dl.code === "missing_binary"
-              ? `⚠️ Can't process media links yet — yt-dlp/ffmpeg isn't installed on the server. Ask the admin.`
-              : dl.code === "timeout"
-                ? `⚠️ Timed out downloading that ${platform} clip. Try again later.`
-                : `⚠️ Couldn't download that ${platform} clip. It may be private, region-locked, or unavailable.`
-      await failJob(job, userMsg, `${dl.code}: ${dl.error}`)
-      return
-    }
-
-    // persist metadata
-    sqlite
-      .prepare(`UPDATE transcription_jobs SET title = ?, duration_sec = ?, source_url = ?, updated_at = datetime('now') WHERE id = ?`)
-      .run(dl.title, dl.durationSec, dl.webpageUrl, job.id)
-
-    // 2) transcribe (local-first → Groq). Media gets a generous local
-    //    timeout since a long clip on a CPU box is slow.
-    setStatus(job.id, "transcribing")
+    let transcript: string
+    let metaTitle: string | null = null
+    let sourceUrl: string | null = job.source_url
     const groqKey = resolveGroqKey(job.user_id)
-    const tr = await transcribeAudioFile(dl.audioPath, {
-      groqApiKey: groqKey,
-      language: job.language,
-      ownerUserId: job.user_id,
-      mime: "audio/mpeg",
-      filename: "media.mp3",
-      localTimeoutMs: 1_500_000, // 25 min
-      groqTimeoutMs: 120_000,
-    })
-    if (!tr.ok) {
-      await failJob(
-        job,
-        `⚠️ Downloaded the ${platform} clip but couldn't transcribe it: ${tr.error.slice(0, 160)}`,
-        `transcribe: ${tr.error}`,
-      )
-      return
+
+    if (isUpload) {
+      // ── Uploaded audio (voice note / audio / video note) ──────────────
+      if (!job.file_id) {
+        await failJob(job, "⚠️ Couldn't process that recording (missing file).", "no file_id")
+        return
+      }
+      const dl = await downloadTelegramFile(job.bot_token, job.file_id)
+      if (!dl.ok) {
+        const userMsg =
+          dl.code === "too_large"
+            ? "⚠️ That recording is over Telegram's 20 MB bot download limit. To transcribe big files, the admin needs to run a self-hosted Telegram Bot API server (see TRANSCRIPTION.md)."
+            : "⚠️ Couldn't download that recording from Telegram. Try sending it again."
+        await failJob(job, userMsg, `${dl.code}: ${dl.error}`)
+        return
+      }
+      setStatus(job.id, "transcribing")
+      const tr = await transcribeAudioBytes(dl.bytes, {
+        groqApiKey: groqKey,
+        language: job.language,
+        ownerUserId: job.user_id,
+        mime: "audio/ogg",
+        filename: "recording.ogg",
+        localTimeoutMs: 1_500_000, // 25 min — long recordings on a CPU box
+        groqTimeoutMs: 120_000,
+      })
+      if (!tr.ok) {
+        await failJob(job, `⚠️ Couldn't transcribe that recording: ${tr.error.slice(0, 160)}`, `transcribe: ${tr.error}`)
+        return
+      }
+      transcript = tr.text
+    } else {
+      // ── Media URL (TikTok/YouTube/…) ──────────────────────────────────
+      if (!job.source_url) return
+      const bins = await checkBinaries()
+      if (!bins.ytdlp || !bins.ffmpeg) {
+        const missing = [!bins.ytdlp && "yt-dlp", !bins.ffmpeg && "ffmpeg"].filter(Boolean).join(" + ")
+        await failJob(
+          job,
+          `⚠️ Can't process media links yet — ${missing} isn't installed on the server. Ask the admin to install it (see TRANSCRIPTION.md).`,
+          `missing_binary: ${missing}`,
+        )
+        return
+      }
+      await mkdir(workDir, { recursive: true })
+      const dl = await downloadMediaAudio(job.source_url, {
+        workDir,
+        maxDurationSec: MAX_DURATION_SEC,
+        maxFileSizeMb: MAX_FILESIZE_MB,
+        timeoutMs: DOWNLOAD_TIMEOUT_MS,
+      })
+      if (!dl.ok) {
+        const userMsg =
+          dl.code === "too_long"
+            ? `⚠️ That ${platform} clip is too long to transcribe (limit ${Math.round(MAX_DURATION_SEC / 60)} min).`
+            : dl.code === "too_large"
+              ? `⚠️ That ${platform} clip's audio is too large to transcribe (limit ${MAX_FILESIZE_MB} MB).`
+              : dl.code === "missing_binary"
+                ? `⚠️ Can't process media links yet — yt-dlp/ffmpeg isn't installed on the server. Ask the admin.`
+                : dl.code === "timeout"
+                  ? `⚠️ Timed out downloading that ${platform} clip. Try again later.`
+                  : `⚠️ Couldn't download that ${platform} clip. It may be private, region-locked, or unavailable.`
+        await failJob(job, userMsg, `${dl.code}: ${dl.error}`)
+        return
+      }
+      sqlite
+        .prepare(`UPDATE transcription_jobs SET title = ?, duration_sec = ?, source_url = ?, updated_at = datetime('now') WHERE id = ?`)
+        .run(dl.title, dl.durationSec, dl.webpageUrl, job.id)
+      metaTitle = dl.title
+      sourceUrl = dl.webpageUrl
+
+      setStatus(job.id, "transcribing")
+      const tr = await transcribeAudioFile(dl.audioPath, {
+        groqApiKey: groqKey,
+        language: job.language,
+        ownerUserId: job.user_id,
+        mime: "audio/mpeg",
+        filename: "media.mp3",
+        localTimeoutMs: 1_500_000, // 25 min
+        groqTimeoutMs: 120_000,
+      })
+      if (!tr.ok) {
+        await failJob(
+          job,
+          `⚠️ Downloaded the ${platform} clip but couldn't transcribe it: ${tr.error.slice(0, 160)}`,
+          `transcribe: ${tr.error}`,
+        )
+        return
+      }
+      transcript = tr.text
     }
-    const transcript = tr.text
+
     sqlite
       .prepare(`UPDATE transcription_jobs SET transcript = ?, updated_at = datetime('now') WHERE id = ?`)
       .run(transcript, job.id)
 
-    // 3) AI summary (optional — null if no provider / failure)
+    // AI summary (optional — null if no provider / failure)
     setStatus(job.id, "summarizing")
     const summary = await summarizeTranscript(job.user_id, transcript)
     if (summary) {
@@ -257,30 +346,29 @@ async function processMediaJob(id: string): Promise<void> {
         .run(summary, job.id)
     }
 
-    // 4) capture as a todo (raw INSERT as the bot's user)
+    // Capture as a todo (raw INSERT as the bot's user)
     setStatus(job.id, "saving")
     const { todoId, listTitle } = captureTodo(job.user_id, {
       summary,
-      title: dl.title,
+      title: metaTitle,
       transcript,
-      url: dl.webpageUrl,
+      url: sourceUrl,
       platform,
     })
     sqlite
       .prepare(`UPDATE transcription_jobs SET status = 'done', result_todo_id = ?, updated_at = datetime('now') WHERE id = ?`)
       .run(todoId, job.id)
 
-    // 5) notify
-    const headline = firstLine(summary) ?? dl.title ?? transcript.slice(0, 80)
+    // Notify
+    const headline = firstLine(summary) ?? metaTitle ?? transcript.slice(0, 80)
     const body = [
-      `✅ Captured from ${platform} → ${listTitle}`,
+      isUpload ? `✅ Transcribed your recording → ${listTitle}` : `✅ Captured from ${platform} → ${listTitle}`,
       ``,
       headline,
       summary ? `\n${summary}` : ``,
-      ``,
-      `🔗 ${dl.webpageUrl}`,
+      sourceUrl ? `\n🔗 ${sourceUrl}` : ``,
     ]
-      .filter((l) => l !== undefined)
+      .filter((l) => l !== "")
       .join("\n")
     // Plain text (no parseMode) — transcript/summary can contain arbitrary
     // characters that would break Telegram's Markdown parser.
@@ -288,8 +376,9 @@ async function processMediaJob(id: string): Promise<void> {
       replyMarkup: inlineKeyboard([
         [
           { text: "↩️ Undo", callback_data: `undo:todo:${todoId}` },
-          { text: "🏠 Menu", callback_data: "menu:main" },
+          { text: "📂 Move to…", callback_data: `move:todo:${todoId}` },
         ],
+        [{ text: "🏠 Menu", callback_data: "menu:main" }],
       ]),
     }).catch(() => undefined)
   } catch (err) {
@@ -339,10 +428,12 @@ function resolveTargetList(userId: string): string {
 
 function captureTodo(
   userId: string,
-  data: { summary: string | null; title: string | null; transcript: string; url: string; platform: string },
+  data: { summary: string | null; title: string | null; transcript: string; url: string | null; platform: string },
 ): { todoId: string; listTitle: string } {
   const todoTitle = (firstLine(data.summary) ?? data.title ?? data.transcript.slice(0, 80) ?? "Media capture").slice(0, 200)
-  const notesParts = [`Source: ${data.url}`, `Platform: ${data.platform}`]
+  const notesParts: string[] = []
+  if (data.url) notesParts.push(`Source: ${data.url}`)
+  notesParts.push(`From: ${data.platform}`)
   if (data.summary) notesParts.push("", data.summary)
   notesParts.push("", "— Transcript —", data.transcript.slice(0, 8000))
   const notes = notesParts.join("\n")

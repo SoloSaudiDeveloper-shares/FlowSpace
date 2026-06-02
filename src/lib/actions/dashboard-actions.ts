@@ -347,6 +347,112 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   }
 }
 
+// ─── AI "what to work on today" suggestion ──────────────────────────────
+// Looks at the user's open tasks (priority + deadline) and asks their
+// configured AI provider to pick the few most important things to do today,
+// each with a one-line reason. Degrades gracefully: returns a status the UI
+// can render (no AI configured / nothing to do / error) instead of throwing.
+
+export type FocusSuggestion =
+  | { status: "ok"; items: { title: string; why: string; href?: string }[] }
+  | { status: "no_ai" }
+  | { status: "empty" }
+  | { status: "error" }
+
+export async function getFocusSuggestion(): Promise<FocusSuggestion> {
+  const uid = await currentUserId()
+  if (!uid) return { status: "no_ai" }
+
+  const { getUserAIConfig } = await import("@/lib/telegram/nl-intent")
+  const cfg = getUserAIConfig(uid)
+  if (!cfg || !cfg.enabled) return { status: "no_ai" }
+
+  // Candidate open tasks, priority then soonest deadline first.
+  const candidates = sqlite
+    .prepare(
+      `SELECT t.id, t.title, t.priority, t.due_date, e.id AS project_id, e.title AS project_title
+       FROM tasks t
+       INNER JOIN elements e ON e.id = t.project_id
+       WHERE e.created_by = ?
+         AND t.status_id NOT IN (SELECT id FROM task_statuses WHERE is_done_state = 1)
+       ORDER BY
+         CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END ASC,
+         (t.due_date IS NULL) ASC,
+         t.due_date ASC
+       LIMIT 25`,
+    )
+    .all(uid) as {
+      id: string
+      title: string
+      priority: string
+      due_date: string | null
+      project_id: string
+      project_title: string
+    }[]
+
+  if (candidates.length === 0) return { status: "empty" }
+
+  const today = new Date().toISOString().slice(0, 10)
+  const lines = candidates.map((c, i) => {
+    const due = c.due_date
+      ? c.due_date.slice(0, 10) < today
+        ? `OVERDUE (due ${c.due_date.slice(0, 10)})`
+        : `due ${c.due_date.slice(0, 10)}`
+      : "no due date"
+    return `${i + 1}. "${c.title}" — priority ${c.priority}, ${due}, project: ${c.project_title}`
+  })
+
+  const system =
+    `You are a focus coach for a productivity app. Given a list of the user's open tasks with priority and deadlines, pick the 3-5 MOST important to work on TODAY (${today}). ` +
+    `Prioritise overdue and soon-due items, then high priority. Return ONLY JSON: {"items":[{"title":"<exact task title from the list>","why":"<one short reason>"}]}. No markdown, no preamble.`
+
+  let parsed: { items?: { title?: string; why?: string }[] }
+  try {
+    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: lines.join("\n") },
+        ],
+        temperature: 0.2,
+        max_tokens: 500,
+        response_format: { type: "json_object" },
+      }),
+      signal: AbortSignal.timeout(20_000),
+    })
+    if (!res.ok) return { status: "error" }
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
+    const raw = data.choices?.[0]?.message?.content?.trim() ?? ""
+    const cleaned = raw.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, "")
+    parsed = JSON.parse(cleaned)
+  } catch {
+    return { status: "error" }
+  }
+
+  const rawItems = Array.isArray(parsed.items) ? parsed.items : []
+  const items = rawItems
+    .filter((it) => it && typeof it.title === "string")
+    .slice(0, 5)
+    .map((it) => {
+      const title = String(it.title).trim()
+      // Attach a link by matching the returned title back to a candidate.
+      const match =
+        candidates.find((c) => c.title.toLowerCase() === title.toLowerCase()) ??
+        candidates.find((c) => title.toLowerCase().includes(c.title.toLowerCase()))
+      return {
+        title,
+        why: String(it.why ?? "").trim().slice(0, 160),
+        href: match ? `/projects/${match.project_id}` : undefined,
+      }
+    })
+
+  if (items.length === 0) return { status: "error" }
+  return { status: "ok", items }
+}
+
 export async function initializeDefaultDashboard() {
   const existing = await getDashboardWidgets()
   if (existing.length > 0) return
