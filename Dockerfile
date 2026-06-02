@@ -34,6 +34,21 @@ ENV HOSTNAME=0.0.0.0
 # All SQLite + uploads + backups land under /data, which the host mounts as a volume.
 ENV DATA_DIR=/data
 
+# ffmpeg + yt-dlp power the media-link capture feature (share a TikTok/YouTube
+# link to the Telegram bot → download, transcribe, summarize). The long-audio
+# upload path does NOT need these (it streams bytes straight to Whisper), so a
+# failed yt-dlp download here only disables link capture, not the whole app.
+# yt-dlp ships self-contained PyInstaller binaries per-arch (bundle their own
+# Python), so we fetch the one matching the build architecture.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ffmpeg ca-certificates curl \
+    && arch="$(dpkg --print-architecture)" \
+    && if [ "$arch" = "arm64" ]; then ytasset=yt-dlp_linux_aarch64; else ytasset=yt-dlp_linux; fi \
+    && (curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytasset}" -o /usr/local/bin/yt-dlp \
+        && chmod a+rx /usr/local/bin/yt-dlp \
+        || echo "WARN: yt-dlp download failed — media-link capture will be disabled until re-deployed") \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create a non-root user for security
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs --home-dir /app nextjs && \
