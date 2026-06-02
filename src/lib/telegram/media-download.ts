@@ -105,8 +105,16 @@ export async function downloadMediaAudio(
   opts: DownloadOpts,
 ): Promise<MediaDownloadResult | MediaDownloadError> {
   const maxDuration = opts.maxDurationSec ?? 1800
-  const maxFileSizeMb = opts.maxFileSizeMb ?? 50
+  // This bounds the SOURCE download, not the audio we keep. On sites that only
+  // offer a combined video+audio stream (e.g. TikTok), yt-dlp must pull the
+  // whole video before ffmpeg strips the audio — so this is deliberately
+  // generous. The real guard is the duration cap above; the extracted audio is
+  // tiny (mono 16 kHz, see below).
+  const maxFileSizeMb = opts.maxFileSizeMb ?? 500
   const timeoutMs = opts.timeoutMs ?? 300_000
+  // The extracted audio is what we transcribe. Mono 16 kHz keeps it small
+  // (a few MB even for ~30 min) and well under Groq's 25 MB cap.
+  const AUDIO_MAX_MB = 60
 
   // ── Step 1: probe metadata (fast, cheap) so we can reject over-long
   // clips BEFORE downloading any bytes.
@@ -146,7 +154,11 @@ export async function downloadMediaAudio(
     }
   }
 
-  // ── Step 2: download audio-only and let ffmpeg transcode to mp3.
+  // ── Step 2: grab audio (prefer an audio-only stream; fall back to the
+  // full video on sites that only mux), then transcode to a COMPACT mp3 —
+  // mono, 16 kHz, low bitrate. Whisper downsamples to 16 kHz mono anyway, so
+  // this loses nothing for transcription while shrinking a long clip to a few
+  // MB. `--postprocessor-args ffmpeg:…` passes the resample flags to ffmpeg.
   const outTemplate = path.join(opts.workDir, "media.%(ext)s")
   const dlArgs = [
     "--no-playlist",
@@ -158,7 +170,9 @@ export async function downloadMediaAudio(
     "--audio-format",
     "mp3",
     "--audio-quality",
-    "5",
+    "9", // smallest LAME VBR — fine at 16 kHz mono for speech
+    "--postprocessor-args",
+    "ffmpeg:-ac 1 -ar 16000",
     "--max-filesize",
     `${maxFileSizeMb}M`,
     "--match-filter",
@@ -210,8 +224,10 @@ export async function downloadMediaAudio(
     if (s.size === 0) {
       return { ok: false, code: "download_failed", error: "Downloaded audio is empty." }
     }
-    if (s.size > maxFileSizeMb * 1024 * 1024 * 1.5) {
-      return { ok: false, code: "too_large", error: `Audio exceeds the ${maxFileSizeMb} MB limit.` }
+    // Sanity bound on the EXTRACTED audio (not the source video). With mono
+    // 16 kHz this is generous — it should never trip for in-duration clips.
+    if (s.size > AUDIO_MAX_MB * 1024 * 1024) {
+      return { ok: false, code: "too_large", error: `Extracted audio exceeds ${AUDIO_MAX_MB} MB.` }
     }
   } catch {
     return { ok: false, code: "download_failed", error: "Audio file not found after download." }

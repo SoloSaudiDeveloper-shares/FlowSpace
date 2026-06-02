@@ -50,7 +50,9 @@ pipx install yt-dlp        # apt's build is usually stale
 # (crontab) 0 4 * * 0 pipx upgrade yt-dlp
 ```
 **Env knobs:** `MEDIA_CAPTURE_MAX_DURATION_SEC` (1800), `MEDIA_CAPTURE_MAX_FILESIZE_MB`
-(50), `MEDIA_CAPTURE_TIMEOUT_MS` (300000), optional `YTDLP_BIN` / `FFMPEG_BIN`.
+(500 — bounds the *source video* download, not the kept audio), `MEDIA_CAPTURE_TIMEOUT_MS`
+(300000), optional `YTDLP_BIN` / `FFMPEG_BIN`. The duration cap is the real guard; only
+the audio is transcribed and it's downmixed to mono 16 kHz (a few MB even for ~30 min).
 
 **ToS:** downloading from these platforms generally violates their Terms of
 Service. Fine for a single-user, self-hosted, personal tool; don't expose it as a

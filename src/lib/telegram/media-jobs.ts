@@ -34,7 +34,10 @@ import { summarizeTranscript } from "@/lib/telegram/summarize"
 
 // ── Tunables (env-overridable) ──────────────────────────────────────────
 const MAX_DURATION_SEC = Number(process.env.MEDIA_CAPTURE_MAX_DURATION_SEC) || 1800
-const MAX_FILESIZE_MB = Number(process.env.MEDIA_CAPTURE_MAX_FILESIZE_MB) || 50
+// Bounds the SOURCE video download (we keep only the extracted audio), so it's
+// generous — the duration cap is the real guard. TikTok-style muxed videos can
+// be large; we still only transcribe a few-MB mono-16kHz audio track.
+const MAX_FILESIZE_MB = Number(process.env.MEDIA_CAPTURE_MAX_FILESIZE_MB) || 500
 const DOWNLOAD_TIMEOUT_MS = Number(process.env.MEDIA_CAPTURE_TIMEOUT_MS) || 300_000
 const MAX_ATTEMPTS = 3
 const STALE = "-15 minutes" // watchdog threshold for SQLite datetime()
@@ -297,7 +300,7 @@ async function processMediaJob(id: string): Promise<void> {
           dl.code === "too_long"
             ? `⚠️ That ${platform} clip is too long to transcribe (limit ${Math.round(MAX_DURATION_SEC / 60)} min).`
             : dl.code === "too_large"
-              ? `⚠️ That ${platform} clip's audio is too large to transcribe (limit ${MAX_FILESIZE_MB} MB).`
+              ? `⚠️ That ${platform} video is unusually large (over ${MAX_FILESIZE_MB} MB to download). Try a shorter clip.`
               : dl.code === "missing_binary"
                 ? `⚠️ Can't process media links yet — yt-dlp/ffmpeg isn't installed on the server. Ask the admin.`
                 : dl.code === "timeout"
