@@ -37,6 +37,7 @@ import {
   deleteConfirmMenu,
   projectArchiveConfirm,
   voiceDestinationMenu,
+  captureRouterRows,
   voiceListPicker,
   voiceProjectPicker,
   type MenuResponse,
@@ -112,6 +113,54 @@ export async function handleCallback(
           },
         },
       }
+    }
+
+    // Send a captured to-do somewhere else: → a new Page, or → a Project task.
+    if (data.startsWith("snd:pg:")) {
+      const todoId = data.slice("snd:pg:".length)
+      const r = convertTodoToPage(userId, todoId)
+      if (!r.ok) return { toast: "Couldn't create that page." }
+      return {
+        toast: "Page created",
+        edit: {
+          text: `📄 *Created page:* "${escMd(r.title)}"`,
+          markup: {
+            inline_keyboard: [
+              [{ text: "↩️ Undo", callback_data: `undo:page:${r.pageId}` }],
+              [{ text: "🏠 Menu", callback_data: "menu:main" }],
+            ],
+          },
+        },
+      }
+    }
+    if (data.startsWith("snd:pr:")) {
+      const todoId = data.slice("snd:pr:".length)
+      return { edit: sendProjectPickerMenu(userId, todoId) }
+    }
+    if (data.startsWith("stp:")) {
+      const [, todoId, projectId] = data.split(":")
+      const r = sendTodoToProject(userId, todoId, projectId)
+      if (!r.ok) return { toast: "Couldn't add the task." }
+      return {
+        toast: "Task added",
+        edit: {
+          text: `📁 *Added to ${escMd(r.projectTitle)}:* "${escMd(r.title)}"`,
+          markup: {
+            inline_keyboard: [
+              [{ text: "↩️ Undo", callback_data: `undo:task:${r.taskId}` }],
+              [{ text: "🏠 Menu", callback_data: "menu:main" }],
+            ],
+          },
+        },
+      }
+    }
+    if (data.startsWith("undo:page:")) {
+      const ok = deletePageForUser(userId, data.slice("undo:page:".length))
+      return { toast: ok ? "Removed" : "Already gone", replace: { text: ok ? "↩️ _Page removed._" : "↩️ _Already gone._" } }
+    }
+    if (data.startsWith("undo:task:")) {
+      const ok = deleteTaskForUser(userId, data.slice("undo:task:".length))
+      return { toast: ok ? "Removed" : "Already gone", replace: { text: ok ? "↩️ _Task removed._" : "↩️ _Already gone._" } }
     }
 
     // View routes
@@ -715,15 +764,7 @@ async function captureToList(v: PendingVoice, listId: string): Promise<CallbackR
         "",
         `_"${escMd(captured.title)}"_${captureHits(captured)}`,
       ].join("\n"),
-      markup: {
-        inline_keyboard: [
-          [
-            { text: "↩️ Undo", callback_data: `undo:todo:${itemId}` },
-            { text: "📂 Move to…", callback_data: `move:todo:${itemId}` },
-          ],
-          [{ text: "🏠 Menu", callback_data: "menu:main" }],
-        ],
-      },
+      markup: { inline_keyboard: captureRouterRows(itemId) },
     },
   }
 }
@@ -778,6 +819,131 @@ function moveTodoToList(userId: string, todoId: string, listId: string): { ok: b
     .run(listId, max.m + 1, todoId)
   sqlite.prepare(`UPDATE elements SET updated_at = datetime('now') WHERE id = ?`).run(listId)
   return { ok: true, listTitle: target.title }
+}
+
+/** Convert a captured to-do into a brand-new Page (title from the note, body =
+ *  its notes/transcript), then delete the to-do. Ownership verified via the
+ *  to-do's list. */
+function convertTodoToPage(userId: string, todoId: string): { ok: boolean; pageId: string; title: string } {
+  const todo = sqlite
+    .prepare(
+      `SELECT ti.title AS title, ti.notes AS notes FROM todo_items ti
+       INNER JOIN elements e ON e.id = ti.list_id
+       WHERE ti.id = ? AND e.created_by = ?`,
+    )
+    .get(todoId, userId) as { title: string; notes: string | null } | undefined
+  if (!todo) return { ok: false, pageId: "", title: "" }
+  const title = (todo.title || "Untitled note").slice(0, 200)
+  const body = todo.notes && todo.notes.trim() ? todo.notes : todo.title
+  // BlockNote document = one paragraph block holding the captured text.
+  const content = JSON.stringify([
+    {
+      id: createId(),
+      type: "paragraph",
+      props: {},
+      content: body ? [{ type: "text", text: body, styles: {} }] : [],
+      children: [],
+    },
+  ])
+  const pageId = createId()
+  const now = new Date().toISOString()
+  sqlite.transaction(() => {
+    sqlite
+      .prepare(
+        `INSERT INTO elements (id, type, title, icon, color, created_by, created_at, updated_at)
+         VALUES (?, 'page', ?, 'FileText', '#a78bfa', ?, ?, ?)`,
+      )
+      .run(pageId, title, userId, now, now)
+    sqlite.prepare(`INSERT INTO pages (id, content) VALUES (?, ?)`).run(pageId, content)
+    sqlite.prepare(`DELETE FROM todo_items WHERE id = ?`).run(todoId)
+  })()
+  return { ok: true, pageId, title }
+}
+
+/** Project picker for the "→ Project" capture action. */
+function sendProjectPickerMenu(
+  userId: string,
+  todoId: string,
+): { text: string; markup: { inline_keyboard: { text: string; callback_data: string }[][] } } {
+  const projects = sqlite
+    .prepare(
+      `SELECT id, title FROM elements
+       WHERE created_by = ? AND type = 'project' AND is_archived = 0 AND is_deleted = 0
+       ORDER BY updated_at DESC LIMIT 6`,
+    )
+    .all(userId) as { id: string; title: string }[]
+  const rows = projects.map((p) => [
+    { text: `📁 ${p.title.slice(0, 30)}`, callback_data: `stp:${todoId}:${p.id}` },
+  ])
+  return {
+    text: projects.length ? "📁 *Add as a task in which project?*" : "_You have no projects yet._",
+    markup: { inline_keyboard: [...rows, [{ text: "🏠 Menu", callback_data: "menu:main" }]] },
+  }
+}
+
+/** Turn a captured to-do into a task in the given project's first open column,
+ *  then delete the to-do. Ownership verified on both ends. */
+function sendTodoToProject(
+  userId: string,
+  todoId: string,
+  projectId: string,
+): { ok: boolean; taskId: string; title: string; projectTitle: string } {
+  const fail = { ok: false, taskId: "", title: "", projectTitle: "" }
+  const project = sqlite
+    .prepare(`SELECT title FROM elements WHERE id = ? AND created_by = ? AND type = 'project'`)
+    .get(projectId, userId) as { title: string } | undefined
+  if (!project) return fail
+  const todo = sqlite
+    .prepare(
+      `SELECT ti.title AS title FROM todo_items ti
+       INNER JOIN elements e ON e.id = ti.list_id
+       WHERE ti.id = ? AND e.created_by = ?`,
+    )
+    .get(todoId, userId) as { title: string } | undefined
+  if (!todo) return fail
+  const status = sqlite
+    .prepare(`SELECT id FROM task_statuses WHERE project_id = ? AND is_done_state = 0 ORDER BY sort_order ASC LIMIT 1`)
+    .get(projectId) as { id: string } | undefined
+  if (!status) return fail
+  const taskId = createId()
+  const now = new Date().toISOString()
+  sqlite.transaction(() => {
+    sqlite
+      .prepare(
+        `INSERT INTO tasks (id, project_id, status_id, title, priority, due_date, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'none', NULL, 0, ?, ?)`,
+      )
+      .run(taskId, projectId, status.id, todo.title, now, now)
+    sqlite.prepare(`UPDATE elements SET updated_at = ? WHERE id = ?`).run(now, projectId)
+    sqlite.prepare(`DELETE FROM todo_items WHERE id = ?`).run(todoId)
+  })()
+  return { ok: true, taskId, title: todo.title, projectTitle: project.title }
+}
+
+/** Undo a "→ Page" — delete the page element (+ its pages row) if owned. */
+function deletePageForUser(userId: string, pageId: string): boolean {
+  const owns = sqlite
+    .prepare(`SELECT 1 FROM elements WHERE id = ? AND created_by = ? AND type = 'page'`)
+    .get(pageId, userId) as { 1: number } | undefined
+  if (!owns) return false
+  sqlite.transaction(() => {
+    sqlite.prepare(`DELETE FROM pages WHERE id = ?`).run(pageId)
+    sqlite.prepare(`DELETE FROM elements WHERE id = ?`).run(pageId)
+  })()
+  return true
+}
+
+/** Undo a "→ Project" — delete the task if owned (via its project). */
+function deleteTaskForUser(userId: string, taskId: string): boolean {
+  const r = sqlite
+    .prepare(
+      `DELETE FROM tasks WHERE id IN (
+         SELECT t.id FROM tasks t INNER JOIN elements e ON e.id = t.project_id
+         WHERE t.id = ? AND e.created_by = ?
+       )`,
+    )
+    .run(taskId, userId)
+  return r.changes > 0
 }
 
 async function addAsTask(v: PendingVoice, projectId: string): Promise<CallbackResult> {

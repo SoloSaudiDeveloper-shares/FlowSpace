@@ -757,6 +757,29 @@ export function languagePickerFor(pid: string, defaultLangLabel: string): MenuRe
   }
 }
 
+/**
+ * The "Send to…" router shown under every capture confirmation (text, voice,
+ * media). The item already exists as a to-do in the default list; these
+ * buttons re-route it: one tap → Page (new page from the content), pick a
+ * Project (becomes a task), or move to another to-do list. Undo / Menu round
+ * it out. Keep callback_data short — Telegram caps it at 64 bytes.
+ */
+export function captureRouterRows(
+  todoId: string,
+): { text: string; callback_data: string }[][] {
+  return [
+    [
+      { text: "📄 → Page", callback_data: `snd:pg:${todoId}` },
+      { text: "📁 → Project", callback_data: `snd:pr:${todoId}` },
+    ],
+    [{ text: "📂 Move to another list", callback_data: `move:todo:${todoId}` }],
+    [
+      { text: "↩️ Undo", callback_data: `undo:todo:${todoId}` },
+      { text: "🏠 Menu", callback_data: "menu:main" },
+    ],
+  ]
+}
+
 export function voiceDestinationMenu(pid: string, transcript: string): MenuResponse {
   return {
     text: [

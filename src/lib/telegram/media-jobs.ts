@@ -28,6 +28,7 @@ import { sqlite } from "@/lib/db"
 import { createId } from "@/lib/utils/ids"
 import { getDataDir } from "@/lib/utils/data-dir"
 import { sendMessage, inlineKeyboard, getFile, fileDownloadUrl } from "@/lib/telegram/client"
+import { captureRouterRows } from "@/lib/telegram/menus"
 import { resolveGroqKey, transcribeAudioFile, transcribeAudioBytes } from "@/lib/telegram/voice"
 import { checkBinaries, downloadMediaAudio } from "@/lib/telegram/media-download"
 import { summarizeTranscript } from "@/lib/telegram/summarize"
@@ -376,13 +377,7 @@ async function processMediaJob(id: string): Promise<void> {
     // Plain text (no parseMode) — transcript/summary can contain arbitrary
     // characters that would break Telegram's Markdown parser.
     await sendMessage(job.bot_token, job.chat_id, body, {
-      replyMarkup: inlineKeyboard([
-        [
-          { text: "↩️ Undo", callback_data: `undo:todo:${todoId}` },
-          { text: "📂 Move to…", callback_data: `move:todo:${todoId}` },
-        ],
-        [{ text: "🏠 Menu", callback_data: "menu:main" }],
-      ]),
+      replyMarkup: inlineKeyboard(captureRouterRows(todoId)),
     }).catch(() => undefined)
   } catch (err) {
     await failJob(

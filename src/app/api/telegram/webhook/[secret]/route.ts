@@ -48,6 +48,7 @@ import { parseAIImport } from "@/lib/import/ai-import-parser"
 import { createId } from "@/lib/utils/ids"
 import { detectMediaUrl } from "@/lib/telegram/media-url"
 import { enqueueMediaJob, enqueueAudioJob, kickMediaWorker } from "@/lib/telegram/media-jobs"
+import { captureRouterRows } from "@/lib/telegram/menus"
 
 interface BotRow {
   user_id: string
@@ -270,10 +271,13 @@ export async function POST(
         // with text the dispatcher could misinterpret.
         `/add ${text}`,
       )
-      logMessage(bot.user_id, "out", reply)
-      await sendMessage(bot.bot_token, msg.chat.id, "📎 _Forwarded._\n" + reply, {
+      const { text: fwdReply, todoId: fwdTodoId } = parseUndoMarker(reply)
+      logMessage(bot.user_id, "out", fwdReply)
+      await sendMessage(bot.bot_token, msg.chat.id, "📎 _Forwarded._\n" + fwdReply, {
         parseMode: "Markdown",
-        replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+        replyMarkup: fwdTodoId
+          ? inlineKeyboard(captureRouterRows(fwdTodoId))
+          : inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
       })
       return new NextResponse("ok", { status: 200 })
     }
@@ -397,15 +401,15 @@ export async function POST(
     // is a capture-success, we ALSO add an "↩️ Undo" button on the same
     // row so the user can immediately reverse a fat-finger or mistaken
     // capture without scrolling to find the item.
-    const keyboardRow: { text: string; callback_data: string }[] = []
-    if (undoTodoId) {
-      keyboardRow.push({ text: "↩️ Undo", callback_data: `undo:todo:${undoTodoId}` })
-      keyboardRow.push({ text: "📂 Move to…", callback_data: `move:todo:${undoTodoId}` })
-    }
-    keyboardRow.push({ text: "🏠 Menu", callback_data: "menu:main" })
+    // On a capture-success the reply carries a todo id — show the full
+    // "Send to…" router (→ Page / → Project / move list / undo). Otherwise
+    // just the Menu shortcut.
+    const replyMarkup = undoTodoId
+      ? inlineKeyboard(captureRouterRows(undoTodoId))
+      : inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]])
     await sendMessage(bot.bot_token, msg.chat.id, reply, {
       parseMode: "Markdown",
-      replyMarkup: inlineKeyboard([keyboardRow]),
+      replyMarkup,
     })
     // Voice OUT — if the user opted in, also send a TTS rendering. This
     // is fire-and-forget so a slow TTS provider can't hold up the
