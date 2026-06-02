@@ -173,6 +173,39 @@ sqlite.exec(`
 `)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_pending_voices_user ON pending_voices(user_id, created_at);`)
 
+// ─── Transcription jobs (async media-link + long-audio pipeline) ───────
+// A durable queue for work that's too slow to do inline in the webhook
+// (download a TikTok/YouTube clip with yt-dlp, transcribe, summarize, then
+// capture). A single-flight worker (see src/lib/telegram/media-jobs.ts)
+// claims one `queued` row at a time. The `source` discriminator lets a
+// future uploaded-long-audio path share this table (see TRANSCRIPTION.md).
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS transcription_jobs (
+    id                TEXT PRIMARY KEY,
+    user_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source            TEXT NOT NULL DEFAULT 'media_url',
+    bot_token         TEXT NOT NULL,
+    chat_id           TEXT NOT NULL,
+    message_id        INTEGER NOT NULL DEFAULT 0,
+    source_url        TEXT,
+    platform          TEXT,
+    title             TEXT,
+    duration_sec      INTEGER,
+    language          TEXT NOT NULL DEFAULT 'en',
+    status            TEXT NOT NULL DEFAULT 'queued',
+    transcript        TEXT,
+    summary           TEXT,
+    error             TEXT,
+    result_todo_id    TEXT,
+    result_element_id TEXT,
+    attempts          INTEGER NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_txjobs_status ON transcription_jobs(status, created_at);`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_txjobs_user ON transcription_jobs(user_id);`)
+
 // ─── Reminder bot-fired tracking ────────────────────────────────────────
 // `bot_fired_at` so the cron doesn't re-DM the same reminder forever.
 // SQLite has no ADD COLUMN IF NOT EXISTS — check pragma first.

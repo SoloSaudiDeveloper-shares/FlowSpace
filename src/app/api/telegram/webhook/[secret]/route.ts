@@ -46,6 +46,8 @@ import {
 } from "@/lib/telegram/conversations"
 import { parseAIImport } from "@/lib/import/ai-import-parser"
 import { createId } from "@/lib/utils/ids"
+import { detectMediaUrl } from "@/lib/telegram/media-url"
+import { enqueueMediaJob, kickMediaWorker } from "@/lib/telegram/media-jobs"
 
 interface BotRow {
   user_id: string
@@ -288,6 +290,35 @@ export async function POST(
         replyMarkup: m.markup,
       })
       return new NextResponse("ok", { status: 200 })
+    }
+
+    // ── Media URL → async download + transcribe + capture ───────────
+    // A link to a known media host (TikTok/YouTube/Instagram/…) gets
+    // downloaded server-side (yt-dlp), transcribed, summarized, and saved
+    // as a todo by a background worker. We enqueue + ack INSTANTLY so the
+    // webhook never blocks on the multi-second/minute pipeline. A pasted
+    // link to an UNKNOWN host returns null here and falls through to plain
+    // smart-capture (becomes a normal todo). `/add <link>` skips this too
+    // (the slash guard) so users can force a plain save.
+    if (!firstWord?.startsWith("/")) {
+      const media = detectMediaUrl(text)
+      if (media) {
+        enqueueMediaJob({
+          userId: bot.user_id,
+          botToken: bot.bot_token,
+          chatId: String(msg.chat.id),
+          messageId: msg.message_id,
+          url: media.url,
+          platform: media.platform,
+        })
+        kickMediaWorker()
+        const ack = `⏳ Grabbing that ${media.platform} clip — I'll transcribe it and send the capture here when it's ready.`
+        logMessage(bot.user_id, "out", ack)
+        await sendMessage(bot.bot_token, msg.chat.id, ack, {
+          replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+        })
+        return new NextResponse("ok", { status: 200 })
+      }
     }
 
     // ── AI-import detection ──────────────────────────────────────────

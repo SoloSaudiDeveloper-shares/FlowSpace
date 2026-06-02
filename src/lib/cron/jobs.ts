@@ -337,5 +337,63 @@ registerJob({
   },
 })
 
+// ─── Job 6: media-link transcription worker ─────────────────────────────
+//
+// Drains the transcription_jobs queue ONE job at a time. The tick is cheap:
+// it runs the watchdog, then claims + LAUNCHES (un-awaited) the heavy
+// download/transcribe/summarize/capture pipeline. We can safely `await`
+// runMediaWorkerTick here precisely because it returns immediately after
+// launching the work — see media-jobs.ts header for why blocking the tick
+// would be a bug. The webhook also nudges the worker on enqueue, so this is
+// mainly a durability safety net (and the crash-recovery watchdog).
+
+registerJob({
+  name: "telegram:media-capture",
+  async run() {
+    const { runMediaWorkerTick } = await import("@/lib/telegram/media-jobs")
+    await runMediaWorkerTick()
+  },
+})
+
+// ─── Job 7: clean up finished transcription jobs + orphaned scratch ─────
+// Done/failed rows older than 24h are purged. Scratch dirs left by a job
+// that crashed mid-download are swept (the per-job dir is normally removed
+// in processMediaJob's finally).
+
+registerJob({
+  name: "telegram:transcription-cleanup",
+  async run() {
+    sqlite
+      .prepare(
+        `DELETE FROM transcription_jobs
+          WHERE status IN ('done','failed')
+            AND updated_at < datetime('now', '-1 day')`,
+      )
+      .run()
+    // Sweep orphaned scratch dirs (best-effort, never throws).
+    try {
+      const { readdir, rm, stat } = await import("node:fs/promises")
+      const path = await import("node:path")
+      const { getDataDir } = await import("@/lib/utils/data-dir")
+      const tmpRoot = path.join(getDataDir(), "uploads", "media-tmp")
+      const entries = await readdir(tmpRoot).catch(() => [] as string[])
+      for (const name of entries) {
+        const dir = path.join(tmpRoot, name)
+        const live = sqlite
+          .prepare(`SELECT 1 FROM transcription_jobs WHERE id = ? AND status IN ('downloading','transcribing','summarizing','saving')`)
+          .get(name)
+        if (live) continue // an active job owns this dir
+        const s = await stat(dir).catch(() => null)
+        // Remove dirs older than 1h with no active job.
+        if (s && Date.now() - s.mtimeMs > 3_600_000) {
+          await rm(dir, { recursive: true, force: true }).catch(() => undefined)
+        }
+      }
+    } catch {
+      /* sweep is best-effort */
+    }
+  },
+})
+
 // Keep the imported-but-unused symbol around so esbuild doesn't drop it.
 void dispatchTelegramMessage

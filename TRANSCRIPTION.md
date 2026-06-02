@@ -29,6 +29,36 @@ notes already transcribe locally on the box for free.
 
 ---
 
+## Media links (TikTok / YouTube / Instagram / X / …) — IMPLEMENTED
+
+Send the bot a link to a known media host and it downloads the clip, rips the
+audio, transcribes it (local-first → Groq), AI-summarizes it, and saves a todo
+— then DMs you the result with an ↩️ Undo button. A pasted link to an *unknown*
+host still becomes a plain todo (no surprise jobs); `/add <link>` forces a plain
+save.
+
+**Code:** `media-url.ts` (host allowlist), `media-download.ts` (yt-dlp/ffmpeg via
+`execFile` — never a shell string), `media-jobs.ts` (the single-flight worker +
+`transcription_jobs` queue), `summarize.ts` (map-reduce AI summary). The webhook
+enqueues + acks instantly; the worker (cron job `telegram:media-capture`, plus an
+on-enqueue nudge) drains one job at a time and self-heals via a DB watchdog.
+
+**Requires `yt-dlp` on the VM** (in addition to ffmpeg):
+```bash
+pipx install yt-dlp        # apt's build is usually stale
+# add a weekly auto-update — sites change and yt-dlp breaks often:
+# (crontab) 0 4 * * 0 pipx upgrade yt-dlp
+```
+**Env knobs:** `MEDIA_CAPTURE_MAX_DURATION_SEC` (1800), `MEDIA_CAPTURE_MAX_FILESIZE_MB`
+(50), `MEDIA_CAPTURE_TIMEOUT_MS` (300000), optional `YTDLP_BIN` / `FFMPEG_BIN`.
+
+**ToS:** downloading from these platforms generally violates their Terms of
+Service. Fine for a single-user, self-hosted, personal tool; don't expose it as a
+public multi-tenant service. The allowlist is conservative and `--no-playlist` is
+always enforced.
+
+---
+
 ## Server-side components to stand up (Oracle ARM VM)
 
 ### 1. FFmpeg
