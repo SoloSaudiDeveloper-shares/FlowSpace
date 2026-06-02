@@ -21,6 +21,7 @@ import * as misc from "./misc"
 import * as auth from "./auth"
 import * as canvas from "./canvas"
 import * as misc2 from "./misc2"
+import * as guides from "./guides"
 
 const modules = [
   core,

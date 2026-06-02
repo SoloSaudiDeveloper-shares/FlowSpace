@@ -11,15 +11,16 @@
 import { useState } from "react"
 import { ChevronRight } from "lucide-react"
 import { GuideDialog } from "@/components/shared/guide-dialog"
-import { GUIDE_LIST, GUIDES, type GuideId } from "@/lib/guides"
+import { useGuides, type GuideId } from "@/lib/guides"
 
 export function GuidesHub() {
+  const { guides, list } = useGuides()
   const [openId, setOpenId] = useState<GuideId | null>(null)
-  const active = openId ? GUIDES[openId] : null
+  const active = openId ? guides[openId] : null
   return (
     <>
       <div className="grid gap-2 sm:grid-cols-2">
-        {GUIDE_LIST.map((g) => {
+        {list.map((g) => {
           const Icon = g.icon
           return (
             <button

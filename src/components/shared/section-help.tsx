@@ -12,7 +12,7 @@
 import { useState } from "react"
 import { HelpCircle } from "lucide-react"
 import { GuideDialog } from "@/components/shared/guide-dialog"
-import { GUIDES, type GuideId } from "@/lib/guides"
+import { useGuides, type GuideId } from "@/lib/guides"
 import { useT } from "@/lib/hooks/use-i18n"
 
 export function SectionHelp({
@@ -26,8 +26,9 @@ export function SectionHelp({
   className?: string
 }) {
   const { t } = useT()
+  const { guides } = useGuides()
   const [open, setOpen] = useState(false)
-  const guide = GUIDES[guideId]
+  const guide = guides[guideId]
   return (
     <>
       <button
