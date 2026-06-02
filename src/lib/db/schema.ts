@@ -119,6 +119,11 @@ export const tasks = sqliteTable("tasks", {
   timeTrackingStartedAt: text("time_tracking_started_at"),
   isCompleted: integer("is_completed", { mode: "boolean" }).notNull().default(false),
   completedAt: text("completed_at"),
+  /** Set when an `task_overdue` notification has been generated for this
+   *  task. Prevents a dismissed/deleted overdue notification from being
+   *  resurrected on the next page render. Auto-cleared when the task is no
+   *  longer overdue (completed, rescheduled to the future, or due-date cleared). */
+  overdueNotifiedAt: text("overdue_notified_at"),
   createdBy: text("created_by"),
   assigneeId: text("assignee_id"),
   lastEditedBy: text("last_edited_by"),

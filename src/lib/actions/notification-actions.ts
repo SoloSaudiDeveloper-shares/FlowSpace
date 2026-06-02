@@ -3,7 +3,7 @@
 import { db } from "@/lib/db"
 import { notifications, reminders, elements, tasks, taskStatuses } from "@/lib/db/schema"
 import { createId } from "@/lib/utils/ids"
-import { eq, and, desc, lte, sql, isNull } from "drizzle-orm"
+import { eq, and, desc, lte, gt, or, sql, isNull, isNotNull, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { currentUserId } from "@/lib/auth/scope"
 
@@ -149,7 +149,34 @@ export async function generateNotifications() {
     }
   }
 
-  // Overdue tasks in projects owned by the current user
+  // ── Overdue tasks ────────────────────────────────────────────────────
+  // The `overdueNotifiedAt` flag is a tombstone: once we've raised an
+  // overdue notification for a task, we don't raise another — otherwise a
+  // notification the user just deleted would be resurrected on the very next
+  // render (this page calls generateNotifications() on every load, and
+  // deleteNotification revalidates it). The flag is auto-cleared below when a
+  // task stops being overdue, so a rescheduled task can notify again later.
+
+  // ids of the current user's projects (used to scope the re-arm UPDATE)
+  const ownedProjectIds = db
+    .select({ id: elements.id })
+    .from(elements)
+    .where(and(eq(elements.createdBy, uid), eq(elements.type, "project")))
+
+  // Re-arm: clear the flag for tasks that are no longer overdue (completed,
+  // due-date cleared, or rescheduled to the future) so they can notify again.
+  await db
+    .update(tasks)
+    .set({ overdueNotifiedAt: null })
+    .where(
+      and(
+        inArray(tasks.projectId, ownedProjectIds),
+        isNotNull(tasks.overdueNotifiedAt),
+        or(eq(tasks.isCompleted, true), isNull(tasks.dueDate), gt(tasks.dueDate, now))
+      )
+    )
+
+  // Generate for overdue + incomplete tasks we haven't flagged yet.
   const overdueTasks = await db
     .select({ task: tasks, project: elements })
     .from(tasks)
@@ -158,12 +185,20 @@ export async function generateNotifications() {
       and(
         eq(elements.createdBy, uid),
         lte(tasks.dueDate, now),
-        eq(tasks.isCompleted, false)
+        eq(tasks.isCompleted, false),
+        isNull(tasks.overdueNotifiedAt)
       )
     )
 
   for (const { task } of overdueTasks) {
     if (!task.dueDate) continue
+    // Flag first (idempotent guard) so a crash mid-loop can't double-notify.
+    await db
+      .update(tasks)
+      .set({ overdueNotifiedAt: now })
+      .where(eq(tasks.id, task.id))
+
+    // Secondary guard: skip if an identical notification still exists.
     const existing = await db
       .select()
       .from(notifications)

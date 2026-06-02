@@ -415,6 +415,10 @@ sqlite.exec(`
   if (taskCols.length && !taskCols.some((c) => c.name === "repeat_rule")) {
     sqlite.exec(`ALTER TABLE tasks ADD COLUMN repeat_rule TEXT`)
   }
+  // Tombstone so a dismissed "overdue" notification isn't regenerated.
+  if (taskCols.length && !taskCols.some((c) => c.name === "overdue_notified_at")) {
+    sqlite.exec(`ALTER TABLE tasks ADD COLUMN overdue_notified_at TEXT`)
+  }
 }
 
 // ─── Full-text search (FTS5) ───────────────────────────────────────────
