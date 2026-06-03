@@ -39,6 +39,7 @@ import {
   pendingImportMenu,
   languagePickerFor,
   galleryAlbumPicker,
+  captionLangPicker,
 } from "@/lib/telegram/menus"
 import {
   getState,
@@ -376,6 +377,18 @@ export async function POST(
     // ── /menu and /start: send the rich main menu with inline buttons ──
     if (firstWord === "/menu" || firstWord === "/start") {
       const m = mainMenu()
+      logMessage(bot.user_id, "out", m.text)
+      await sendMessage(bot.bot_token, msg.chat.id, m.text, {
+        parseMode: "Markdown",
+        replyMarkup: m.markup,
+      })
+      return new NextResponse("ok", { status: 200 })
+    }
+
+    // ── /caption with no argument → show a tap-to-pick language picker.
+    // (`/caption ar` with an argument falls through to the command handler.)
+    if (firstWord === "/caption" && !text.trim().split(/\s+/).slice(1).join(" ").trim()) {
+      const m = captionLangPicker()
       logMessage(bot.user_id, "out", m.text)
       await sendMessage(bot.bot_token, msg.chat.id, m.text, {
         parseMode: "Markdown",

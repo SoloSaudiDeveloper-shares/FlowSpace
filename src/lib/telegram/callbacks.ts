@@ -246,6 +246,20 @@ export async function handleCallback(
       }
     }
 
+    // Gallery caption language picker (cl:<lang>)
+    if (data.startsWith("cl:")) {
+      const lang = data.slice("cl:".length)
+      const val = lang === "auto" || /^[a-z]{2}$/.test(lang) ? lang : "auto"
+      sqlite.prepare(`UPDATE telegram_bots SET caption_lang = ? WHERE user_id = ?`).run(val, userId)
+      const names: Record<string, string> = {
+        en: "English", ar: "Arabic", es: "Spanish", fr: "French", tr: "Turkish", ur: "Urdu", auto: "Auto",
+      }
+      return {
+        toast: "Caption language set",
+        replace: { text: `🖼 *Gallery captions → ${names[val] ?? val}.*` },
+      }
+    }
+
     // View routes
     if (data === "v:tasks")      return { edit: tasksMenu(userId) }
     if (data === "v:projects")   return { edit: projectsMenu(userId, 0) }

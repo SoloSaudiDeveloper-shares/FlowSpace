@@ -126,45 +126,6 @@ function languageName(lang: string): string {
   return map[lang] ?? lang
 }
 
-/**
- * Translate a caption into the target language using the user's TEXT AI
- * provider (e.g. Gemini). This pairs a light English-only vision model
- * (moondream → great English caption, free, local) with a strong multilingual
- * LLM for the translation — so Arabic captions come out clean. Returns the
- * original text if no text provider is configured or on any failure (a good
- * English caption beats nothing).
- */
-async function translateCaption(userId: string, text: string, lang: string): Promise<string> {
-  const { getUserAIConfig } = await import("@/lib/telegram/nl-intent")
-  const cfg = getUserAIConfig(userId)
-  if (!cfg) return text
-  try {
-    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: [
-          {
-            role: "system",
-            content: `Translate the user's short image caption into ${languageName(lang)}. Preserve meaning and any names/text. Reply with ONLY the translation — no quotes, no notes.`,
-          },
-          { role: "user", content: text },
-        ],
-        temperature: 0.2,
-        max_tokens: 200,
-      }),
-      signal: AbortSignal.timeout(30_000),
-    })
-    if (!res.ok) return text
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
-    const out = (data.choices?.[0]?.message?.content || "").trim().replace(/^["']|["']$/g, "")
-    return out || text
-  } catch {
-    return text
-  }
-}
-
 export async function describeGalleryImage(
   userId: string,
   imageId: string,
@@ -223,6 +184,20 @@ export async function describeGalleryImage(
     return { ok: false, error: "could not read file" }
   }
 
+  // Build a rich, search-friendly prompt: enough detail (objects, people,
+  // places) AND a verbatim transcription of any visible text, written in the
+  // user's chosen caption language — so gallery search finds images both by
+  // what they show and by what they say.
+  const lang = readCaptionLang(userId)
+  const langClause =
+    !lang || lang === "auto"
+      ? "Write it in the main language of any visible text in the image, otherwise English."
+      : `Write the WHOLE description in ${languageName(lang)}.`
+  const promptText =
+    "Describe this image for search in 2–4 sentences. Include what it shows (key objects, people, places, brands) AND transcribe any visible text VERBATIM — do not shorten or summarize that text. Mention specific names, numbers and dates if present. " +
+    langClause +
+    " Reply with only the description, no preamble."
+
   try {
     const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
       method: "POST",
@@ -236,18 +211,15 @@ export async function describeGalleryImage(
           {
             role: "user",
             content: [
-              {
-                type: "text",
-                text: "Describe this image in ONE short caption (max ~20 words). If it contains readable text, capture the key text instead. Reply with just the caption — no preamble.",
-              },
+              { type: "text", text: promptText },
               { type: "image_url", image_url: { url: dataUrl } },
             ],
           },
         ],
-        max_tokens: 160,
+        max_tokens: 600,
       }),
       // Local CPU vision (moondream) is slower than a cloud call — give it room.
-      signal: AbortSignal.timeout(cfg.isLocal ? 120_000 : 45_000),
+      signal: AbortSignal.timeout(cfg.isLocal ? 120_000 : 60_000),
     })
     if (!res.ok) {
       setCaptionStatus(imageId, userId, "failed")
@@ -259,17 +231,15 @@ export async function describeGalleryImage(
     const caption = (typeof c === "string" ? c : Array.isArray(c) ? c.map((x: { text?: string }) => x.text ?? "").join("") : "")
       .trim()
       .replace(/^["']|["']$/g, "")
-      .slice(0, 280)
+      .slice(0, 1200)
     if (!caption) {
       setCaptionStatus(imageId, userId, "failed")
       await finishNotify(await albumPicker())
       return { ok: false, error: "empty response" }
     }
-    // Vision gives an English caption; if the user picked another caption
-    // language, translate it via their text AI provider (e.g. Gemini → Arabic).
-    const lang = readCaptionLang(userId)
-    const finalCaption =
-      lang && lang !== "auto" && lang !== "en" ? await translateCaption(userId, caption, lang) : caption
+    // Language is already handled in the prompt (the vision model writes in the
+    // chosen language), so no separate translation step.
+    const finalCaption = caption
 
     sqlite
       .prepare(`UPDATE gallery_images SET caption = ?, caption_status = 'done' WHERE id = ? AND user_id = ?`)

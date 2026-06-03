@@ -24,6 +24,8 @@ export interface TelegramBotStatus {
   voiceLanguage: string
   voiceAutoSkip: boolean
   voiceKeyUseShared: boolean
+  /** Language for AI gallery captions: 'auto' | 'en' | 'ar' | … */
+  captionLanguage: string
   /** True if the server has TELEGRAM_VOICE_GROQ_KEY set — used by the UI
    *  to decide whether to even offer the "shared key" toggle. */
   sharedVoiceKeyAvailable: boolean
@@ -40,6 +42,7 @@ interface BotRow {
   voice_language: string | null
   voice_auto_skip: number | null
   voice_key_use_shared: number | null
+  caption_lang: string | null
 }
 
 /** Compute the base URL for outbound webhook registration. We MUST send a
@@ -60,7 +63,7 @@ export async function getMyTelegramStatus(): Promise<TelegramBotStatus> {
     .prepare(`SELECT * FROM telegram_bots WHERE user_id = ?`)
     .get(me.id) as BotRow | undefined
   if (!row) {
-    return { connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY }
+    return { connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY }
   }
   const url = buildWebhookUrl(row.webhook_secret)
   return {
@@ -74,8 +77,22 @@ export async function getMyTelegramStatus(): Promise<TelegramBotStatus> {
     voiceLanguage: row.voice_language ?? "en",
     voiceAutoSkip: row.voice_auto_skip === 1,
     voiceKeyUseShared: row.voice_key_use_shared === 1,
+    captionLanguage: row.caption_lang ?? "auto",
     sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY,
   }
+}
+
+/** Set the language for AI gallery captions (telegram_bots.caption_lang). */
+export async function setTelegramCaptionLanguage(language: string): Promise<{ ok: true }> {
+  const me = await requireAuth()
+  const lang = language.trim().toLowerCase()
+  if (lang !== "auto" && !/^[a-z]{2}$/.test(lang)) {
+    throw new Error("Use a 2-letter ISO code (en, ar, …) or 'auto'.")
+  }
+  sqlite
+    .prepare(`UPDATE telegram_bots SET caption_lang = ?, updated_at = datetime('now') WHERE user_id = ?`)
+    .run(lang, me.id)
+  return { ok: true }
 }
 
 /**

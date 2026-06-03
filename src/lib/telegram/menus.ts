@@ -811,6 +811,32 @@ export function galleryAlbumPicker(userId: string, imageId: string, captionHint?
   }
 }
 
+/** Tap-to-pick language for gallery AI captions (easier than typing /caption ar). */
+export function captionLangPicker(): MenuResponse {
+  return {
+    text: [
+      "🖼 *Gallery caption language*",
+      "",
+      "Photos you send me are auto-captioned (and the captions power image search). Pick the caption language:",
+    ].join("\n"),
+    markup: inlineKeyboard([
+      [
+        { text: "🇬🇧 English", callback_data: "cl:en" },
+        { text: "🇸🇦 العربية", callback_data: "cl:ar" },
+      ],
+      [
+        { text: "🇪🇸 Español", callback_data: "cl:es" },
+        { text: "🇫🇷 Français", callback_data: "cl:fr" },
+      ],
+      [
+        { text: "🇹🇷 Türkçe", callback_data: "cl:tr" },
+        { text: "🇵🇰 اردو", callback_data: "cl:ur" },
+      ],
+      [{ text: "🌐 Auto (match the image)", callback_data: "cl:auto" }],
+    ]),
+  }
+}
+
 /** Sent when an AI caption finishes — lets the user edit/refine the caption,
  *  file the image into an album, or add a comment, right from Telegram. */
 export function galleryCaptionReadyMenu(imageId: string, caption: string): MenuResponse {

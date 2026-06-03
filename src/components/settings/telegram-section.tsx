@@ -40,6 +40,7 @@ import {
   setTelegramVoiceLanguage,
   setTelegramVoiceAutoSkip,
   setTelegramVoiceKeyUseShared,
+  setTelegramCaptionLanguage,
   type TelegramBotStatus,
   type TelegramHistoryEntry,
 } from "@/lib/actions/telegram-actions"
@@ -77,7 +78,7 @@ export function TelegramSection({
         setLists(ls)
       }
     } catch {
-      setStatus({ connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, sharedVoiceKeyAvailable: false })
+      setStatus({ connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", sharedVoiceKeyAvailable: false })
     }
   }
   useEffect(() => { refresh() }, [])
@@ -116,6 +117,19 @@ export function TelegramSection({
       await refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("settings.telegram.langFailed"))
+    } finally {
+      setSavingVoice(false)
+    }
+  }
+
+  async function handleSetCaptionLanguage(lang: string) {
+    setSavingVoice(true)
+    try {
+      await setTelegramCaptionLanguage(lang)
+      toast.success("Caption language updated")
+      await refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't update caption language")
     } finally {
       setSavingVoice(false)
     }
@@ -361,6 +375,34 @@ export function TelegramSection({
               </p>
             </div>
           )}
+        </div>
+
+        {/* Gallery caption language */}
+        <div className="px-4 py-3 rounded-lg border bg-card">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+            🖼 Gallery captions
+          </p>
+          <label className="block text-[11px] font-medium text-muted-foreground mb-1">Caption language</label>
+          <select
+            value={status.captionLanguage}
+            onChange={(e) => handleSetCaptionLanguage(e.target.value)}
+            disabled={savingVoice}
+            className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="auto">🌐 Auto (match the image)</option>
+            <option value="en">🇬🇧 English</option>
+            <option value="ar">🇸🇦 Arabic</option>
+            <option value="es">🇪🇸 Spanish</option>
+            <option value="fr">🇫🇷 French</option>
+            <option value="de">🇩🇪 German</option>
+            <option value="tr">🇹🇷 Turkish</option>
+            <option value="ur">🇵🇰 Urdu</option>
+            <option value="fa">🇮🇷 Persian</option>
+            <option value="hi">🇮🇳 Hindi</option>
+          </select>
+          <p className="text-[11px] text-muted-foreground leading-relaxed mt-1.5">
+            Photos you send the bot are auto-captioned for search. Captions are written in this language (needs a vision-capable AI provider, e.g. Gemini). Also settable in the bot with <code>/caption</code>.
+          </p>
         </div>
 
         {/* Where captures go */}
