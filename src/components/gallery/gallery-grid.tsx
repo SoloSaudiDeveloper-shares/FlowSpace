@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { ImageOff, MessageSquare, Trash2, Send, FolderPlus, Search, X, Loader2 } from "lucide-react"
+import { ImageOff, MessageSquare, Trash2, Send, FolderPlus, Search, X, Loader2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -58,6 +58,7 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
   const [loadingComments, setLoadingComments] = useState(false)
   const [newComment, setNewComment] = useState("")
   const [caption, setCaption] = useState("")
+  const [editingCaption, setEditingCaption] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const counts = useMemo(() => {
@@ -122,6 +123,7 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
   async function open(img: GalleryImage) {
     setSelected(img)
     setCaption(img.caption ?? "")
+    setEditingCaption(false)
     setNewComment("")
     setComments([])
     setLoadingComments(true)
@@ -307,21 +309,79 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
               </div>
 
               <div className="flex flex-col max-h-[88vh] border-l min-w-0">
-                <DialogHeader className="p-4 pb-2 shrink-0">
-                  <DialogTitle className="text-sm">Image details</DialogTitle>
+                <DialogHeader className="px-4 pt-4 pb-2 shrink-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <DialogTitle className="text-sm">Caption</DialogTitle>
+                    {!editingCaption && (
+                      <button
+                        onClick={() => {
+                          setCaption(selected.caption ?? "")
+                          setEditingCaption(true)
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+                      >
+                        <Pencil className="size-3" /> Edit
+                      </button>
+                    )}
+                  </div>
                 </DialogHeader>
 
-                <div className="px-4 pb-3 shrink-0 space-y-2">
-                  <label className="block text-[11px] font-medium text-muted-foreground">Caption</label>
-                  <textarea
-                    value={caption}
-                    onChange={(e) => setCaption(e.target.value)}
-                    onBlur={saveCaption}
-                    placeholder="Add a caption…"
-                    rows={7}
-                    className="w-full resize-y min-h-[7rem] max-h-[45vh] rounded-md border bg-background px-2.5 py-2 text-sm leading-relaxed outline-none focus:border-primary/60"
-                  />
-                  {/* Move to album */}
+                {editingCaption ? (
+                  <div className="px-4 pb-2 shrink-0 space-y-2">
+                    <textarea
+                      autoFocus
+                      dir="auto"
+                      value={caption}
+                      onChange={(e) => setCaption(e.target.value)}
+                      placeholder="Add a caption…"
+                      rows={8}
+                      className="w-full resize-y min-h-[8rem] max-h-[55vh] rounded-md border bg-background px-2.5 py-2 text-sm leading-relaxed outline-none focus:border-primary/60"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setCaption(selected.caption ?? "")
+                          setEditingCaption(false)
+                        }}
+                        className="rounded-md border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <Button
+                        size="sm"
+                        className="h-7 px-3 text-xs"
+                        disabled={busy}
+                        onClick={async () => {
+                          await saveCaption()
+                          setEditingCaption(false)
+                        }}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-[3] min-h-0 overflow-auto px-4 pb-3">
+                    {selected.caption ? (
+                      <p dir="auto" className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                        {selected.caption}
+                      </p>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setCaption("")
+                          setEditingCaption(true)
+                        }}
+                        className="text-sm italic text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Add a caption…
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Album + saved */}
+                <div className="px-4 py-2 shrink-0 space-y-2 border-t">
                   <div className="flex items-center gap-2">
                     <label className="text-[11px] text-muted-foreground shrink-0">Album</label>
                     <select
@@ -338,9 +398,7 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
                   <p className="text-[10px] text-muted-foreground">Saved · {timeAgo(selected.createdAt)}</p>
                 </div>
 
-                <div className="h-px w-full bg-border" />
-
-                <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
+                <div className="flex-[2] min-h-0 overflow-auto px-4 py-3 space-y-2 border-t">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Comments</p>
                   {loadingComments ? (
                     <p className="text-xs text-muted-foreground">Loading…</p>
