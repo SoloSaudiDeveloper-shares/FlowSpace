@@ -292,6 +292,30 @@ export function handleStatedMessage(
     )
   }
 
+  // ── Edit a gallery image's caption ───────────────────────────────────
+  if (state.step.startsWith("gc:edit:")) {
+    const imageId = state.step.slice("gc:edit:".length)
+    const r = sqlite
+      .prepare(`UPDATE gallery_images SET caption = ?, caption_status = 'done' WHERE id = ? AND user_id = ?`)
+      .run(trimmed.slice(0, 280), imageId, userId)
+    clearState(userId)
+    return r.changes > 0
+      ? successWithActions(`✏️ Caption updated.`, [[{ text: "🏠 Menu", callback_data: "menu:main" }]])
+      : doneFooter("That image is gone.")
+  }
+
+  // ── Add a comment to a gallery image ─────────────────────────────────
+  if (state.step.startsWith("gc:cmt:")) {
+    const imageId = state.step.slice("gc:cmt:".length)
+    const owns = sqlite.prepare(`SELECT 1 FROM gallery_images WHERE id = ? AND user_id = ?`).get(imageId, userId)
+    clearState(userId)
+    if (!owns) return doneFooter("That image is gone.")
+    sqlite
+      .prepare(`INSERT INTO gallery_comments (id, image_id, user_id, body) VALUES (?, ?, ?, ?)`)
+      .run(createId(), imageId, userId, trimmed.slice(0, 4000))
+    return successWithActions(`💬 Comment added.`, [[{ text: "🏠 Menu", callback_data: "menu:main" }]])
+  }
+
   // Unknown state — wipe it so the user isn't stuck.
   clearState(userId)
   return doneFooter("Lost track of where we were. Try the menu again.")

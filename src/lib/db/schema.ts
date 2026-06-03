@@ -180,6 +180,8 @@ export const galleryImages = sqliteTable("gallery_images", {
   filePath: text("file_path").notNull(),
   mime: text("mime"),
   caption: text("caption"),
+  /** NULL | 'pending' (AI captioning) | 'done' | 'failed'. */
+  captionStatus: text("caption_status"),
   /** Album this image belongs to. NULL = Unsorted. */
   albumId: text("album_id"),
   width: integer("width"),

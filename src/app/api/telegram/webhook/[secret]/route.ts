@@ -275,7 +275,7 @@ export async function POST(
       // "Identify" the image: if no caption was provided, auto-describe it with
       // the user's vision model in the background (best-effort; updates the
       // caption when done so the webhook can ack instantly).
-      if (!msg.caption?.trim()) void describeGalleryImage(bot.user_id, r.id)
+      if (!msg.caption?.trim()) void describeGalleryImage(bot.user_id, r.id, { notify: true })
       const picker = galleryAlbumPicker(bot.user_id, r.id, msg.caption?.trim() || undefined)
       logMessage(bot.user_id, "out", picker.text)
       await sendMessage(bot.bot_token, msg.chat.id, picker.text, {

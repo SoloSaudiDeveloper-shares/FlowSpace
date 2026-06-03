@@ -68,6 +68,7 @@ export async function dispatchTelegramMessage(
       case "/search":   return searchAll(bot, args)
       case "/digest":   return toggleDigest(bot, args)
       case "/voice":    return voiceLanguage(bot, args)
+      case "/caption":  return captionLang(bot, args)
       case "/nl":       return toggleNL(bot, args)
       case "/voiceout": return toggleVoiceOut(bot, args)
       case "/clear":    return clearMyHistory(bot, args)
@@ -137,6 +138,10 @@ function helpText(): string {
     "",
     "🌅 *Daily digest*",
     "  • `/digest` — show/toggle/set time (e.g. `/digest 07:30`)",
+    "",
+    "🖼 *Gallery*",
+    "  • Send a photo — I save it, auto-caption it, and offer an album",
+    "  • `/caption ar` — set caption language (e.g. Arabic)",
     "",
     "🎙 *Voice*",
     "  • Hold the mic button — I'll transcribe & route as text",
@@ -902,6 +907,30 @@ function setDefaultList(bot: BotRow, args: string): string {
   }
   sqlite.prepare(`UPDATE telegram_bots SET target_list_id = ? WHERE user_id = ?`).run(list.id, bot.user_id)
   return `⭐ Default list set to *${escapeMd(list.title)}*. New captures land here.`
+}
+
+/**
+ * Show or set the language for AI gallery captions (telegram_bots.caption_lang).
+ *   /caption            → show current + usage
+ *   /caption ar|en|auto → set it (or any 2-letter code / language word)
+ */
+function captionLang(bot: BotRow, args: string): string {
+  const a = args.trim().toLowerCase()
+  if (!a) {
+    const row = sqlite
+      .prepare(`SELECT caption_lang FROM telegram_bots WHERE user_id = ?`)
+      .get(bot.user_id) as { caption_lang: string | null } | undefined
+    const cur = row?.caption_lang || "auto"
+    return [
+      `🖼 Gallery caption language: *${cur}*.`,
+      "",
+      "Change it with `/caption ar` (Arabic), `/caption en` (English), or `/caption auto`.",
+      "_Quality depends on the vision model — moondream is English-centric; for solid Arabic use a multilingual model (e.g. qwen2.5vl / gemma3) or your cloud provider._",
+    ].join("\n")
+  }
+  const val = a === "auto" || /^[a-z]{2}$/.test(a) ? a : a.slice(0, 20)
+  sqlite.prepare(`UPDATE telegram_bots SET caption_lang = ? WHERE user_id = ?`).run(val, bot.user_id)
+  return `🖼 Gallery captions will now be written in *${escapeMd(val)}*.`
 }
 
 function findListByName(userId: string, name: string) {

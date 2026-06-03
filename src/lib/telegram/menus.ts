@@ -811,6 +811,25 @@ export function galleryAlbumPicker(userId: string, imageId: string, captionHint?
   }
 }
 
+/** Sent when an AI caption finishes — lets the user edit/refine the caption,
+ *  file the image into an album, or add a comment, right from Telegram. */
+export function galleryCaptionReadyMenu(imageId: string, caption: string): MenuResponse {
+  return {
+    text: ["✨ *Caption ready*", `_"${escMd(caption)}"_`].join("\n"),
+    markup: inlineKeyboard([
+      [
+        { text: "✏️ Edit", callback_data: `gc:edit:${imageId}` },
+        { text: "🔄 Refine", callback_data: `gc:refine:${imageId}` },
+      ],
+      [
+        { text: "📁 Album", callback_data: `gc:album:${imageId}` },
+        { text: "💬 Comment", callback_data: `gc:cmt:${imageId}` },
+      ],
+      [{ text: "🏠 Menu", callback_data: "menu:main" }],
+    ]),
+  }
+}
+
 export function voiceDestinationMenu(pid: string, transcript: string): MenuResponse {
   return {
     text: [

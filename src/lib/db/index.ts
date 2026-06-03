@@ -243,6 +243,8 @@ sqlite.exec(`
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_gallery_albums_user ON gallery_albums(user_id, created_at);`)
 // album_id: which album an image belongs to (NULL = Unsorted).
 try { sqlite.exec(`ALTER TABLE gallery_images ADD COLUMN album_id TEXT`) } catch {}
+// caption_status: NULL | 'pending' (AI captioning) | 'done' | 'failed'.
+try { sqlite.exec(`ALTER TABLE gallery_images ADD COLUMN caption_status TEXT`) } catch {}
 // file_id is used by the 'audio_upload' source (long/large uploaded audio).
 // Silent: duplicate-column on an already-migrated DB is expected and benign.
 try { sqlite.exec(`ALTER TABLE transcription_jobs ADD COLUMN file_id TEXT`) } catch {}
@@ -708,6 +710,9 @@ try {
   // its text reply (synthesised through the user's AI provider's
   // /audio/speech endpoint, e.g. OpenAI tts-1). Off by default.
   if (!has("voice_out_enabled")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN voice_out_enabled INTEGER NOT NULL DEFAULT 0`)
+  // Language for AI gallery captions: 'auto' (match image / English), 'en',
+  // 'ar', or any language name. Set via /caption <lang>.
+  if (!has("caption_lang")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN caption_lang TEXT NOT NULL DEFAULT 'auto'`)
 } catch (err) {
   console.error("[migration] telegram_bots digest columns:", err)
 }

@@ -11,6 +11,8 @@ import { revalidatePath } from "next/cache"
 export interface GalleryImage {
   id: string
   caption: string | null
+  /** NULL | 'pending' (AI captioning) | 'done' | 'failed'. */
+  captionStatus: string | null
   mime: string | null
   albumId: string | null
   width: number | null
@@ -39,8 +41,8 @@ export async function getMyGalleryImages(): Promise<GalleryImage[]> {
   if (!uid) return []
   return sqlite
     .prepare(
-      `SELECT g.id, g.caption, g.mime, g.album_id AS albumId, g.width, g.height, g.source,
-              g.created_at AS createdAt,
+      `SELECT g.id, g.caption, g.caption_status AS captionStatus, g.mime, g.album_id AS albumId,
+              g.width, g.height, g.source, g.created_at AS createdAt,
               (SELECT COUNT(*) FROM gallery_comments c WHERE c.image_id = g.id) AS commentCount,
               LOWER(
                 COALESCE(g.caption, '') || ' ' ||
@@ -53,6 +55,25 @@ export async function getMyGalleryImages(): Promise<GalleryImage[]> {
        ORDER BY g.created_at DESC`,
     )
     .all(uid) as GalleryImage[]
+}
+
+/** Poll caption status/text for a set of images (used by the gallery to live
+ *  update "captioning…" cards without a refresh). Scoped to the owner. */
+export async function pollGalleryCaptions(
+  ids: string[],
+): Promise<{ id: string; caption: string | null; captionStatus: string | null }[]> {
+  const uid = await currentUserId()
+  if (!uid || ids.length === 0) return []
+  const safe = ids.slice(0, 100).filter((s) => typeof s === "string")
+  if (safe.length === 0) return []
+  const placeholders = safe.map(() => "?").join(",")
+  return sqlite
+    .prepare(
+      `SELECT id, caption, caption_status AS captionStatus
+       FROM gallery_images
+       WHERE user_id = ? AND id IN (${placeholders})`,
+    )
+    .all(uid, ...safe) as { id: string; caption: string | null; captionStatus: string | null }[]
 }
 
 export async function getMyAlbums(): Promise<GalleryAlbum[]> {

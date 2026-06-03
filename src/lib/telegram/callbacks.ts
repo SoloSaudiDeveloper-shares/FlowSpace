@@ -38,6 +38,7 @@ import {
   projectArchiveConfirm,
   voiceDestinationMenu,
   captureRouterRows,
+  galleryAlbumPicker,
   voiceListPicker,
   voiceProjectPicker,
   type MenuResponse,
@@ -192,12 +193,44 @@ export async function handleCallback(
     if (data.startsWith("ga:cap:")) {
       const imageId = data.slice("ga:cap:".length)
       const { describeGalleryImage } = await import("@/lib/telegram/gallery")
-      // Vision can take many seconds — run it in the background and update the
-      // caption when done rather than blocking the callback.
-      void describeGalleryImage(userId, imageId, { overwrite: true })
+      // Vision can take many seconds — run it in the background; it notifies
+      // when the caption is ready (with edit/refine/album/comment actions).
+      void describeGalleryImage(userId, imageId, { overwrite: true, notify: true })
       return {
         toast: "Describing…",
-        replace: { text: "✨ _Describing the image with AI — the caption will appear in your Gallery shortly._" },
+        replace: { text: "✨ _Describing the image with AI — I'll send the caption here when it's ready._" },
+      }
+    }
+
+    // ── Caption-ready actions (edit / refine / album / comment) ──────────
+    if (data.startsWith("gc:edit:")) {
+      const imageId = data.slice("gc:edit:".length)
+      setState(userId, `gc:edit:${imageId}`)
+      return {
+        edit: {
+          text: "✏️ *Edit caption*\n\nSend the new caption as your next message.",
+          markup: { inline_keyboard: [[{ text: "❌ Cancel", callback_data: "cancel" }]] },
+        },
+      }
+    }
+    if (data.startsWith("gc:refine:")) {
+      const imageId = data.slice("gc:refine:".length)
+      const { describeGalleryImage } = await import("@/lib/telegram/gallery")
+      void describeGalleryImage(userId, imageId, { overwrite: true, notify: true })
+      return { toast: "Refining…", replace: { text: "🔄 _Generating a fresh caption — I'll send it here shortly._" } }
+    }
+    if (data.startsWith("gc:album:")) {
+      const imageId = data.slice("gc:album:".length)
+      return { edit: galleryAlbumPicker(userId, imageId) }
+    }
+    if (data.startsWith("gc:cmt:")) {
+      const imageId = data.slice("gc:cmt:".length)
+      setState(userId, `gc:cmt:${imageId}`)
+      return {
+        edit: {
+          text: "💬 *Add a comment*\n\nSend your comment as your next message.",
+          markup: { inline_keyboard: [[{ text: "❌ Cancel", callback_data: "cancel" }]] },
+        },
       }
     }
 

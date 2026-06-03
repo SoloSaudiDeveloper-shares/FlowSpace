@@ -69,10 +69,13 @@ export async function saveGalleryImage(opts: {
   }
 
   try {
+    // If no caption was provided we'll auto-describe — mark 'pending' up front
+    // so the Gallery shows a "captioning…" spinner immediately.
+    const initialStatus = opts.caption?.trim() ? null : "pending"
     sqlite
       .prepare(
-        `INSERT INTO gallery_images (id, user_id, file_path, mime, caption, width, height, source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO gallery_images (id, user_id, file_path, mime, caption, caption_status, width, height, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -80,6 +83,7 @@ export async function saveGalleryImage(opts: {
         fileName,
         mime,
         opts.caption?.trim() || null,
+        initialStatus,
         opts.width ?? null,
         opts.height ?? null,
         opts.source || "telegram",
@@ -98,10 +102,29 @@ export async function saveGalleryImage(opts: {
  * EMPTY caption (so it won't clobber a user-written one); pass overwrite to
  * force a re-describe.
  */
+function setCaptionStatus(imageId: string, userId: string, status: string | null): void {
+  try {
+    sqlite.prepare(`UPDATE gallery_images SET caption_status = ? WHERE id = ? AND user_id = ?`).run(status, imageId, userId)
+  } catch { /* ignore */ }
+}
+
+/** Build the language instruction for the caption prompt from the user's
+ *  caption_lang preference (set via /caption). */
+function captionLanguageClause(userId: string): string {
+  const row = sqlite
+    .prepare(`SELECT caption_lang FROM telegram_bots WHERE user_id = ?`)
+    .get(userId) as { caption_lang: string | null } | undefined
+  const lang = (row?.caption_lang || "auto").trim().toLowerCase()
+  if (!lang || lang === "auto") return ""
+  if (lang === "en") return " Write the caption in English."
+  if (lang === "ar") return " Write the caption in Arabic (العربية)."
+  return ` Write the caption in ${lang}.`
+}
+
 export async function describeGalleryImage(
   userId: string,
   imageId: string,
-  opts: { overwrite?: boolean } = {},
+  opts: { overwrite?: boolean; notify?: boolean } = {},
 ): Promise<{ ok: true; caption: string } | { ok: false; error: string }> {
   const row = sqlite
     .prepare(`SELECT file_path, mime, caption FROM gallery_images WHERE id = ? AND user_id = ?`)
@@ -112,7 +135,11 @@ export async function describeGalleryImage(
   // Local-first vision (self-hosted Ollama/moondream) → cloud fallback.
   const { resolveVisionConfig } = await import("@/lib/ai/vision-config")
   const cfg = resolveVisionConfig(userId)
-  if (!cfg) return { ok: false, error: "no vision provider" }
+  if (!cfg) {
+    setCaptionStatus(imageId, userId, null) // no provider — clear any spinner
+    return { ok: false, error: "no vision provider" }
+  }
+  setCaptionStatus(imageId, userId, "pending")
 
   // Build a data URL from the stored file.
   let dataUrl: string
@@ -120,6 +147,7 @@ export async function describeGalleryImage(
     const bytes = await readFile(path.join(getDataDir(), "uploads", path.basename(row.file_path)))
     dataUrl = `data:${row.mime || "image/jpeg"};base64,${bytes.toString("base64")}`
   } catch {
+    setCaptionStatus(imageId, userId, "failed")
     return { ok: false, error: "could not read file" }
   }
 
@@ -138,30 +166,74 @@ export async function describeGalleryImage(
             content: [
               {
                 type: "text",
-                text: "Describe this image in ONE short caption (max ~20 words). If it contains readable text, capture the key text instead. Reply with just the caption — no preamble.",
+                text:
+                  "Describe this image in ONE short caption (max ~20 words). If it contains readable text, capture the key text instead. Reply with just the caption — no preamble." +
+                  captionLanguageClause(userId),
               },
               { type: "image_url", image_url: { url: dataUrl } },
             ],
           },
         ],
-        max_tokens: 120,
+        max_tokens: 160,
       }),
       // Local CPU vision (moondream) is slower than a cloud call — give it room.
       signal: AbortSignal.timeout(cfg.isLocal ? 120_000 : 45_000),
     })
-    if (!res.ok) return { ok: false, error: `provider ${res.status}` }
+    if (!res.ok) {
+      setCaptionStatus(imageId, userId, "failed")
+      return { ok: false, error: `provider ${res.status}` }
+    }
     const data = (await res.json()) as { choices?: { message?: { content?: unknown } }[] }
     const c = data.choices?.[0]?.message?.content
     const caption = (typeof c === "string" ? c : Array.isArray(c) ? c.map((x: { text?: string }) => x.text ?? "").join("") : "")
       .trim()
       .replace(/^["']|["']$/g, "")
       .slice(0, 280)
-    if (!caption) return { ok: false, error: "empty response" }
-    sqlite.prepare(`UPDATE gallery_images SET caption = ? WHERE id = ? AND user_id = ?`).run(caption, imageId, userId)
+    if (!caption) {
+      setCaptionStatus(imageId, userId, "failed")
+      return { ok: false, error: "empty response" }
+    }
+    sqlite
+      .prepare(`UPDATE gallery_images SET caption = ?, caption_status = 'done' WHERE id = ? AND user_id = ?`)
+      .run(caption, imageId, userId)
+
+    // Notify the user in Telegram that the caption is ready, with quick actions.
+    if (opts.notify) {
+      try {
+        const bot = sqlite
+          .prepare(`SELECT bot_token, chat_id FROM telegram_bots WHERE user_id = ?`)
+          .get(userId) as { bot_token: string; chat_id: string | null } | undefined
+        if (bot?.bot_token && bot.chat_id) {
+          const { sendMessage } = await import("@/lib/telegram/client")
+          const { galleryCaptionReadyMenu } = await import("@/lib/telegram/menus")
+          const m = galleryCaptionReadyMenu(imageId, caption)
+          await sendMessage(bot.bot_token, bot.chat_id, m.text, { parseMode: "Markdown", replyMarkup: m.markup }).catch(() => undefined)
+        }
+      } catch { /* notify is best-effort */ }
+    }
     return { ok: true, caption }
   } catch (err) {
+    setCaptionStatus(imageId, userId, "failed")
     return { ok: false, error: err instanceof Error ? err.message : "vision error" }
   }
+}
+
+/** Set a caption directly (bot Edit flow), marking it done. */
+export function setGalleryCaption(userId: string, imageId: string, caption: string): boolean {
+  const r = sqlite
+    .prepare(`UPDATE gallery_images SET caption = ?, caption_status = 'done' WHERE id = ? AND user_id = ?`)
+    .run(caption.trim().slice(0, 280) || null, imageId, userId)
+  return r.changes > 0
+}
+
+/** Add a comment to an image (bot flow), verifying ownership. */
+export function addGalleryCommentForBot(userId: string, imageId: string, body: string): boolean {
+  const owns = sqlite.prepare(`SELECT 1 FROM gallery_images WHERE id = ? AND user_id = ?`).get(imageId, userId)
+  if (!owns) return false
+  sqlite
+    .prepare(`INSERT INTO gallery_comments (id, image_id, user_id, body) VALUES (?, ?, ?, ?)`)
+    .run(createId(), imageId, userId, body.trim().slice(0, 4000))
+  return true
 }
 
 /** List a user's albums for the bot picker. */

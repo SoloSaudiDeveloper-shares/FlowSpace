@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { ImageOff, MessageSquare, Trash2, Send, FolderPlus, Search, X } from "lucide-react"
+import { useState, useMemo, useEffect } from "react"
+import { ImageOff, MessageSquare, Trash2, Send, FolderPlus, Search, X, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -18,6 +18,7 @@ import {
   deleteGalleryImage,
   createAlbum,
   moveImageToAlbum,
+  pollGalleryCaptions,
   type GalleryImage,
   type GalleryComment,
   type GalleryAlbum,
@@ -76,6 +77,47 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
     if (q) list = list.filter((i) => i.search.includes(q))
     return list
   }, [items, filter, query])
+
+  // Live "captioning…" updates: while any image is mid-caption, poll until the
+  // background AI fills it in, then update the card without a refresh.
+  const pendingKey = useMemo(
+    () => items.filter((i) => i.captionStatus === "pending").map((i) => i.id).sort().join(","),
+    [items],
+  )
+  useEffect(() => {
+    if (!pendingKey) return
+    const pendingIds = pendingKey.split(",")
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const updates = await pollGalleryCaptions(pendingIds)
+        if (cancelled) return
+        const changed = updates.filter((u) => u.captionStatus !== "pending")
+        if (changed.length === 0) return
+        setItems((prev) =>
+          prev.map((i) => {
+            const u = changed.find((x) => x.id === i.id)
+            return u
+              ? {
+                  ...i,
+                  caption: u.caption,
+                  captionStatus: u.captionStatus,
+                  search: u.caption ? `${i.search} ${u.caption.toLowerCase()}` : i.search,
+                }
+              : i
+          }),
+        )
+      } catch {
+        /* ignore — try again next tick */
+      }
+    }
+    const t = window.setInterval(tick, 4000)
+    void tick()
+    return () => {
+      cancelled = true
+      window.clearInterval(t)
+    }
+  }, [pendingKey])
 
   async function open(img: GalleryImage) {
     setSelected(img)
@@ -230,7 +272,11 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
                 className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
               />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-6">
-                {img.caption ? (
+                {img.captionStatus === "pending" ? (
+                  <p className="text-[11px] text-white/90 flex items-center gap-1.5">
+                    <Loader2 className="size-3 animate-spin" /> Captioning…
+                  </p>
+                ) : img.caption ? (
                   <p className="text-[11px] text-white/90 line-clamp-2">{img.caption}</p>
                 ) : (
                   <p className="text-[11px] text-white/50 italic">No caption</p>
