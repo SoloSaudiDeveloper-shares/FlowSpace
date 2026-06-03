@@ -206,6 +206,32 @@ sqlite.exec(`
 `)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_txjobs_status ON transcription_jobs(status, created_at);`)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_txjobs_user ON transcription_jobs(user_id);`)
+
+// ─── Gallery (images pushed via the Telegram bot, + comment threads) ───
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS gallery_images (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    file_path   TEXT NOT NULL,
+    mime        TEXT,
+    caption     TEXT,
+    width       INTEGER,
+    height      INTEGER,
+    source      TEXT NOT NULL DEFAULT 'telegram',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS gallery_comments (
+    id          TEXT PRIMARY KEY,
+    image_id    TEXT NOT NULL REFERENCES gallery_images(id) ON DELETE CASCADE,
+    user_id     TEXT NOT NULL,
+    body        TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_gallery_user ON gallery_images(user_id, created_at);`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_gallery_comments ON gallery_comments(image_id, created_at);`)
 // file_id is used by the 'audio_upload' source (long/large uploaded audio).
 // Silent: duplicate-column on an already-migrated DB is expected and benign.
 try { sqlite.exec(`ALTER TABLE transcription_jobs ADD COLUMN file_id TEXT`) } catch {}

@@ -79,6 +79,10 @@ export interface TelegramMessage {
   audio?: TelegramAudio
   /** Video note (round video). Has audio we can transcribe too. */
   video_note?: { file_id: string; duration: number; file_size?: number }
+  /** Photo — Telegram sends multiple sizes; the last is the largest. */
+  photo?: { file_id: string; file_unique_id: string; width: number; height: number; file_size?: number }[]
+  /** Generic file attachment (covers uncompressed images sent as a "file"). */
+  document?: { file_id: string; file_unique_id: string; file_name?: string; mime_type?: string; file_size?: number }
   /** Older API: set when the message was forwarded from a private user. */
   forward_from?: TelegramUser
   /** Older API: name of the channel/user the message was forwarded from. */

@@ -248,6 +248,37 @@ export async function POST(
     return new NextResponse("ok", { status: 200 })
   }
 
+  // ── Photo / image → save to the Gallery ──────────────────────────────
+  // Pictures pushed through the bot (e.g. a useful screenshot from TikTok or
+  // WhatsApp) land in the user's Gallery, where they can be captioned and
+  // commented on. Telegram sends compressed photos as `photo` (pick the
+  // largest size) and uncompressed ones as an image `document`.
+  const photoSizes = msg.photo
+  const imageDoc = msg.document && msg.document.mime_type?.startsWith("image/") ? msg.document : null
+  if ((photoSizes && photoSizes.length) || imageDoc) {
+    const largest = photoSizes && photoSizes.length ? photoSizes[photoSizes.length - 1] : null
+    const fileId = imageDoc ? imageDoc.file_id : largest!.file_id
+    const mime = imageDoc ? imageDoc.mime_type ?? "image/jpeg" : "image/jpeg"
+    logMessage(bot.user_id, "in", "[🖼 photo received]")
+    const { saveGalleryImage } = await import("@/lib/telegram/gallery")
+    const r = await saveGalleryImage({
+      userId: bot.user_id,
+      botToken: bot.bot_token,
+      fileId,
+      caption: msg.caption?.trim() || null,
+      mime,
+      width: largest?.width ?? null,
+      height: largest?.height ?? null,
+    })
+    const reply = r.ok ? "🖼 Saved to your *Gallery*." : `⚠️ Couldn't save that image: ${r.error}`
+    logMessage(bot.user_id, "out", reply)
+    await sendMessage(bot.bot_token, msg.chat.id, reply, {
+      parseMode: "Markdown",
+      replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+    })
+    return new NextResponse("ok", { status: 200 })
+  }
+
   const text = rawText
   // Persist the inbound message so the user can scroll their history.
   const historyPrefix = isForwarded ? "[forwarded] " : ""

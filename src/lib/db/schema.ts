@@ -162,6 +162,31 @@ export const pages = sqliteTable("pages", {
   isTemplate: integer("is_template", { mode: "boolean" }).notNull().default(false),
 })
 
+// ─── Gallery ────────────────────────────────────────────────────────────
+// A per-user image board. Photos pushed through the Telegram bot land here
+// (great for saving useful screenshots / pictures from TikTok / WhatsApp),
+// each with an optional caption and a comment thread to annotate and revisit.
+export const galleryImages = sqliteTable("gallery_images", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  /** Filename under <DATA_DIR>/uploads (served via /api/gallery/[id]). */
+  filePath: text("file_path").notNull(),
+  mime: text("mime"),
+  caption: text("caption"),
+  width: integer("width"),
+  height: integer("height"),
+  source: text("source").notNull().default("telegram"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+})
+
+export const galleryComments = sqliteTable("gallery_comments", {
+  id: text("id").primaryKey(),
+  imageId: text("image_id").notNull(),
+  userId: text("user_id").notNull(),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+})
+
 // ─── Canvas ─────────────────────────────────────────────────────────────
 
 export const canvases = sqliteTable("canvases", {

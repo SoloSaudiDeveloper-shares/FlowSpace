@@ -37,6 +37,7 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   HelpCircle,
+  Image as ImageIcon,
 } from "lucide-react"
 import {
   DndContext,
@@ -1522,6 +1523,16 @@ export function AppSidebar({ elements, favorites }: AppSidebarProps) {
                 >
                   <ScanEye className="size-4" />
                   <span>Vision</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === "/gallery"}
+                  onClick={() => router.push("/gallery")}
+                  tooltip="Gallery (photos from the bot)"
+                >
+                  <ImageIcon className="size-4" />
+                  <span>Gallery</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
