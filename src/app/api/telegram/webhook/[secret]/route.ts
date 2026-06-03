@@ -174,8 +174,19 @@ export async function POST(
   // (handled by callbacks.ts) transcribe with the chosen language and
   // route the result to the user's chosen destination. This puts the
   // user in control per-message instead of relying on a global pref.
+  // Audio sent "as a file" arrives as a `document` with an audio/video mime
+  // type — Telegram only tags voice/audio/video_note when it recognises a
+  // playable track. Desktop "📎 → File" and many exported recordings come
+  // through as documents, so without this they'd be silently dropped.
+  const audioDoc =
+    msg.document && /^(audio|video)\//i.test(msg.document.mime_type ?? "")
+      ? msg.document
+      : null
   const voiceFileId =
-    msg.voice?.file_id ?? msg.audio?.file_id ?? msg.video_note?.file_id
+    msg.voice?.file_id ??
+    msg.audio?.file_id ??
+    msg.video_note?.file_id ??
+    audioDoc?.file_id
   if (voiceFileId) {
     // ── Long/large audio → async worker ──────────────────────────────
     // The inline picker transcribes synchronously inside the button-tap
@@ -188,8 +199,15 @@ export async function POST(
     const audioDuration =
       msg.voice?.duration ?? msg.audio?.duration ?? msg.video_note?.duration ?? 0
     const audioSize =
-      msg.voice?.file_size ?? msg.audio?.file_size ?? msg.video_note?.file_size ?? 0
-    if (audioDuration >= 150 || audioSize > 18 * 1024 * 1024) {
+      msg.voice?.file_size ??
+      msg.audio?.file_size ??
+      msg.video_note?.file_size ??
+      audioDoc?.file_size ??
+      0
+    // Documents carry no duration, so route them to the background worker
+    // unconditionally — we can't tell a 10-second clip from a 15-minute one,
+    // and the inline picker path would die on Telegram's ~30s callback deadline.
+    if (audioDuration >= 150 || audioSize > 18 * 1024 * 1024 || audioDoc) {
       logMessage(bot.user_id, "in", "[🎙 long recording received]")
       enqueueAudioJob({
         userId: bot.user_id,
@@ -200,8 +218,10 @@ export async function POST(
         durationSec: audioDuration,
       })
       kickMediaWorker()
-      const mins = Math.max(1, Math.round(audioDuration / 60))
-      const ack = `⏳ Transcribing your ${mins}-min recording — this runs in the background. I'll send the result here when it's ready.`
+      const ack =
+        audioDuration > 0
+          ? `⏳ Transcribing your ${Math.max(1, Math.round(audioDuration / 60))}-min recording — this runs in the background. I'll send the result here when it's ready.`
+          : `⏳ Transcribing your recording — this runs in the background. I'll send the result here when it's ready.`
       logMessage(bot.user_id, "out", ack)
       await sendMessage(bot.bot_token, msg.chat.id, ack, {
         replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
