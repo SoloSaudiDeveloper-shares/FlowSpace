@@ -79,7 +79,7 @@ export function TelegramSection({
         setLists(ls)
       }
     } catch {
-      setStatus({ connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", captionMaxWords: 80, captionMaxTokens: 700, sharedVoiceKeyAvailable: false })
+      setStatus({ connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", captionMaxWords: 300, captionMaxTokens: 3000, sharedVoiceKeyAvailable: false })
     }
   }
   useEffect(() => { refresh() }, [])
@@ -455,7 +455,7 @@ export function TelegramSection({
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground leading-relaxed mt-1.5">
-            Higher = longer, more detailed captions (better search), but slower & more tokens. Try ~120 words / 1200 tokens for rich captions. The token limit must comfortably exceed the word target (Arabic uses more tokens per word).
+            Higher = longer, more detailed captions (better search), but slower & more tokens. Default is 300 words / 3000 tokens. The token limit must comfortably exceed the word target (Arabic uses more tokens per word).
           </p>
         </div>
 

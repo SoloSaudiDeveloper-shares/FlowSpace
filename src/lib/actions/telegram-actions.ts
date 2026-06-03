@@ -69,7 +69,7 @@ export async function getMyTelegramStatus(): Promise<TelegramBotStatus> {
     .prepare(`SELECT * FROM telegram_bots WHERE user_id = ?`)
     .get(me.id) as BotRow | undefined
   if (!row) {
-    return { connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", captionMaxWords: 80, captionMaxTokens: 700, sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY }
+    return { connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", captionMaxWords: 300, captionMaxTokens: 3000, sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY }
   }
   const url = buildWebhookUrl(row.webhook_secret)
   return {
@@ -84,8 +84,8 @@ export async function getMyTelegramStatus(): Promise<TelegramBotStatus> {
     voiceAutoSkip: row.voice_auto_skip === 1,
     voiceKeyUseShared: row.voice_key_use_shared === 1,
     captionLanguage: row.caption_lang ?? "auto",
-    captionMaxWords: row.caption_max_words ?? 80,
-    captionMaxTokens: row.caption_max_tokens ?? 700,
+    captionMaxWords: row.caption_max_words ?? 300,
+    captionMaxTokens: row.caption_max_tokens ?? 3000,
     sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY,
   }
 }
@@ -109,8 +109,8 @@ export async function setTelegramCaptionDetail(
   maxTokens: number,
 ): Promise<{ ok: true; maxWords: number; maxTokens: number }> {
   const me = await requireAuth()
-  const w = Math.min(400, Math.max(15, Math.round(Number(maxWords) || 80)))
-  const tk = Math.min(3000, Math.max(80, Math.round(Number(maxTokens) || 700)))
+  const w = Math.min(500, Math.max(15, Math.round(Number(maxWords) || 300)))
+  const tk = Math.min(4000, Math.max(80, Math.round(Number(maxTokens) || 3000)))
   sqlite
     .prepare(`UPDATE telegram_bots SET caption_max_words = ?, caption_max_tokens = ?, updated_at = datetime('now') WHERE user_id = ?`)
     .run(w, tk, me.id)

@@ -294,31 +294,32 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
       )}
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden gap-0">
+        <DialogContent className="sm:max-w-5xl p-0 overflow-hidden gap-0">
           {selected && (
-            <div className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr] max-h-[85vh]">
-              <div className="bg-black/40 flex items-center justify-center min-h-[200px] max-h-[85vh]">
+            <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(360px,1.25fr)] max-h-[88vh]">
+              <div className="bg-black/40 flex items-center justify-center min-h-[200px] max-h-[88vh]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`/api/gallery/${selected.id}`}
                   alt={selected.caption ?? "Gallery image"}
-                  className="max-h-[85vh] w-full object-contain"
+                  className="max-h-[88vh] w-full object-contain"
                 />
               </div>
 
-              <div className="flex flex-col max-h-[85vh] border-l">
+              <div className="flex flex-col max-h-[88vh] border-l min-w-0">
                 <DialogHeader className="p-4 pb-2 shrink-0">
                   <DialogTitle className="text-sm">Image details</DialogTitle>
                 </DialogHeader>
 
                 <div className="px-4 pb-3 shrink-0 space-y-2">
+                  <label className="block text-[11px] font-medium text-muted-foreground">Caption</label>
                   <textarea
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
                     onBlur={saveCaption}
                     placeholder="Add a caption…"
-                    rows={2}
-                    className="w-full resize-none rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
+                    rows={7}
+                    className="w-full resize-y min-h-[7rem] max-h-[45vh] rounded-md border bg-background px-2.5 py-2 text-sm leading-relaxed outline-none focus:border-primary/60"
                   />
                   {/* Move to album */}
                   <div className="flex items-center gap-2">

@@ -123,8 +123,8 @@ function readCaptionDetail(userId: string): { maxWords: number; maxTokens: numbe
   const row = sqlite
     .prepare(`SELECT caption_max_words, caption_max_tokens FROM telegram_bots WHERE user_id = ?`)
     .get(userId) as { caption_max_words: number | null; caption_max_tokens: number | null } | undefined
-  const maxWords = Math.min(400, Math.max(15, Math.round(row?.caption_max_words ?? 80)))
-  const maxTokens = Math.min(3000, Math.max(80, Math.round(row?.caption_max_tokens ?? 700)))
+  const maxWords = Math.min(500, Math.max(15, Math.round(row?.caption_max_words ?? 300)))
+  const maxTokens = Math.min(4000, Math.max(80, Math.round(row?.caption_max_tokens ?? 3000)))
   return { maxWords, maxTokens }
 }
 
