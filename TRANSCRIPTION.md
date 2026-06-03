@@ -43,12 +43,19 @@ save.
 enqueues + acks instantly; the worker (cron job `telegram:media-capture`, plus an
 on-enqueue nudge) drains one job at a time and self-heals via a DB watchdog.
 
-**Requires `yt-dlp` on the VM** (in addition to ffmpeg):
+**Requires `yt-dlp` on the VM** (in addition to ffmpeg). In Docker this is baked
+into the image (under `/app/bin`, owned by the runtime user) and **auto-updates
+itself** on boot + daily via the `media:ytdlp-update` cron — so it never goes
+stale between deploys. For a bare (non-Docker) install:
 ```bash
 pipx install yt-dlp        # apt's build is usually stale
-# add a weekly auto-update — sites change and yt-dlp breaks often:
-# (crontab) 0 4 * * 0 pipx upgrade yt-dlp
 ```
+
+**Region/IP blocks (`--cookies`):** if TikTok/YouTube starts blocking the VM's
+datacenter IP, export your browser cookies to a Netscape `cookies.txt` (e.g. via
+the "Get cookies.txt" browser extension), drop it on the box (e.g. the data
+volume → `/data/cookies.txt`), and set `YTDLP_COOKIES_FILE=/data/cookies.txt`.
+yt-dlp then authenticates like your real browser.
 **Env knobs:** `MEDIA_CAPTURE_MAX_DURATION_SEC` (1800), `MEDIA_CAPTURE_MAX_FILESIZE_MB`
 (500 — bounds the *source video* download, not the kept audio), `MEDIA_CAPTURE_TIMEOUT_MS`
 (300000), optional `YTDLP_BIN` / `FFMPEG_BIN`. The duration cap is the real guard; only

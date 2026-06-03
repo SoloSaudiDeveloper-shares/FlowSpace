@@ -395,5 +395,33 @@ registerJob({
   },
 })
 
+// ─── Job 8: keep yt-dlp fresh ───────────────────────────────────────────
+//
+// TikTok/Instagram/X change their sites constantly and yt-dlp ships fixes
+// almost weekly. A frozen binary = broken media capture. Run `yt-dlp --update`
+// once shortly after boot, then daily, so it never goes stale between deploys.
+// Best-effort: missing binary / no write permission / offline just no-ops.
+// (In Docker, yt-dlp lives under /app/bin owned by the runtime user, so the
+//  self-update can replace it.)
+
+let ytdlpLastUpdate = 0
+registerJob({
+  name: "media:ytdlp-update",
+  async run() {
+    const now = Date.now()
+    if (ytdlpLastUpdate && now - ytdlpLastUpdate < 24 * 60 * 60 * 1000) return
+    ytdlpLastUpdate = now
+    const bin = process.env.YTDLP_BIN || "yt-dlp"
+    try {
+      const { execFile } = await import("node:child_process")
+      const { promisify } = await import("node:util")
+      await promisify(execFile)(bin, ["--update"], { timeout: 120_000 })
+      console.log("[ytdlp-update] checked for updates")
+    } catch {
+      /* not installed / not writable / offline — non-fatal */
+    }
+  },
+})
+
 // Keep the imported-but-unused symbol around so esbuild doesn't drop it.
 void dispatchTelegramMessage

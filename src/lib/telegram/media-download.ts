@@ -116,6 +116,13 @@ export async function downloadMediaAudio(
   // The extracted audio is what we transcribe. Mono 16 kHz keeps it small
   // (a few MB even for ~30 min) and well under Groq's 25 MB cap.
   const AUDIO_MAX_MB = 60
+  // Optional cookies (Netscape cookies.txt). Lets yt-dlp authenticate like a
+  // real browser to get past region/IP blocks. Export once and point
+  // YTDLP_COOKIES_FILE at it (e.g. /data/cookies.txt). Ignored if unset.
+  const cookieArgs =
+    process.env.YTDLP_COOKIES_FILE && process.env.YTDLP_COOKIES_FILE.trim()
+      ? ["--cookies", process.env.YTDLP_COOKIES_FILE.trim()]
+      : []
 
   // ── Step 1: probe metadata (best-effort) to reject over-long clips early.
   // TikTok / Instagram / X intermittently fail extraction on the FIRST request
@@ -131,7 +138,7 @@ export async function downloadMediaAudio(
     try {
       const { stdout } = await execFileP(
         YTDLP_BIN,
-        ["--no-playlist", "--no-warnings", "--dump-single-json", "--extractor-retries", "3", "--socket-timeout", "20", url],
+        ["--no-playlist", "--no-warnings", "--dump-single-json", "--extractor-retries", "3", "--socket-timeout", "20", ...cookieArgs, url],
         { timeout: 45_000, maxBuffer: 16 * 1024 * 1024 },
       )
       const meta = JSON.parse(stdout) as { title?: string; duration?: number; webpage_url?: string }
@@ -193,6 +200,7 @@ export async function downloadMediaAudio(
   if (process.env.FFMPEG_BIN) {
     dlArgs.push("--ffmpeg-location", FFMPEG_BIN)
   }
+  if (cookieArgs.length) dlArgs.push(...cookieArgs)
   dlArgs.push("-o", outTemplate, "--print", "after_move:filepath", url)
 
   // ── Step 3: download with retries. Transient extraction/network errors get

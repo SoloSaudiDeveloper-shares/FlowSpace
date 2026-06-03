@@ -39,17 +39,23 @@ ENV DATA_DIR=/data
 # upload path does NOT need these (it streams bytes straight to Whisper), so a
 # failed yt-dlp download here only disables link capture, not the whole app.
 # yt-dlp ships self-contained PyInstaller binaries per-arch (bundle their own
-# Python), so we fetch the one matching the build architecture.
+# Python), so we fetch the one matching the build architecture. We install it
+# under /app/bin (owned by the runtime user below) rather than /usr/local/bin,
+# so the app can self-update it at runtime (yt-dlp --update) and never go stale
+# between deploys — TikTok/IG change often and yt-dlp ships fixes weekly.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ffmpeg ca-certificates curl \
+    && mkdir -p /app/bin \
     && arch="$(dpkg --print-architecture)" \
     && if [ "$arch" = "arm64" ]; then ytasset=yt-dlp_linux_aarch64; else ytasset=yt-dlp_linux; fi \
-    && (curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytasset}" -o /usr/local/bin/yt-dlp \
-        && chmod a+rx /usr/local/bin/yt-dlp \
+    && (curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytasset}" -o /app/bin/yt-dlp \
+        && chmod a+rx /app/bin/yt-dlp \
         || echo "WARN: yt-dlp download failed — media-link capture will be disabled until re-deployed") \
     && rm -rf /var/lib/apt/lists/*
+ENV YTDLP_BIN=/app/bin/yt-dlp
 
-# Create a non-root user for security
+# Create a non-root user for security. The chown of /app also makes
+# /app/bin/yt-dlp writable by the runtime user so it can self-update.
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs --home-dir /app nextjs && \
     mkdir -p /data && chown -R nextjs:nodejs /data /app

@@ -71,11 +71,10 @@ export function enqueueMediaJob(args: {
   platform: string
 }): string {
   const id = createId()
-  // Pin the transcription language to the user's voice preference if set.
-  const pref = sqlite
-    .prepare(`SELECT voice_language FROM telegram_bots WHERE user_id = ?`)
-    .get(args.userId) as { voice_language: string | null } | undefined
-  const language = pref?.voice_language || "en"
+  // Media links are arbitrary internet clips in ANY language, so let Whisper
+  // auto-detect rather than pinning the user's short-voice default (usually
+  // "en", which would force-transcribe an Arabic clip as garbled English).
+  const language = "auto"
   sqlite
     .prepare(
       `INSERT INTO transcription_jobs
@@ -99,13 +98,9 @@ export function enqueueAudioJob(args: {
   language?: string | null
 }): string {
   const id = createId()
-  let language = args.language || null
-  if (!language) {
-    const pref = sqlite
-      .prepare(`SELECT voice_language FROM telegram_bots WHERE user_id = ?`)
-      .get(args.userId) as { voice_language: string | null } | undefined
-    language = pref?.voice_language || "en"
-  }
+  // Long uploads can be any language (the user might forward an Arabic clip),
+  // so default to auto-detect unless an explicit language was passed.
+  const language = args.language || "auto"
   sqlite
     .prepare(
       `INSERT INTO transcription_jobs
