@@ -248,6 +248,10 @@ try { sqlite.exec(`ALTER TABLE gallery_images ADD COLUMN caption_status TEXT`) }
 // file_id is used by the 'audio_upload' source (long/large uploaded audio).
 // Silent: duplicate-column on an already-migrated DB is expected and benign.
 try { sqlite.exec(`ALTER TABLE transcription_jobs ADD COLUMN file_id TEXT`) } catch {}
+// file_name: the original (or normalized) upload filename, so the transcriber
+// can label the file with a correct extension for cloud engines (Groq keys
+// off the extension). NULL → falls back to recording.ogg.
+try { sqlite.exec(`ALTER TABLE transcription_jobs ADD COLUMN file_name TEXT`) } catch {}
 
 // ─── Reminder bot-fired tracking ────────────────────────────────────────
 // `bot_fired_at` so the cron doesn't re-DM the same reminder forever.

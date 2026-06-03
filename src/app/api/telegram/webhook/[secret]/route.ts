@@ -228,6 +228,14 @@ export async function POST(
         messageId: msg.message_id,
         fileId: voiceFileId,
         durationSec: audioDuration,
+        // Documents carry a real file name; voice/audio carry a mime type.
+        // Either lets us label the upload with a correct extension for Groq.
+        fileName: audioDoc?.file_name ?? null,
+        mime:
+          audioDoc?.mime_type ??
+          msg.voice?.mime_type ??
+          msg.audio?.mime_type ??
+          null,
       })
       kickMediaWorker()
       const ack =

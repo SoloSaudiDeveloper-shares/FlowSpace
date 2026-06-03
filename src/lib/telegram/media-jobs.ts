@@ -56,8 +56,56 @@ interface JobRow {
   source: string
   source_url: string | null
   file_id: string | null
+  file_name: string | null
   platform: string | null
   language: string
+}
+
+// Map a file extension → mime type. Cloud transcribers (Groq) key off the
+// filename EXTENSION, so labelling an upload correctly matters; local
+// faster-whisper sniffs content and is unaffected.
+const EXT_TO_MIME: Record<string, string> = {
+  ogg: "audio/ogg", oga: "audio/ogg", opus: "audio/ogg",
+  mp3: "audio/mpeg", mpga: "audio/mpeg", mpeg: "audio/mpeg",
+  m4a: "audio/mp4", m4b: "audio/mp4", aac: "audio/aac",
+  wav: "audio/wav", flac: "audio/flac", amr: "audio/amr",
+  wma: "audio/x-ms-wma", mka: "audio/x-matroska", caf: "audio/x-caf",
+  aif: "audio/aiff", aiff: "audio/aiff",
+  mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime",
+  webm: "video/webm", "3gp": "video/3gpp", "3gpp": "video/3gpp",
+}
+const MIME_TO_EXT: Record<string, string> = {
+  "audio/ogg": "ogg", "application/ogg": "ogg", "audio/opus": "ogg", "audio/x-opus+ogg": "ogg",
+  "audio/mpeg": "mp3", "audio/mp3": "mp3",
+  "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "m4a", "audio/aacp": "m4a",
+  "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav", "audio/vnd.wave": "wav",
+  "audio/flac": "flac", "audio/x-flac": "flac",
+  "audio/amr": "amr",
+  "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm", "video/3gpp": "3gp",
+}
+
+function extOf(name: string): string {
+  const m = /\.([a-z0-9]{1,5})$/i.exec(name.trim())
+  return m ? m[1].toLowerCase() : ""
+}
+
+/**
+ * Derive a transcriber-friendly { filename, mime } from whatever Telegram gave
+ * us (a document file_name and/or a mime type). Prefers the real extension;
+ * falls back to the mime; finally to ogg (Telegram voice notes are ogg/opus).
+ */
+export function resolveUploadName(
+  fileName?: string | null,
+  mime?: string | null,
+): { filename: string; mime: string } {
+  const base = (fileName ?? "").split(/[\\/]/).pop()?.slice(0, 120) ?? ""
+  let ext = extOf(base)
+  if (!ext && mime) ext = MIME_TO_EXT[mime.toLowerCase()] ?? ""
+  if (!ext) ext = "ogg"
+  const resolvedMime = EXT_TO_MIME[ext] ?? mime ?? "audio/ogg"
+  // Keep the real name if it already carries a usable extension, else synthesize.
+  const filename = extOf(base) ? base : `recording.${ext}`
+  return { filename, mime: resolvedMime }
 }
 
 // ── Enqueue ─────────────────────────────────────────────────────────────
@@ -96,18 +144,25 @@ export function enqueueAudioJob(args: {
   fileId: string
   durationSec?: number | null
   language?: string | null
+  /** Original Telegram file name (documents) — used to label the upload. */
+  fileName?: string | null
+  /** Telegram-reported mime type (voice/audio/document). */
+  mime?: string | null
 }): string {
   const id = createId()
   // Long uploads can be any language (the user might forward an Arabic clip),
   // so default to auto-detect unless an explicit language was passed.
   const language = args.language || "auto"
+  // Normalize to a transcriber-friendly filename now (we have the metadata
+  // here); the worker re-derives the mime from this filename's extension.
+  const { filename } = resolveUploadName(args.fileName, args.mime)
   sqlite
     .prepare(
       `INSERT INTO transcription_jobs
-         (id, user_id, source, bot_token, chat_id, message_id, file_id, platform, duration_sec, language, status)
-       VALUES (?, ?, 'audio_upload', ?, ?, ?, ?, 'recording', ?, ?, 'queued')`,
+         (id, user_id, source, bot_token, chat_id, message_id, file_id, file_name, platform, duration_sec, language, status)
+       VALUES (?, ?, 'audio_upload', ?, ?, ?, ?, ?, 'recording', ?, ?, 'queued')`,
     )
-    .run(id, args.userId, args.botToken, args.chatId, args.messageId, args.fileId, args.durationSec ?? null, language)
+    .run(id, args.userId, args.botToken, args.chatId, args.messageId, args.fileId, filename, args.durationSec ?? null, language)
   return id
 }
 
@@ -226,7 +281,7 @@ async function downloadTelegramFile(
 async function processMediaJob(id: string): Promise<void> {
   const job = sqlite
     .prepare(
-      `SELECT id, user_id, bot_token, chat_id, source, source_url, file_id, platform, language FROM transcription_jobs WHERE id = ?`,
+      `SELECT id, user_id, bot_token, chat_id, source, source_url, file_id, file_name, platform, language FROM transcription_jobs WHERE id = ?`,
     )
     .get(id) as JobRow | undefined
   if (!job) return
@@ -257,12 +312,15 @@ async function processMediaJob(id: string): Promise<void> {
         return
       }
       setStatus(job.id, "transcribing")
+      // Label the upload with its real extension/mime so the cloud engine
+      // (Groq keys off the extension) accepts it; local whisper is unaffected.
+      const { filename, mime } = resolveUploadName(job.file_name, null)
       const tr = await transcribeAudioBytes(dl.bytes, {
         groqApiKey: groqKey,
         language: job.language,
         ownerUserId: job.user_id,
-        mime: "audio/ogg",
-        filename: "recording.ogg",
+        mime,
+        filename,
         localTimeoutMs: 1_500_000, // 25 min — long recordings on a CPU box
         groqTimeoutMs: 120_000,
       })
