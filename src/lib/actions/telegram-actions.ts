@@ -26,6 +26,10 @@ export interface TelegramBotStatus {
   voiceKeyUseShared: boolean
   /** Language for AI gallery captions: 'auto' | 'en' | 'ar' | … */
   captionLanguage: string
+  /** Target word count for AI captions (drives the prompt). */
+  captionMaxWords: number
+  /** Hard max_tokens cap on the caption response. */
+  captionMaxTokens: number
   /** True if the server has TELEGRAM_VOICE_GROQ_KEY set — used by the UI
    *  to decide whether to even offer the "shared key" toggle. */
   sharedVoiceKeyAvailable: boolean
@@ -43,6 +47,8 @@ interface BotRow {
   voice_auto_skip: number | null
   voice_key_use_shared: number | null
   caption_lang: string | null
+  caption_max_words: number | null
+  caption_max_tokens: number | null
 }
 
 /** Compute the base URL for outbound webhook registration. We MUST send a
@@ -63,7 +69,7 @@ export async function getMyTelegramStatus(): Promise<TelegramBotStatus> {
     .prepare(`SELECT * FROM telegram_bots WHERE user_id = ?`)
     .get(me.id) as BotRow | undefined
   if (!row) {
-    return { connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY }
+    return { connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", captionMaxWords: 80, captionMaxTokens: 700, sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY }
   }
   const url = buildWebhookUrl(row.webhook_secret)
   return {
@@ -78,6 +84,8 @@ export async function getMyTelegramStatus(): Promise<TelegramBotStatus> {
     voiceAutoSkip: row.voice_auto_skip === 1,
     voiceKeyUseShared: row.voice_key_use_shared === 1,
     captionLanguage: row.caption_lang ?? "auto",
+    captionMaxWords: row.caption_max_words ?? 80,
+    captionMaxTokens: row.caption_max_tokens ?? 700,
     sharedVoiceKeyAvailable: !!process.env.TELEGRAM_VOICE_GROQ_KEY,
   }
 }
@@ -93,6 +101,20 @@ export async function setTelegramCaptionLanguage(language: string): Promise<{ ok
     .prepare(`UPDATE telegram_bots SET caption_lang = ?, updated_at = datetime('now') WHERE user_id = ?`)
     .run(lang, me.id)
   return { ok: true }
+}
+
+/** Set caption verbosity: target words + max_tokens cap (both clamped). */
+export async function setTelegramCaptionDetail(
+  maxWords: number,
+  maxTokens: number,
+): Promise<{ ok: true; maxWords: number; maxTokens: number }> {
+  const me = await requireAuth()
+  const w = Math.min(400, Math.max(15, Math.round(Number(maxWords) || 80)))
+  const tk = Math.min(3000, Math.max(80, Math.round(Number(maxTokens) || 700)))
+  sqlite
+    .prepare(`UPDATE telegram_bots SET caption_max_words = ?, caption_max_tokens = ?, updated_at = datetime('now') WHERE user_id = ?`)
+    .run(w, tk, me.id)
+  return { ok: true, maxWords: w, maxTokens: tk }
 }
 
 /**

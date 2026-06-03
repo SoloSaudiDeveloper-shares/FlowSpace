@@ -41,6 +41,7 @@ import {
   setTelegramVoiceAutoSkip,
   setTelegramVoiceKeyUseShared,
   setTelegramCaptionLanguage,
+  setTelegramCaptionDetail,
   type TelegramBotStatus,
   type TelegramHistoryEntry,
 } from "@/lib/actions/telegram-actions"
@@ -78,7 +79,7 @@ export function TelegramSection({
         setLists(ls)
       }
     } catch {
-      setStatus({ connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", sharedVoiceKeyAvailable: false })
+      setStatus({ connected: false, webhookConfigured: false, targetListId: null, voiceLanguage: "en", voiceAutoSkip: false, voiceKeyUseShared: false, captionLanguage: "auto", captionMaxWords: 80, captionMaxTokens: 700, sharedVoiceKeyAvailable: false })
     }
   }
   useEffect(() => { refresh() }, [])
@@ -130,6 +131,19 @@ export function TelegramSection({
       await refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't update caption language")
+    } finally {
+      setSavingVoice(false)
+    }
+  }
+
+  async function handleSetCaptionDetail(words: number, tokens: number) {
+    setSavingVoice(true)
+    try {
+      await setTelegramCaptionDetail(words, tokens)
+      toast.success("Caption detail updated")
+      await refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't update caption detail")
     } finally {
       setSavingVoice(false)
     }
@@ -402,6 +416,46 @@ export function TelegramSection({
           </select>
           <p className="text-[11px] text-muted-foreground leading-relaxed mt-1.5">
             Photos you send the bot are auto-captioned for search. Captions are written in this language (needs a vision-capable AI provider, e.g. Gemini). Also settable in the bot with <code>/caption</code>.
+          </p>
+
+          {/* Caption verbosity: target words + token cap */}
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">Detail (≈ words)</label>
+              <input
+                key={`cw-${status.captionMaxWords}`}
+                type="number"
+                min={15}
+                max={400}
+                defaultValue={status.captionMaxWords}
+                disabled={savingVoice}
+                onBlur={(e) => {
+                  const w = Number(e.target.value)
+                  if (w && w !== status.captionMaxWords) handleSetCaptionDetail(w, status.captionMaxTokens)
+                }}
+                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-muted-foreground mb-1">Token limit</label>
+              <input
+                key={`ct-${status.captionMaxTokens}`}
+                type="number"
+                min={80}
+                max={3000}
+                step={50}
+                defaultValue={status.captionMaxTokens}
+                disabled={savingVoice}
+                onBlur={(e) => {
+                  const tk = Number(e.target.value)
+                  if (tk && tk !== status.captionMaxTokens) handleSetCaptionDetail(status.captionMaxWords, tk)
+                }}
+                className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed mt-1.5">
+            Higher = longer, more detailed captions (better search), but slower & more tokens. Try ~120 words / 1200 tokens for rich captions. The token limit must comfortably exceed the word target (Arabic uses more tokens per word).
           </p>
         </div>
 

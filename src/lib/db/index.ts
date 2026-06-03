@@ -721,6 +721,10 @@ try {
   // Language for AI gallery captions: 'auto' (match image / English), 'en',
   // 'ar', or any language name. Set via /caption <lang>.
   if (!has("caption_lang")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN caption_lang TEXT NOT NULL DEFAULT 'auto'`)
+  // Caption verbosity: target word count (drives the prompt) + the hard
+  // max_tokens cap on the model response. Configurable in Settings → Telegram.
+  if (!has("caption_max_words"))  sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN caption_max_words INTEGER NOT NULL DEFAULT 80`)
+  if (!has("caption_max_tokens")) sqlite.exec(`ALTER TABLE telegram_bots ADD COLUMN caption_max_tokens INTEGER NOT NULL DEFAULT 700`)
 } catch (err) {
   console.error("[migration] telegram_bots digest columns:", err)
 }

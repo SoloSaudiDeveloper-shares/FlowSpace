@@ -118,6 +118,16 @@ function readCaptionLang(userId: string): string {
   return (row?.caption_lang || "auto").trim().toLowerCase()
 }
 
+/** Per-user caption verbosity (target word count + hard token cap), clamped. */
+function readCaptionDetail(userId: string): { maxWords: number; maxTokens: number } {
+  const row = sqlite
+    .prepare(`SELECT caption_max_words, caption_max_tokens FROM telegram_bots WHERE user_id = ?`)
+    .get(userId) as { caption_max_words: number | null; caption_max_tokens: number | null } | undefined
+  const maxWords = Math.min(400, Math.max(15, Math.round(row?.caption_max_words ?? 80)))
+  const maxTokens = Math.min(3000, Math.max(80, Math.round(row?.caption_max_tokens ?? 700)))
+  return { maxWords, maxTokens }
+}
+
 function languageName(lang: string): string {
   const map: Record<string, string> = {
     ar: "Arabic", en: "English", es: "Spanish", fr: "French",
@@ -189,12 +199,15 @@ export async function describeGalleryImage(
   // user's chosen caption language — so gallery search finds images both by
   // what they show and by what they say.
   const lang = readCaptionLang(userId)
+  const { maxWords, maxTokens } = readCaptionDetail(userId)
   const langClause =
     !lang || lang === "auto"
       ? "Write it in the main language of any visible text in the image, otherwise English."
       : `Write the WHOLE description in ${languageName(lang)}.`
   const promptText =
-    "Describe this image for search in 2–4 sentences. Include what it shows (key objects, people, places, brands) AND transcribe any visible text VERBATIM — do not shorten or summarize that text. Mention specific names, numbers and dates if present. " +
+    `Describe this image for search in detail — aim for about ${maxWords} words (be thorough, not padded). ` +
+    "Cover what it shows (key objects, people, places, brands, the setting) AND transcribe ALL visible text VERBATIM — do not shorten or summarize that text. " +
+    "Include any specific names, numbers, prices and dates. " +
     langClause +
     " Reply with only the description, no preamble."
 
@@ -216,7 +229,7 @@ export async function describeGalleryImage(
             ],
           },
         ],
-        max_tokens: 600,
+        max_tokens: maxTokens,
       }),
       // Local CPU vision (moondream) is slower than a cloud call — give it room.
       signal: AbortSignal.timeout(cfg.isLocal ? 120_000 : 60_000),
@@ -231,7 +244,7 @@ export async function describeGalleryImage(
     const caption = (typeof c === "string" ? c : Array.isArray(c) ? c.map((x: { text?: string }) => x.text ?? "").join("") : "")
       .trim()
       .replace(/^["']|["']$/g, "")
-      .slice(0, 1200)
+      .slice(0, 4000)
     if (!caption) {
       setCaptionStatus(imageId, userId, "failed")
       await finishNotify(await albumPicker())
