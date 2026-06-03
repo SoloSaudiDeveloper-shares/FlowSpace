@@ -276,6 +276,10 @@ export const todoItems = sqliteTable("todo_items", {
   priority: text("priority", {
     enum: ["urgent", "high", "medium", "low"],
   }),
+  /** An emoji char OR a `data:image/...` URL for a custom uploaded icon. */
+  icon: text("icon"),
+  /** Short comment shown beneath the task title. */
+  description: text("description"),
   completedAt: text("completed_at"),
   createdAt: text("created_at")
     .notNull()

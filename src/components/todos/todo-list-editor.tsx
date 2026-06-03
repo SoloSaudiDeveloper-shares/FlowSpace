@@ -3,8 +3,9 @@
 import { useState } from "react"
 import {
   Plus, Trash2, GripVertical, Calendar, Pencil, CheckSquare, Square,
-  Flag, MoreVertical, X,
+  Flag, MoreVertical, X, Smile, MessageSquare,
 } from "lucide-react"
+import { IconPicker, TodoIcon } from "@/components/shared/icon-picker"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { SpeechButton } from "@/components/shared/speech-button"
@@ -125,8 +126,8 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
   const { t } = useT()
   const [title, setTitle] = useState(item.title)
   const [isEditing, setIsEditing] = useState(false)
-  /** "priority" | "date" | null — which inline popover is open. */
-  const [activePopover, setActivePopover] = useState<"priority" | "date" | null>(null)
+  /** which inline popover is open. */
+  const [activePopover, setActivePopover] = useState<"priority" | "date" | "icon" | "desc" | null>(null)
   const { menu: ctxMenu, open: openCtx, close: closeCtx } = useContextMenu()
 
   function handleContextMenu(e: React.MouseEvent) {
@@ -151,6 +152,16 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
         label: item.dueDate ? t("misc.todo.due").replace("{date}", new Date(item.dueDate).toLocaleDateString()) : t("misc.todo.setDueDate"),
         icon: Calendar,
         onClick: () => setActivePopover("date"),
+      },
+      {
+        label: item.icon ? "Change icon" : "Add icon",
+        icon: Smile,
+        onClick: () => setActivePopover("icon"),
+      },
+      {
+        label: item.description ? "Edit comment" : "Add comment",
+        icon: MessageSquare,
+        onClick: () => setActivePopover("desc"),
       },
       { separator: true },
       {
@@ -191,6 +202,20 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
                 <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
+          </button>
+
+          {/* Icon — shows when set; a faint placeholder appears on hover so
+              you can add one. Optional. */}
+          <button
+            type="button"
+            onClick={() => setActivePopover(activePopover === "icon" ? null : "icon")}
+            className={`shrink-0 size-6 rounded-md flex items-center justify-center hover:bg-accent transition-all ${
+              item.icon ? "" : "opacity-0 group-hover:opacity-100 text-muted-foreground/40"
+            }`}
+            title={item.icon ? "Change icon" : "Add icon"}
+            aria-label="Set icon"
+          >
+            {item.icon ? <TodoIcon icon={item.icon} /> : <Smile className="size-4" />}
           </button>
 
           {/* Title */}
@@ -275,6 +300,39 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
             </Button>
           </div>
         </div>
+
+        {/* Comment / description — shown beneath the title, separated by a
+            thin line, when set (and not currently being edited). */}
+        {item.description && activePopover !== "desc" && (
+          <div className="px-2 sm:px-3 pb-2 -mt-0.5">
+            <div className="ml-7 border-t border-border/50 pt-1.5 text-xs text-muted-foreground whitespace-pre-wrap break-words">
+              {item.description}
+            </div>
+          </div>
+        )}
+
+        {/* Inline popover — pick an icon */}
+        {activePopover === "icon" && (
+          <div className="border-t bg-background/95 backdrop-blur-sm px-2 sm:px-3 py-2">
+            <IconPicker
+              value={item.icon}
+              onPick={(ic) => updateTodoItem(item.id, listId, { icon: ic })}
+              onClose={() => setActivePopover(null)}
+            />
+          </div>
+        )}
+
+        {/* Inline popover — edit the comment */}
+        {activePopover === "desc" && (
+          <DescEditor
+            initial={item.description ?? ""}
+            onSave={(d) => {
+              updateTodoItem(item.id, listId, { description: d || null })
+              setActivePopover(null)
+            }}
+            onClose={() => setActivePopover(null)}
+          />
+        )}
 
         {/* Inline popover — picks priority */}
         {activePopover === "priority" && (
@@ -385,6 +443,46 @@ function TodoItemRow({ item, listId, onDelete }: { item: TodoItem; listId: strin
         />
       )}
     </>
+  )
+}
+
+function DescEditor({
+  initial,
+  onSave,
+  onClose,
+}: {
+  initial: string
+  onSave: (d: string) => void
+  onClose: () => void
+}) {
+  const [text, setText] = useState(initial)
+  return (
+    <div className="border-t bg-background/95 backdrop-blur-sm px-2 sm:px-3 py-2">
+      <textarea
+        autoFocus
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Add a comment / description…"
+        rows={2}
+        className="w-full resize-none rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary/60"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSave(text.trim())
+          if (e.key === "Escape") onClose()
+        }}
+      />
+      <div className="flex items-center justify-end gap-1.5 mt-1.5">
+        <button type="button" onClick={onClose} className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => onSave(text.trim())}
+          className="text-[11px] text-primary font-medium px-2 py-1 rounded-md hover:bg-primary/10"
+        >
+          Save
+        </button>
+      </div>
+    </div>
   )
 }
 

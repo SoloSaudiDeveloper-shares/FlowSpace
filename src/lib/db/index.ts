@@ -301,6 +301,14 @@ try {
   if (!cols.some((c) => c.name === "priority")) {
     sqlite.exec(`ALTER TABLE todo_items ADD COLUMN priority TEXT`)
   }
+  // icon: an emoji char OR a `data:image/...` URL for a custom uploaded icon.
+  if (!cols.some((c) => c.name === "icon")) {
+    sqlite.exec(`ALTER TABLE todo_items ADD COLUMN icon TEXT`)
+  }
+  // description: a short comment shown beneath the task title.
+  if (!cols.some((c) => c.name === "description")) {
+    sqlite.exec(`ALTER TABLE todo_items ADD COLUMN description TEXT`)
+  }
 } catch (err) {
   console.error("[migration] todo_items.priority:", err)
 }

@@ -48,6 +48,10 @@ export async function updateTodoItem(
     notes?: string | null
     /** "urgent" | "high" | "medium" | "low" | null. */
     priority?: "urgent" | "high" | "medium" | "low" | null
+    /** Emoji char or data:image URL. Empty string / null clears it. */
+    icon?: string | null
+    /** Short comment shown beneath the title. */
+    description?: string | null
   }
 ) {
   const updateData: Record<string, unknown> = { ...data }
