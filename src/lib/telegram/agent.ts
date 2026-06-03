@@ -925,7 +925,7 @@ function captionLang(bot: BotRow, args: string): string {
       `🖼 Gallery caption language: *${cur}*.`,
       "",
       "Change it with `/caption ar` (Arabic), `/caption en` (English), or `/caption auto`.",
-      "_Quality depends on the vision model — moondream is English-centric; for solid Arabic use a multilingual model (e.g. qwen2.5vl / gemma3) or your cloud provider._",
+      "_How it works: the vision model captions the image in English, then your AI provider translates it to your language — so Arabic comes out clean even with a light English-only vision model (moondream). Needs an AI provider configured._",
     ].join("\n")
   }
   const val = a === "auto" || /^[a-z]{2}$/.test(a) ? a : a.slice(0, 20)

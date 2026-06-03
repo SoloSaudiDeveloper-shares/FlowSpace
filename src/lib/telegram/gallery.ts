@@ -110,15 +110,58 @@ function setCaptionStatus(imageId: string, userId: string, status: string | null
 
 /** Build the language instruction for the caption prompt from the user's
  *  caption_lang preference (set via /caption). */
-function captionLanguageClause(userId: string): string {
+function readCaptionLang(userId: string): string {
   const row = sqlite
     .prepare(`SELECT caption_lang FROM telegram_bots WHERE user_id = ?`)
     .get(userId) as { caption_lang: string | null } | undefined
-  const lang = (row?.caption_lang || "auto").trim().toLowerCase()
-  if (!lang || lang === "auto") return ""
-  if (lang === "en") return " Write the caption in English."
-  if (lang === "ar") return " Write the caption in Arabic (العربية)."
-  return ` Write the caption in ${lang}.`
+  return (row?.caption_lang || "auto").trim().toLowerCase()
+}
+
+function languageName(lang: string): string {
+  const map: Record<string, string> = {
+    ar: "Arabic", en: "English", es: "Spanish", fr: "French",
+    de: "German", tr: "Turkish", ur: "Urdu", fa: "Persian", hi: "Hindi",
+  }
+  return map[lang] ?? lang
+}
+
+/**
+ * Translate a caption into the target language using the user's TEXT AI
+ * provider (e.g. Gemini). This pairs a light English-only vision model
+ * (moondream → great English caption, free, local) with a strong multilingual
+ * LLM for the translation — so Arabic captions come out clean. Returns the
+ * original text if no text provider is configured or on any failure (a good
+ * English caption beats nothing).
+ */
+async function translateCaption(userId: string, text: string, lang: string): Promise<string> {
+  const { getUserAIConfig } = await import("@/lib/telegram/nl-intent")
+  const cfg = getUserAIConfig(userId)
+  if (!cfg) return text
+  try {
+    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          {
+            role: "system",
+            content: `Translate the user's short image caption into ${languageName(lang)}. Preserve meaning and any names/text. Reply with ONLY the translation — no quotes, no notes.`,
+          },
+          { role: "user", content: text },
+        ],
+        temperature: 0.2,
+        max_tokens: 200,
+      }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!res.ok) return text
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] }
+    const out = (data.choices?.[0]?.message?.content || "").trim().replace(/^["']|["']$/g, "")
+    return out || text
+  } catch {
+    return text
+  }
 }
 
 export async function describeGalleryImage(
@@ -166,9 +209,7 @@ export async function describeGalleryImage(
             content: [
               {
                 type: "text",
-                text:
-                  "Describe this image in ONE short caption (max ~20 words). If it contains readable text, capture the key text instead. Reply with just the caption — no preamble." +
-                  captionLanguageClause(userId),
+                text: "Describe this image in ONE short caption (max ~20 words). If it contains readable text, capture the key text instead. Reply with just the caption — no preamble.",
               },
               { type: "image_url", image_url: { url: dataUrl } },
             ],
@@ -193,9 +234,15 @@ export async function describeGalleryImage(
       setCaptionStatus(imageId, userId, "failed")
       return { ok: false, error: "empty response" }
     }
+    // Vision gives an English caption; if the user picked another caption
+    // language, translate it via their text AI provider (e.g. Gemini → Arabic).
+    const lang = readCaptionLang(userId)
+    const finalCaption =
+      lang && lang !== "auto" && lang !== "en" ? await translateCaption(userId, caption, lang) : caption
+
     sqlite
       .prepare(`UPDATE gallery_images SET caption = ?, caption_status = 'done' WHERE id = ? AND user_id = ?`)
-      .run(caption, imageId, userId)
+      .run(finalCaption, imageId, userId)
 
     // Notify the user in Telegram that the caption is ready, with quick actions.
     if (opts.notify) {
@@ -206,12 +253,12 @@ export async function describeGalleryImage(
         if (bot?.bot_token && bot.chat_id) {
           const { sendMessage } = await import("@/lib/telegram/client")
           const { galleryCaptionReadyMenu } = await import("@/lib/telegram/menus")
-          const m = galleryCaptionReadyMenu(imageId, caption)
+          const m = galleryCaptionReadyMenu(imageId, finalCaption)
           await sendMessage(bot.bot_token, bot.chat_id, m.text, { parseMode: "Markdown", replyMarkup: m.markup }).catch(() => undefined)
         }
       } catch { /* notify is best-effort */ }
     }
-    return { ok: true, caption }
+    return { ok: true, caption: finalCaption }
   } catch (err) {
     setCaptionStatus(imageId, userId, "failed")
     return { ok: false, error: err instanceof Error ? err.message : "vision error" }
