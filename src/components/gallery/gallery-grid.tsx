@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { ImageOff, MessageSquare, Trash2, Send, FolderPlus } from "lucide-react"
+import { ImageOff, MessageSquare, Trash2, Send, FolderPlus, Search, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -51,6 +51,7 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
   const [items, setItems] = useState<GalleryImage[]>(images)
   const [albumList, setAlbumList] = useState<GalleryAlbum[]>(albums)
   const [filter, setFilter] = useState<string>("all") // "all" | "unsorted" | <albumId>
+  const [query, setQuery] = useState("")
   const [selected, setSelected] = useState<GalleryImage | null>(null)
   const [comments, setComments] = useState<GalleryComment[]>([])
   const [loadingComments, setLoadingComments] = useState(false)
@@ -68,10 +69,13 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
   }, [items])
 
   const filtered = useMemo(() => {
-    if (filter === "all") return items
-    if (filter === "unsorted") return items.filter((i) => !i.albumId)
-    return items.filter((i) => i.albumId === filter)
-  }, [items, filter])
+    let list = items
+    if (filter === "unsorted") list = list.filter((i) => !i.albumId)
+    else if (filter !== "all") list = list.filter((i) => i.albumId === filter)
+    const q = query.trim().toLowerCase()
+    if (q) list = list.filter((i) => i.search.includes(q))
+    return list
+  }, [items, filter, query])
 
   async function open(img: GalleryImage) {
     setSelected(img)
@@ -109,9 +113,14 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
       const c = await addGalleryComment(selected.id, newComment.trim())
       if (c) {
         setComments((prev) => [...prev, c])
+        const added = newComment.trim().toLowerCase()
         setNewComment("")
         setItems((prev) =>
-          prev.map((i) => (i.id === selected.id ? { ...i, commentCount: i.commentCount + 1 } : i)),
+          prev.map((i) =>
+            i.id === selected.id
+              ? { ...i, commentCount: i.commentCount + 1, search: `${i.search} ${added}` }
+              : i,
+          ),
         )
       }
     } finally {
@@ -134,7 +143,11 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
     const next = caption.trim()
     if (next === (selected.caption ?? "")) return
     await updateGalleryCaption(selected.id, next)
-    setItems((prev) => prev.map((i) => (i.id === selected.id ? { ...i, caption: next || null } : i)))
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === selected.id ? { ...i, caption: next || null, search: `${i.search} ${next.toLowerCase()}` } : i,
+      ),
+    )
     setSelected((s) => (s ? { ...s, caption: next || null } : s))
   }
 
@@ -154,6 +167,26 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
 
   return (
     <>
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search captions, comments, albums…"
+          className="w-full rounded-lg border bg-background pl-9 pr-9 py-2 text-sm outline-none focus:border-primary/60"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+
       {/* Album filter bar */}
       <div className="flex flex-wrap items-center gap-1.5 mb-4">
         <Chip active={filter === "all"} label="All" count={counts.all} onClick={() => setFilter("all")} />
@@ -178,7 +211,9 @@ export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums
           </p>
         </div>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-16">No images in this album yet.</p>
+        <p className="text-sm text-muted-foreground text-center py-16">
+          {query.trim() ? `No images match "${query.trim()}".` : "No images in this album yet."}
+        </p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {filtered.map((img) => (

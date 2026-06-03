@@ -18,6 +18,8 @@ export interface GalleryImage {
   source: string
   createdAt: string
   commentCount: number
+  /** Lowercased caption + comments + album name, for instant client search. */
+  search: string
 }
 
 export interface GalleryComment {
@@ -39,8 +41,14 @@ export async function getMyGalleryImages(): Promise<GalleryImage[]> {
     .prepare(
       `SELECT g.id, g.caption, g.mime, g.album_id AS albumId, g.width, g.height, g.source,
               g.created_at AS createdAt,
-              (SELECT COUNT(*) FROM gallery_comments c WHERE c.image_id = g.id) AS commentCount
+              (SELECT COUNT(*) FROM gallery_comments c WHERE c.image_id = g.id) AS commentCount,
+              LOWER(
+                COALESCE(g.caption, '') || ' ' ||
+                COALESCE((SELECT GROUP_CONCAT(c2.body, ' ') FROM gallery_comments c2 WHERE c2.image_id = g.id), '') || ' ' ||
+                COALESCE(a.name, '')
+              ) AS search
        FROM gallery_images g
+       LEFT JOIN gallery_albums a ON a.id = g.album_id
        WHERE g.user_id = ?
        ORDER BY g.created_at DESC`,
     )
