@@ -163,6 +163,44 @@ export async function handleCallback(
       return { toast: ok ? "Removed" : "Already gone", replace: { text: ok ? "↩️ _Task removed._" : "↩️ _Already gone._" } }
     }
 
+    // ── Gallery: file a saved photo into an album / describe it ──────────
+    if (data.startsWith("ga:mv:")) {
+      const parts = data.split(":")
+      const imageId = parts[2]
+      const albumId = parts[3]
+      const { moveImageToAlbumForBot } = await import("@/lib/telegram/gallery")
+      const r = moveImageToAlbumForBot(userId, imageId, albumId)
+      if (!r.ok) return { toast: "Couldn't file that." }
+      return { toast: `Filed in ${r.albumName}`, replace: { text: `📁 *Filed into ${escMd(r.albumName)}.*` } }
+    }
+    if (data.startsWith("ga:un:")) {
+      const imageId = data.slice("ga:un:".length)
+      const { moveImageToAlbumForBot } = await import("@/lib/telegram/gallery")
+      moveImageToAlbumForBot(userId, imageId, null)
+      return { toast: "Kept unsorted", replace: { text: "📥 _Kept in Unsorted._" } }
+    }
+    if (data.startsWith("ga:new:")) {
+      const imageId = data.slice("ga:new:".length)
+      setState(userId, `ga:new:${imageId}`)
+      return {
+        edit: {
+          text: "📁 *New album*\n\nSend the album name as your next message.",
+          markup: { inline_keyboard: [[{ text: "❌ Cancel", callback_data: "cancel" }]] },
+        },
+      }
+    }
+    if (data.startsWith("ga:cap:")) {
+      const imageId = data.slice("ga:cap:".length)
+      const { describeGalleryImage } = await import("@/lib/telegram/gallery")
+      // Vision can take many seconds — run it in the background and update the
+      // caption when done rather than blocking the callback.
+      void describeGalleryImage(userId, imageId, { overwrite: true })
+      return {
+        toast: "Describing…",
+        replace: { text: "✨ _Describing the image with AI — the caption will appear in your Gallery shortly._" },
+      }
+    }
+
     // View routes
     if (data === "v:tasks")      return { edit: tasksMenu(userId) }
     if (data === "v:projects")   return { edit: projectsMenu(userId, 0) }

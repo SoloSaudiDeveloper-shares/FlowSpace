@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { ImageOff, MessageSquare, Trash2, Send } from "lucide-react"
+import { useState, useMemo } from "react"
+import { ImageOff, MessageSquare, Trash2, Send, FolderPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,8 +16,11 @@ import {
   deleteGalleryComment,
   updateGalleryCaption,
   deleteGalleryImage,
+  createAlbum,
+  moveImageToAlbum,
   type GalleryImage,
   type GalleryComment,
+  type GalleryAlbum,
 } from "@/lib/actions/gallery-actions"
 
 function timeAgo(iso: string): string {
@@ -30,14 +33,45 @@ function timeAgo(iso: string): string {
   return new Date(iso.replace(" ", "T")).toLocaleDateString()
 }
 
-export function GalleryGrid({ images }: { images: GalleryImage[] }) {
+function Chip({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+        active ? "bg-primary/15 border-primary/40 text-foreground" : "border-border text-muted-foreground hover:text-foreground hover:bg-accent/50"
+      }`}
+    >
+      {label}
+      <span className="text-[10px] tabular-nums opacity-70">{count}</span>
+    </button>
+  )
+}
+
+export function GalleryGrid({ images, albums }: { images: GalleryImage[]; albums: GalleryAlbum[] }) {
   const [items, setItems] = useState<GalleryImage[]>(images)
+  const [albumList, setAlbumList] = useState<GalleryAlbum[]>(albums)
+  const [filter, setFilter] = useState<string>("all") // "all" | "unsorted" | <albumId>
   const [selected, setSelected] = useState<GalleryImage | null>(null)
   const [comments, setComments] = useState<GalleryComment[]>([])
   const [loadingComments, setLoadingComments] = useState(false)
   const [newComment, setNewComment] = useState("")
   const [caption, setCaption] = useState("")
   const [busy, setBusy] = useState(false)
+
+  const counts = useMemo(() => {
+    const m: Record<string, number> = { all: items.length, unsorted: 0 }
+    for (const i of items) {
+      if (!i.albumId) m.unsorted++
+      else m[i.albumId] = (m[i.albumId] ?? 0) + 1
+    }
+    return m
+  }, [items])
+
+  const filtered = useMemo(() => {
+    if (filter === "all") return items
+    if (filter === "unsorted") return items.filter((i) => !i.albumId)
+    return items.filter((i) => i.albumId === filter)
+  }, [items, filter])
 
   async function open(img: GalleryImage) {
     setSelected(img)
@@ -50,6 +84,22 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
     } finally {
       setLoadingComments(false)
     }
+  }
+
+  async function newAlbum() {
+    const name = window.prompt("New album name:")?.trim()
+    if (!name) return
+    const a = await createAlbum(name)
+    if (a) {
+      setAlbumList((prev) => [...prev, a].sort((x, y) => x.name.localeCompare(y.name)))
+      toast.success(`Album "${a.name}" created`)
+    }
+  }
+
+  async function changeImageAlbum(imageId: string, albumId: string | null) {
+    await moveImageToAlbum(imageId, albumId)
+    setItems((prev) => prev.map((i) => (i.id === imageId ? { ...i, albumId } : i)))
+    setSelected((s) => (s && s.id === imageId ? { ...s, albumId } : s))
   }
 
   async function submitComment() {
@@ -102,57 +152,70 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
     }
   }
 
-  if (items.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-muted-foreground text-center">
-        <ImageOff className="size-12 mb-3 opacity-30" />
-        <p className="text-sm">Your gallery is empty.</p>
-        <p className="text-xs mt-1 max-w-xs">
-          Send a photo to your Telegram bot and it'll show up here — caption it and add comments to revisit later.
-        </p>
-      </div>
-    )
-  }
-
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {items.map((img) => (
-          <button
-            key={img.id}
-            onClick={() => open(img)}
-            className="group relative aspect-square overflow-hidden rounded-xl border bg-card text-left hover:border-foreground/20 hover:shadow-lg transition-all"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/gallery/${img.id}`}
-              alt={img.caption ?? "Gallery image"}
-              loading="lazy"
-              className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-            />
-            {/* gradient + caption */}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-6">
-              {img.caption ? (
-                <p className="text-[11px] text-white/90 line-clamp-2">{img.caption}</p>
-              ) : (
-                <p className="text-[11px] text-white/50 italic">No caption</p>
-              )}
-            </div>
-            {img.commentCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                <MessageSquare className="size-3" />
-                {img.commentCount}
-              </span>
-            )}
-          </button>
+      {/* Album filter bar */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-4">
+        <Chip active={filter === "all"} label="All" count={counts.all} onClick={() => setFilter("all")} />
+        <Chip active={filter === "unsorted"} label="Unsorted" count={counts.unsorted} onClick={() => setFilter("unsorted")} />
+        {albumList.map((a) => (
+          <Chip key={a.id} active={filter === a.id} label={a.name} count={counts[a.id] ?? 0} onClick={() => setFilter(a.id)} />
         ))}
+        <button
+          onClick={newAlbum}
+          className="px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors flex items-center gap-1"
+        >
+          <FolderPlus className="size-3" /> New album
+        </button>
       </div>
+
+      {items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-muted-foreground text-center">
+          <ImageOff className="size-12 mb-3 opacity-30" />
+          <p className="text-sm">Your gallery is empty.</p>
+          <p className="text-xs mt-1 max-w-xs">
+            Send a photo to your Telegram bot — it'll show up here, the bot will offer to file it into an album, and (if AI is set up) auto-caption it.
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-16">No images in this album yet.</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {filtered.map((img) => (
+            <button
+              key={img.id}
+              onClick={() => open(img)}
+              className="group relative aspect-square overflow-hidden rounded-xl border bg-card text-left hover:border-foreground/20 hover:shadow-lg transition-all"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/gallery/${img.id}`}
+                alt={img.caption ?? "Gallery image"}
+                loading="lazy"
+                className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-6">
+                {img.caption ? (
+                  <p className="text-[11px] text-white/90 line-clamp-2">{img.caption}</p>
+                ) : (
+                  <p className="text-[11px] text-white/50 italic">No caption</p>
+                )}
+              </div>
+              {img.commentCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                  <MessageSquare className="size-3" />
+                  {img.commentCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="sm:max-w-3xl p-0 overflow-hidden gap-0">
           {selected && (
             <div className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr] max-h-[85vh]">
-              {/* Image */}
               <div className="bg-black/40 flex items-center justify-center min-h-[200px] max-h-[85vh]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -162,14 +225,12 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
                 />
               </div>
 
-              {/* Side panel: caption + comments */}
               <div className="flex flex-col max-h-[85vh] border-l">
                 <DialogHeader className="p-4 pb-2 shrink-0">
                   <DialogTitle className="text-sm">Image details</DialogTitle>
                 </DialogHeader>
 
-                {/* Caption editor */}
-                <div className="px-4 pb-3 shrink-0">
+                <div className="px-4 pb-3 shrink-0 space-y-2">
                   <textarea
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
@@ -178,18 +239,27 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
                     rows={2}
                     className="w-full resize-none rounded-md border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
                   />
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    Saved · {timeAgo(selected.createdAt)}
-                  </p>
+                  {/* Move to album */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] text-muted-foreground shrink-0">Album</label>
+                    <select
+                      value={selected.albumId ?? ""}
+                      onChange={(e) => changeImageAlbum(selected.id, e.target.value || null)}
+                      className="flex-1 rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary/60"
+                    >
+                      <option value="">Unsorted</option>
+                      {albumList.map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Saved · {timeAgo(selected.createdAt)}</p>
                 </div>
 
-                <Separator />
+                <div className="h-px w-full bg-border" />
 
-                {/* Comments */}
                 <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-                    Comments
-                  </p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Comments</p>
                   {loadingComments ? (
                     <p className="text-xs text-muted-foreground">Loading…</p>
                   ) : comments.length === 0 ? (
@@ -213,7 +283,6 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
                   )}
                 </div>
 
-                {/* Add comment */}
                 <div className="p-3 border-t shrink-0">
                   <div className="flex items-end gap-2">
                     <textarea
@@ -245,9 +314,4 @@ export function GalleryGrid({ images }: { images: GalleryImage[] }) {
       </Dialog>
     </>
   )
-}
-
-// Local separator (avoid importing the heavy one in a tight client bundle path)
-function Separator() {
-  return <div className="h-px w-full bg-border" />
 }

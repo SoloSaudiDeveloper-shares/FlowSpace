@@ -232,6 +232,17 @@ sqlite.exec(`
 `)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_gallery_user ON gallery_images(user_id, created_at);`)
 sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_gallery_comments ON gallery_comments(image_id, created_at);`)
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS gallery_albums (
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`)
+sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_gallery_albums_user ON gallery_albums(user_id, created_at);`)
+// album_id: which album an image belongs to (NULL = Unsorted).
+try { sqlite.exec(`ALTER TABLE gallery_images ADD COLUMN album_id TEXT`) } catch {}
 // file_id is used by the 'audio_upload' source (long/large uploaded audio).
 // Silent: duplicate-column on an already-migrated DB is expected and benign.
 try { sqlite.exec(`ALTER TABLE transcription_jobs ADD COLUMN file_id TEXT`) } catch {}

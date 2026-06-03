@@ -275,6 +275,23 @@ export function handleStatedMessage(
     )
   }
 
+  // ── New gallery album (then file the pending image into it) ──────────
+  if (state.step.startsWith("ga:new:")) {
+    const imageId = state.step.slice("ga:new:".length)
+    const albumId = createId()
+    sqlite
+      .prepare(`INSERT INTO gallery_albums (id, user_id, name) VALUES (?, ?, ?)`)
+      .run(albumId, userId, trimmed.slice(0, 80))
+    sqlite
+      .prepare(`UPDATE gallery_images SET album_id = ? WHERE id = ? AND user_id = ?`)
+      .run(albumId, imageId, userId)
+    clearState(userId)
+    return successWithActions(
+      `📁 Album *${escMd(trimmed)}* created — image filed there.`,
+      [[{ text: "🏠 Menu", callback_data: "menu:main" }]],
+    )
+  }
+
   // Unknown state — wipe it so the user isn't stuck.
   clearState(userId)
   return doneFooter("Lost track of where we were. Try the menu again.")

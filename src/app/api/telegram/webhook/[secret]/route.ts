@@ -38,6 +38,7 @@ import {
   mainMenu,
   pendingImportMenu,
   languagePickerFor,
+  galleryAlbumPicker,
 } from "@/lib/telegram/menus"
 import {
   getState,
@@ -260,7 +261,7 @@ export async function POST(
     const fileId = imageDoc ? imageDoc.file_id : largest!.file_id
     const mime = imageDoc ? imageDoc.mime_type ?? "image/jpeg" : "image/jpeg"
     logMessage(bot.user_id, "in", "[🖼 photo received]")
-    const { saveGalleryImage } = await import("@/lib/telegram/gallery")
+    const { saveGalleryImage, describeGalleryImage } = await import("@/lib/telegram/gallery")
     const r = await saveGalleryImage({
       userId: bot.user_id,
       botToken: bot.bot_token,
@@ -270,12 +271,24 @@ export async function POST(
       width: largest?.width ?? null,
       height: largest?.height ?? null,
     })
-    const reply = r.ok ? "🖼 Saved to your *Gallery*." : `⚠️ Couldn't save that image: ${r.error}`
-    logMessage(bot.user_id, "out", reply)
-    await sendMessage(bot.bot_token, msg.chat.id, reply, {
-      parseMode: "Markdown",
-      replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
-    })
+    if (r.ok) {
+      // "Identify" the image: if no caption was provided, auto-describe it with
+      // the user's vision model in the background (best-effort; updates the
+      // caption when done so the webhook can ack instantly).
+      if (!msg.caption?.trim()) void describeGalleryImage(bot.user_id, r.id)
+      const picker = galleryAlbumPicker(bot.user_id, r.id, msg.caption?.trim() || undefined)
+      logMessage(bot.user_id, "out", picker.text)
+      await sendMessage(bot.bot_token, msg.chat.id, picker.text, {
+        parseMode: "Markdown",
+        replyMarkup: picker.markup,
+      })
+    } else {
+      const reply = `⚠️ Couldn't save that image: ${r.error}`
+      logMessage(bot.user_id, "out", reply)
+      await sendMessage(bot.bot_token, msg.chat.id, reply, {
+        replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+      })
+    }
     return new NextResponse("ok", { status: 200 })
   }
 

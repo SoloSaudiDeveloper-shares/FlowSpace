@@ -166,6 +166,13 @@ export const pages = sqliteTable("pages", {
 // A per-user image board. Photos pushed through the Telegram bot land here
 // (great for saving useful screenshots / pictures from TikTok / WhatsApp),
 // each with an optional caption and a comment thread to annotate and revisit.
+export const galleryAlbums = sqliteTable("gallery_albums", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+})
+
 export const galleryImages = sqliteTable("gallery_images", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
@@ -173,6 +180,8 @@ export const galleryImages = sqliteTable("gallery_images", {
   filePath: text("file_path").notNull(),
   mime: text("mime"),
   caption: text("caption"),
+  /** Album this image belongs to. NULL = Unsorted. */
+  albumId: text("album_id"),
   width: integer("width"),
   height: integer("height"),
   source: text("source").notNull().default("telegram"),

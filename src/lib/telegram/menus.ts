@@ -780,6 +780,37 @@ export function captureRouterRows(
   ]
 }
 
+/**
+ * Album picker shown after a photo is saved to the Gallery — mirrors the
+ * voice destination picker. Lets the user file the image into an album,
+ * create a new one, AI-describe it, or keep it unsorted.
+ */
+export function galleryAlbumPicker(userId: string, imageId: string, captionHint?: string): MenuResponse {
+  const albums = sqlite
+    .prepare(`SELECT id, name FROM gallery_albums WHERE user_id = ? ORDER BY name COLLATE NOCASE ASC LIMIT 6`)
+    .all(userId) as { id: string; name: string }[]
+  const albumRows = albums.map((a) => [
+    { text: `📁 ${a.name.slice(0, 28)}`, callback_data: `ga:mv:${imageId}:${a.id}` },
+  ])
+  return {
+    text: [
+      "🖼 *Saved to your Gallery.*",
+      captionHint ? `_"${escMd(captionHint)}"_` : "",
+      "File it into an album?",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    markup: inlineKeyboard([
+      ...albumRows,
+      [
+        { text: "➕ New album", callback_data: `ga:new:${imageId}` },
+        { text: "✨ Describe (AI)", callback_data: `ga:cap:${imageId}` },
+      ],
+      [{ text: "📥 Keep unsorted", callback_data: `ga:un:${imageId}` }],
+    ]),
+  }
+}
+
 export function voiceDestinationMenu(pid: string, transcript: string): MenuResponse {
   return {
     text: [
