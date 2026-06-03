@@ -68,6 +68,35 @@ always enforced.
 
 ---
 
+## Local image captioning (Gallery / Vision) — free, on the box
+
+The Gallery's auto-caption ("identify the image") and the in-app Vision feature
+use an OpenAI-compatible vision endpoint, **local-first**: set `VISION_LOCAL_URL`
+and they use a self-hosted model for free; otherwise they fall back to the user's
+configured cloud model (which must be vision-capable).
+
+Recommended light model on a CPU/ARM box: **moondream** (~1.8B, ~2 GB RAM) via
+Ollama, which exposes an OpenAI-compatible API including image input.
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh   # has arm64 builds
+ollama pull moondream
+# Ollama serves http://127.0.0.1:11434/v1
+```
+
+Env (point the URL at wherever Ollama is reachable *from the app container* —
+same gateway trick as `TELEGRAM_VOICE_LOCAL_URL`, e.g. `http://172.17.0.1:11434/v1`):
+```
+VISION_LOCAL_URL=http://172.17.0.1:11434/v1
+VISION_LOCAL_MODEL=moondream      # default if omitted
+# VISION_LOCAL_KEY=               # optional; Ollama needs none
+```
+Captioning runs in the background, so a few seconds–~20 s per image on CPU is
+fine. Lighter still: SmolVLM (256M/500M) via llama.cpp. Want one model for chat
+*and* vision instead? `gemma3:4b` / `qwen2.5vl:3b` are multimodal (heavier/slower).
+
+---
+
 ## Server-side components to stand up (Oracle ARM VM)
 
 ### 1. FFmpeg

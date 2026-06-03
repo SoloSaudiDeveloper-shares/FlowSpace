@@ -109,25 +109,10 @@ export async function describeGalleryImage(
   if (!row) return { ok: false, error: "image not found" }
   if (!opts.overwrite && row.caption?.trim()) return { ok: false, error: "already captioned" }
 
-  // Read the user's OpenAI-compatible config (same prefs the in-app AI uses).
-  const prefRow = sqlite
-    .prepare(`SELECT prefs_json FROM user_preferences WHERE user_id = ?`)
-    .get(userId) as { prefs_json: string } | undefined
-  if (!prefRow?.prefs_json) return { ok: false, error: "no AI provider" }
-  let cfg: { baseUrl: string; apiKey: string; model: string } | null = null
-  try {
-    const p = JSON.parse(prefRow.prefs_json) as {
-      aiOpenAIBaseUrl?: string; aiOpenAIApiKey?: string; aiOpenAIModel?: string
-    }
-    if (p.aiOpenAIBaseUrl && p.aiOpenAIApiKey) {
-      cfg = {
-        baseUrl: p.aiOpenAIBaseUrl.replace(/\/+$/, ""),
-        apiKey: p.aiOpenAIApiKey,
-        model: p.aiOpenAIModel?.trim() || "gpt-4o-mini",
-      }
-    }
-  } catch { /* malformed prefs */ }
-  if (!cfg) return { ok: false, error: "no AI provider" }
+  // Local-first vision (self-hosted Ollama/moondream) → cloud fallback.
+  const { resolveVisionConfig } = await import("@/lib/ai/vision-config")
+  const cfg = resolveVisionConfig(userId)
+  if (!cfg) return { ok: false, error: "no vision provider" }
 
   // Build a data URL from the stored file.
   let dataUrl: string
@@ -141,7 +126,10 @@ export async function describeGalleryImage(
   try {
     const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` },
+      headers: {
+        "Content-Type": "application/json",
+        ...(cfg.apiKey ? { Authorization: `Bearer ${cfg.apiKey}` } : {}),
+      },
       body: JSON.stringify({
         model: cfg.model,
         messages: [
@@ -158,7 +146,8 @@ export async function describeGalleryImage(
         ],
         max_tokens: 120,
       }),
-      signal: AbortSignal.timeout(45_000),
+      // Local CPU vision (moondream) is slower than a cloud call — give it room.
+      signal: AbortSignal.timeout(cfg.isLocal ? 120_000 : 45_000),
     })
     if (!res.ok) return { ok: false, error: `provider ${res.status}` }
     const data = (await res.json()) as { choices?: { message?: { content?: unknown } }[] }

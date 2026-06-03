@@ -24,35 +24,7 @@ import { requireAuth } from "@/lib/auth/scope"
 import { sqlite } from "@/lib/db"
 import { createId } from "@/lib/utils/ids"
 import { revalidatePath } from "next/cache"
-
-interface UserAIConfig {
-  baseUrl: string
-  apiKey: string
-  /** Default chat/vision model the user picked in Settings. */
-  model: string
-}
-
-function readUserAI(userId: string): UserAIConfig | null {
-  const row = sqlite
-    .prepare(`SELECT prefs_json FROM user_preferences WHERE user_id = ?`)
-    .get(userId) as { prefs_json: string } | undefined
-  if (!row?.prefs_json) return null
-  try {
-    const prefs = JSON.parse(row.prefs_json) as {
-      aiOpenAIBaseUrl?: string
-      aiOpenAIApiKey?: string
-      aiOpenAIModel?: string
-    }
-    if (!prefs.aiOpenAIBaseUrl || !prefs.aiOpenAIApiKey) return null
-    return {
-      baseUrl: prefs.aiOpenAIBaseUrl.replace(/\/+$/, ""),
-      apiKey: prefs.aiOpenAIApiKey,
-      model: prefs.aiOpenAIModel?.trim() || "gpt-4o-mini",
-    }
-  } catch {
-    return null
-  }
-}
+import { resolveVisionConfig } from "@/lib/ai/vision-config"
 
 /** Run a vision analysis. `dataUrl` should be a `data:image/…;base64,…`
  *  URL so the provider can decode it inline. */
@@ -61,12 +33,13 @@ export async function analyzeImageWithAI(input: {
   prompt?: string
 }): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const me = await requireAuth()
-  const cfg = readUserAI(me.id)
+  // Local-first (self-hosted Ollama/moondream) → cloud fallback.
+  const cfg = resolveVisionConfig(me.id)
   if (!cfg) {
     return {
       ok: false,
       error:
-        "Configure an OpenAI-compatible AI provider in Settings → AI features first.",
+        "Configure an AI provider in Settings → AI features (or set a local VISION_LOCAL_URL on the server).",
     }
   }
   const prompt =
@@ -78,7 +51,7 @@ export async function analyzeImageWithAI(input: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${cfg.apiKey}`,
+        ...(cfg.apiKey ? { Authorization: `Bearer ${cfg.apiKey}` } : {}),
       },
       body: JSON.stringify({
         model: cfg.model,
@@ -93,7 +66,8 @@ export async function analyzeImageWithAI(input: {
         ],
         max_tokens: 1024,
       }),
-      signal: AbortSignal.timeout(60_000),
+      // Local CPU vision is slower than a cloud call — give it room.
+      signal: AbortSignal.timeout(cfg.isLocal ? 180_000 : 60_000),
     })
     if (!res.ok) {
       const body = await res.text().catch(() => "")
