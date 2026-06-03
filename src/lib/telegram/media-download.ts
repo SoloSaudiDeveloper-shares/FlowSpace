@@ -23,6 +23,7 @@ import { stat } from "node:fs/promises"
 import path from "node:path"
 
 const execFileP = promisify(execFile)
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 const YTDLP_BIN = process.env.YTDLP_BIN || "yt-dlp"
 const FFMPEG_BIN = process.env.FFMPEG_BIN || "ffmpeg"
@@ -116,34 +117,36 @@ export async function downloadMediaAudio(
   // (a few MB even for ~30 min) and well under Groq's 25 MB cap.
   const AUDIO_MAX_MB = 60
 
-  // ── Step 1: probe metadata (fast, cheap) so we can reject over-long
-  // clips BEFORE downloading any bytes.
+  // ── Step 1: probe metadata (best-effort) to reject over-long clips early.
+  // TikTok / Instagram / X intermittently fail extraction on the FIRST request
+  // from a datacenter IP, so retry a few times with backoff. Crucially, if the
+  // probe still fails we do NOT abort — the download step enforces the duration
+  // cap via --match-filter and has its own retries, so a flaky probe never
+  // blocks a download that would otherwise succeed. (This is why a manual
+  // resend "always worked": the first probe flaked, the retry got through.)
   let title: string | null = null
   let durationSec: number | null = null
   let webpageUrl = url
-  try {
-    const { stdout } = await execFileP(
-      YTDLP_BIN,
-      ["--no-playlist", "--no-warnings", "--dump-single-json", "--socket-timeout", "15", url],
-      { timeout: 30_000, maxBuffer: 16 * 1024 * 1024 },
-    )
-    const meta = JSON.parse(stdout) as {
-      title?: string
-      duration?: number
-      webpage_url?: string
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const { stdout } = await execFileP(
+        YTDLP_BIN,
+        ["--no-playlist", "--no-warnings", "--dump-single-json", "--extractor-retries", "3", "--socket-timeout", "20", url],
+        { timeout: 45_000, maxBuffer: 16 * 1024 * 1024 },
+      )
+      const meta = JSON.parse(stdout) as { title?: string; duration?: number; webpage_url?: string }
+      title = meta.title ?? null
+      durationSec = typeof meta.duration === "number" ? Math.round(meta.duration) : null
+      webpageUrl = meta.webpage_url ?? url
+      break
+    } catch (err) {
+      if (isENOENT(err)) {
+        return { ok: false, code: "missing_binary", error: "yt-dlp is not installed on the server." }
+      }
+      // Transient — back off and retry; on the last attempt, fall through to
+      // the download anyway (best-effort, no early too_long check).
+      if (attempt < 3) await sleep(1500 * attempt)
     }
-    title = meta.title ?? null
-    durationSec = typeof meta.duration === "number" ? Math.round(meta.duration) : null
-    webpageUrl = meta.webpage_url ?? url
-  } catch (err) {
-    if (isENOENT(err)) {
-      return { ok: false, code: "missing_binary", error: "yt-dlp is not installed on the server." }
-    }
-    if (isTimeout(err)) {
-      return { ok: false, code: "timeout", error: "Timed out fetching media info." }
-    }
-    const msg = err instanceof Error ? err.message : String(err)
-    return { ok: false, code: "download_failed", error: msg.slice(0, 200) }
   }
 
   if (durationSec !== null && durationSec > maxDuration) {
@@ -177,10 +180,12 @@ export async function downloadMediaAudio(
     `${maxFileSizeMb}M`,
     "--match-filter",
     `duration < ${maxDuration}`,
+    "--extractor-retries",
+    "3",
     "--retries",
-    "2",
+    "5",
     "--socket-timeout",
-    "15",
+    "20",
   ]
   // Only point yt-dlp at a specific ffmpeg when the admin overrode the path.
   // Passing a bare "ffmpeg" name as --ffmpeg-location confuses yt-dlp (it
@@ -190,48 +195,52 @@ export async function downloadMediaAudio(
   }
   dlArgs.push("-o", outTemplate, "--print", "after_move:filepath", url)
 
-  let audioPath: string
-  try {
-    const { stdout } = await execFileP(YTDLP_BIN, dlArgs, {
-      timeout: timeoutMs,
-      maxBuffer: 16 * 1024 * 1024,
-      cwd: opts.workDir,
-    })
-    // `--print after_move:filepath` echoes the final path on stdout. If the
-    // file was skipped by the size/duration filter, stdout may be empty.
-    audioPath = stdout.trim().split(/\r?\n/).filter(Boolean).pop() ?? ""
-    if (!audioPath) {
-      // Fall back to the expected mp3 name.
-      audioPath = path.join(opts.workDir, "media.mp3")
-    }
-  } catch (err) {
-    if (isENOENT(err)) {
-      return { ok: false, code: "missing_binary", error: "yt-dlp/ffmpeg is not installed on the server." }
-    }
-    if (isTimeout(err)) {
-      return { ok: false, code: "timeout", error: "Download timed out." }
-    }
-    const msg = err instanceof Error ? err.message : String(err)
-    if (/file is larger than max-filesize|max-filesize/i.test(msg)) {
-      return { ok: false, code: "too_large", error: `Audio exceeds the ${maxFileSizeMb} MB limit.` }
-    }
-    return { ok: false, code: "download_failed", error: msg.slice(0, 200) }
-  }
+  // ── Step 3: download with retries. Transient extraction/network errors get
+  // a few attempts with backoff before we give up — so the user never has to
+  // resend a link. Non-retryable failures (too large) return immediately.
+  let lastError = "Download failed."
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const { stdout } = await execFileP(YTDLP_BIN, dlArgs, {
+        timeout: timeoutMs,
+        maxBuffer: 16 * 1024 * 1024,
+        cwd: opts.workDir,
+      })
+      // `--print after_move:filepath` echoes the final path on stdout. If the
+      // file was skipped by the size/duration filter, stdout may be empty.
+      let audioPath = stdout.trim().split(/\r?\n/).filter(Boolean).pop() ?? ""
+      if (!audioPath) audioPath = path.join(opts.workDir, "media.mp3")
 
-  // ── Step 3: belt-and-suspenders — confirm the file exists and is bounded.
-  try {
-    const s = await stat(audioPath)
-    if (s.size === 0) {
-      return { ok: false, code: "download_failed", error: "Downloaded audio is empty." }
+      const s = await stat(audioPath).catch(() => null)
+      if (!s || s.size === 0) {
+        // Empty output — usually a transient extraction hiccup. Retry.
+        lastError = "Downloaded audio is empty."
+        if (attempt < 3) { await sleep(2500 * attempt); continue }
+        return { ok: false, code: "download_failed", error: lastError }
+      }
+      // Sanity bound on the EXTRACTED audio (not the source video). With mono
+      // 16 kHz this is generous — it should never trip for in-duration clips.
+      if (s.size > AUDIO_MAX_MB * 1024 * 1024) {
+        return { ok: false, code: "too_large", error: `Extracted audio exceeds ${AUDIO_MAX_MB} MB.` }
+      }
+      return { ok: true, audioPath, title, durationSec, webpageUrl }
+    } catch (err) {
+      if (isENOENT(err)) {
+        return { ok: false, code: "missing_binary", error: "yt-dlp/ffmpeg is not installed on the server." }
+      }
+      const msg = err instanceof Error ? err.message : String(err)
+      if (/file is larger than max-filesize|max-filesize/i.test(msg)) {
+        return { ok: false, code: "too_large", error: `Audio exceeds the ${maxFileSizeMb} MB limit.` }
+      }
+      if (isTimeout(err)) {
+        lastError = "Download timed out."
+        if (attempt < 3) { await sleep(2500 * attempt); continue }
+        return { ok: false, code: "timeout", error: lastError }
+      }
+      lastError = msg.slice(0, 200)
+      if (attempt < 3) { await sleep(2500 * attempt); continue }
+      return { ok: false, code: "download_failed", error: lastError }
     }
-    // Sanity bound on the EXTRACTED audio (not the source video). With mono
-    // 16 kHz this is generous — it should never trip for in-duration clips.
-    if (s.size > AUDIO_MAX_MB * 1024 * 1024) {
-      return { ok: false, code: "too_large", error: `Extracted audio exceeds ${AUDIO_MAX_MB} MB.` }
-    }
-  } catch {
-    return { ok: false, code: "download_failed", error: "Audio file not found after download." }
   }
-
-  return { ok: true, audioPath, title, durationSec, webpageUrl }
+  return { ok: false, code: "download_failed", error: lastError }
 }
