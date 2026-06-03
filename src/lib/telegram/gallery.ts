@@ -14,6 +14,7 @@ import { sqlite } from "@/lib/db"
 import { createId } from "@/lib/utils/ids"
 import { getDataDir } from "@/lib/utils/data-dir"
 import { getFile, fileDownloadUrl } from "@/lib/telegram/client"
+import type { MenuResponse } from "@/lib/telegram/menus"
 
 function extForMime(mime: string | null | undefined): string {
   switch ((mime || "").toLowerCase()) {
@@ -167,7 +168,7 @@ async function translateCaption(userId: string, text: string, lang: string): Pro
 export async function describeGalleryImage(
   userId: string,
   imageId: string,
-  opts: { overwrite?: boolean; notify?: boolean } = {},
+  opts: { overwrite?: boolean; notify?: boolean; editMessageId?: number } = {},
 ): Promise<{ ok: true; caption: string } | { ok: false; error: string }> {
   const row = sqlite
     .prepare(`SELECT file_path, mime, caption FROM gallery_images WHERE id = ? AND user_id = ?`)
@@ -175,11 +176,38 @@ export async function describeGalleryImage(
   if (!row) return { ok: false, error: "image not found" }
   if (!opts.overwrite && row.caption?.trim()) return { ok: false, error: "already captioned" }
 
+  // Resolve the final bot message IN PLACE: when notify + editMessageId are set
+  // we EDIT the "captioning…" message instead of sending a new one — so a photo
+  // yields exactly ONE bot message that evolves into the caption (no duplicate).
+  const finishNotify = async (menu: MenuResponse): Promise<void> => {
+    if (!opts.notify) return
+    const bot = sqlite
+      .prepare(`SELECT bot_token, chat_id FROM telegram_bots WHERE user_id = ?`)
+      .get(userId) as { bot_token: string; chat_id: string | null } | undefined
+    if (!bot?.bot_token || !bot.chat_id) return
+    const { sendMessage, editMessageText } = await import("@/lib/telegram/client")
+    if (opts.editMessageId) {
+      const ed = await editMessageText(bot.bot_token, bot.chat_id, opts.editMessageId, menu.text, {
+        parseMode: "Markdown",
+        replyMarkup: menu.markup,
+      }).catch(() => null)
+      if (ed && ed.ok) return
+    }
+    await sendMessage(bot.bot_token, bot.chat_id, menu.text, { parseMode: "Markdown", replyMarkup: menu.markup }).catch(() => undefined)
+  }
+  // Fallback "resolved" message when captioning can't run / fails: the album
+  // picker, so the image is still actionable (and re-describable).
+  const albumPicker = async (): Promise<MenuResponse> => {
+    const { galleryAlbumPicker } = await import("@/lib/telegram/menus")
+    return galleryAlbumPicker(userId, imageId)
+  }
+
   // Local-first vision (self-hosted Ollama/moondream) → cloud fallback.
   const { resolveVisionConfig } = await import("@/lib/ai/vision-config")
   const cfg = resolveVisionConfig(userId)
   if (!cfg) {
     setCaptionStatus(imageId, userId, null) // no provider — clear any spinner
+    await finishNotify(await albumPicker())
     return { ok: false, error: "no vision provider" }
   }
   setCaptionStatus(imageId, userId, "pending")
@@ -191,6 +219,7 @@ export async function describeGalleryImage(
     dataUrl = `data:${row.mime || "image/jpeg"};base64,${bytes.toString("base64")}`
   } catch {
     setCaptionStatus(imageId, userId, "failed")
+    await finishNotify(await albumPicker())
     return { ok: false, error: "could not read file" }
   }
 
@@ -222,6 +251,7 @@ export async function describeGalleryImage(
     })
     if (!res.ok) {
       setCaptionStatus(imageId, userId, "failed")
+      await finishNotify(await albumPicker())
       return { ok: false, error: `provider ${res.status}` }
     }
     const data = (await res.json()) as { choices?: { message?: { content?: unknown } }[] }
@@ -232,6 +262,7 @@ export async function describeGalleryImage(
       .slice(0, 280)
     if (!caption) {
       setCaptionStatus(imageId, userId, "failed")
+      await finishNotify(await albumPicker())
       return { ok: false, error: "empty response" }
     }
     // Vision gives an English caption; if the user picked another caption
@@ -244,23 +275,12 @@ export async function describeGalleryImage(
       .prepare(`UPDATE gallery_images SET caption = ?, caption_status = 'done' WHERE id = ? AND user_id = ?`)
       .run(finalCaption, imageId, userId)
 
-    // Notify the user in Telegram that the caption is ready, with quick actions.
-    if (opts.notify) {
-      try {
-        const bot = sqlite
-          .prepare(`SELECT bot_token, chat_id FROM telegram_bots WHERE user_id = ?`)
-          .get(userId) as { bot_token: string; chat_id: string | null } | undefined
-        if (bot?.bot_token && bot.chat_id) {
-          const { sendMessage } = await import("@/lib/telegram/client")
-          const { galleryCaptionReadyMenu } = await import("@/lib/telegram/menus")
-          const m = galleryCaptionReadyMenu(imageId, finalCaption)
-          await sendMessage(bot.bot_token, bot.chat_id, m.text, { parseMode: "Markdown", replyMarkup: m.markup }).catch(() => undefined)
-        }
-      } catch { /* notify is best-effort */ }
-    }
+    const { galleryCaptionReadyMenu } = await import("@/lib/telegram/menus")
+    await finishNotify(galleryCaptionReadyMenu(imageId, finalCaption))
     return { ok: true, caption: finalCaption }
   } catch (err) {
     setCaptionStatus(imageId, userId, "failed")
+    await finishNotify(await albumPicker()).catch(() => undefined)
     return { ok: false, error: err instanceof Error ? err.message : "vision error" }
   }
 }

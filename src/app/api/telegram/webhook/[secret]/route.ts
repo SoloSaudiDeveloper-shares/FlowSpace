@@ -118,7 +118,7 @@ export async function POST(
   // answerCallbackQuery within ~30s to clear the loading spinner.
   if (update.callback_query) {
     const cb = update.callback_query
-    const result = await handleCallback(bot.user_id, cb.data ?? "")
+    const result = await handleCallback(bot.user_id, cb.data ?? "", cb.message?.message_id)
 
     // Clear the spinner (always; even on errors).
     await answerCallbackQuery(bot.bot_token, cb.id, {
@@ -272,16 +272,28 @@ export async function POST(
       height: largest?.height ?? null,
     })
     if (r.ok) {
-      // "Identify" the image: if no caption was provided, auto-describe it with
-      // the user's vision model in the background (best-effort; updates the
-      // caption when done so the webhook can ack instantly).
-      if (!msg.caption?.trim()) void describeGalleryImage(bot.user_id, r.id, { notify: true })
-      const picker = galleryAlbumPicker(bot.user_id, r.id, msg.caption?.trim() || undefined)
-      logMessage(bot.user_id, "out", picker.text)
-      await sendMessage(bot.bot_token, msg.chat.id, picker.text, {
-        parseMode: "Markdown",
-        replyMarkup: picker.markup,
-      })
+      if (!msg.caption?.trim()) {
+        // Auto-caption: send ONE "captioning…" message and EDIT it in place
+        // when the caption is ready (no separate second message).
+        const ack = "🖼 *Saved to your Gallery* — ✨ _captioning…_"
+        logMessage(bot.user_id, "out", ack)
+        const sent = await sendMessage(bot.bot_token, msg.chat.id, ack, {
+          parseMode: "Markdown",
+          replyMarkup: inlineKeyboard([[{ text: "🏠 Menu", callback_data: "menu:main" }]]),
+        })
+        void describeGalleryImage(bot.user_id, r.id, {
+          notify: true,
+          editMessageId: sent.ok ? sent.result.message_id : undefined,
+        })
+      } else {
+        // User supplied a caption — just offer the album picker (no captioning).
+        const picker = galleryAlbumPicker(bot.user_id, r.id, msg.caption.trim())
+        logMessage(bot.user_id, "out", picker.text)
+        await sendMessage(bot.bot_token, msg.chat.id, picker.text, {
+          parseMode: "Markdown",
+          replyMarkup: picker.markup,
+        })
+      }
     } else {
       const reply = `⚠️ Couldn't save that image: ${r.error}`
       logMessage(bot.user_id, "out", reply)

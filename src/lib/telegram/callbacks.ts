@@ -66,6 +66,9 @@ export interface CallbackResult {
 export async function handleCallback(
   userId: string,
   data: string,
+  /** The message the button is attached to — lets caption actions edit it in
+   *  place instead of sending a second message. */
+  messageId?: number,
 ): Promise<CallbackResult> {
   try {
     // Root menu
@@ -193,12 +196,15 @@ export async function handleCallback(
     if (data.startsWith("ga:cap:")) {
       const imageId = data.slice("ga:cap:".length)
       const { describeGalleryImage } = await import("@/lib/telegram/gallery")
-      // Vision can take many seconds — run it in the background; it notifies
-      // when the caption is ready (with edit/refine/album/comment actions).
-      void describeGalleryImage(userId, imageId, { overwrite: true, notify: true })
+      // Vision can take many seconds — run it in the background; it edits THIS
+      // message in place when the caption is ready (no second message).
+      void describeGalleryImage(userId, imageId, { overwrite: true, notify: true, editMessageId: messageId })
       return {
         toast: "Describing…",
-        replace: { text: "✨ _Describing the image with AI — I'll send the caption here when it's ready._" },
+        edit: {
+          text: "✨ _Describing the image with AI — the caption will appear here when it's ready._",
+          markup: { inline_keyboard: [[{ text: "🏠 Menu", callback_data: "menu:main" }]] },
+        },
       }
     }
 
@@ -216,8 +222,14 @@ export async function handleCallback(
     if (data.startsWith("gc:refine:")) {
       const imageId = data.slice("gc:refine:".length)
       const { describeGalleryImage } = await import("@/lib/telegram/gallery")
-      void describeGalleryImage(userId, imageId, { overwrite: true, notify: true })
-      return { toast: "Refining…", replace: { text: "🔄 _Generating a fresh caption — I'll send it here shortly._" } }
+      void describeGalleryImage(userId, imageId, { overwrite: true, notify: true, editMessageId: messageId })
+      return {
+        toast: "Refining…",
+        edit: {
+          text: "🔄 _Generating a fresh caption — it'll update here shortly._",
+          markup: { inline_keyboard: [[{ text: "🏠 Menu", callback_data: "menu:main" }]] },
+        },
+      }
     }
     if (data.startsWith("gc:album:")) {
       const imageId = data.slice("gc:album:".length)
