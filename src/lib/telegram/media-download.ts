@@ -228,16 +228,27 @@ export async function downloadMediaAudio(
       if (isENOENT(err)) {
         return { ok: false, code: "missing_binary", error: "yt-dlp/ffmpeg is not installed on the server." }
       }
-      const msg = err instanceof Error ? err.message : String(err)
-      if (/file is larger than max-filesize|max-filesize/i.test(msg)) {
-        return { ok: false, code: "too_large", error: `Audio exceeds the ${maxFileSizeMb} MB limit.` }
+      // IMPORTANT: classify on yt-dlp's actual STDERR, not err.message — Node
+      // prefixes err.message with the full command line, which contains the
+      // literal "--max-filesize 500M" and would false-match the oversize check
+      // for EVERY failure (that's the "over 500 MB" bug).
+      const e = err as { stderr?: string; message?: string }
+      const stderr = (e.stderr || e.message || String(err)).toString()
+      // yt-dlp's genuine oversize message is "larger than max-filesize".
+      if (/larger than max-filesize/i.test(stderr)) {
+        return { ok: false, code: "too_large", error: `Source exceeds the ${maxFileSizeMb} MB download limit.` }
       }
       if (isTimeout(err)) {
         lastError = "Download timed out."
         if (attempt < 3) { await sleep(2500 * attempt); continue }
         return { ok: false, code: "timeout", error: lastError }
       }
-      lastError = msg.slice(0, 200)
+      // Prefer the real yt-dlp ERROR line for the detail, not the command echo.
+      const detail =
+        stderr.split(/\r?\n/).filter((l) => /^ERROR|unable|unavailable|private|not available/i.test(l)).pop() ||
+        stderr.split(/\r?\n/).filter(Boolean).pop() ||
+        "Download failed."
+      lastError = detail.slice(0, 200)
       if (attempt < 3) { await sleep(2500 * attempt); continue }
       return { ok: false, code: "download_failed", error: lastError }
     }
