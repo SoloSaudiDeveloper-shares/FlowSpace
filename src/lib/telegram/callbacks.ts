@@ -167,6 +167,29 @@ export async function handleCallback(
       return { toast: ok ? "Removed" : "Already gone", replace: { text: ok ? "↩️ _Task removed._" : "↩️ _Already gone._" } }
     }
 
+    // ── Gallery viewer: flip through photos one at a time ───────────────
+    // These perform Telegram photo sends/edits directly (the CallbackResult
+    // edit/replace model only handles text messages), so they return just a
+    // toast and do the visible work as a side effect.
+    if (data === "gv:open") {
+      const { openGalleryInBot } = await import("@/lib/telegram/gallery-bot")
+      await openGalleryInBot(userId)
+      return {}
+    }
+    if (data.startsWith("gv:i:")) {
+      const idx = Number.parseInt(data.slice("gv:i:".length), 10) || 0
+      if (messageId == null) return {}
+      const { navigateGalleryInBot } = await import("@/lib/telegram/gallery-bot")
+      await navigateGalleryInBot(userId, messageId, idx)
+      return {}
+    }
+    if (data.startsWith("gv:c:")) {
+      const imageId = data.slice("gv:c:".length)
+      const { sendGalleryComments } = await import("@/lib/telegram/gallery-bot")
+      await sendGalleryComments(userId, imageId)
+      return { toast: "💬 Comments below" }
+    }
+
     // ── Gallery: file a saved photo into an album / describe it ──────────
     if (data.startsWith("ga:mv:")) {
       const parts = data.split(":")

@@ -76,7 +76,10 @@ export function mainMenu(): MenuResponse {
         { text: "📂 Projects", callback_data: "v:projects" },
         { text: "📝 Todo lists", callback_data: "v:lists" },
       ],
-      [{ text: "🆘 Help", callback_data: "v:help" }],
+      [
+        { text: "🖼 Gallery", callback_data: "gv:open" },
+        { text: "🆘 Help", callback_data: "v:help" },
+      ],
       ...openInAppRow("/"),
     ]),
   }

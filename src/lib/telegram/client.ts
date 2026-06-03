@@ -303,6 +303,114 @@ export async function sendVoice(
   }
 }
 
+/**
+ * Send a photo (multipart upload, like sendVoice). Telegram caption is
+ * limited to ~1024 chars; we send captions as plain text (no parse_mode)
+ * so arbitrary user/AI caption content can't break Markdown parsing.
+ */
+export async function sendPhoto(
+  token: string,
+  chatId: number | string,
+  photo: ArrayBuffer | Uint8Array | Blob,
+  opts: {
+    caption?: string
+    parseMode?: "Markdown" | "MarkdownV2" | "HTML"
+    replyMarkup?: InlineKeyboardMarkup
+  } = {},
+): Promise<TelegramApiResult<TelegramMessage>> {
+  try {
+    const form = new FormData()
+    form.append("chat_id", String(chatId))
+    const blob =
+      photo instanceof Blob
+        ? photo
+        : new Blob([photo as BlobPart], { type: "image/jpeg" })
+    form.append("photo", blob, "image.jpg")
+    if (opts.caption) form.append("caption", opts.caption)
+    if (opts.parseMode) form.append("parse_mode", opts.parseMode)
+    if (opts.replyMarkup)
+      form.append("reply_markup", JSON.stringify(opts.replyMarkup))
+
+    const res = await fetch(`${API_BASE}/bot${token}/sendPhoto`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(30_000),
+    })
+    const data = (await res.json()) as
+      | { ok: true; result: TelegramMessage }
+      | { ok: false; error_code?: number; description?: string }
+    if (data.ok) return { ok: true, result: data.result }
+    return {
+      ok: false,
+      error_code: data.error_code,
+      description: data.description ?? "Telegram sendPhoto error",
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      description: err instanceof Error ? err.message : "Network error",
+    }
+  }
+}
+
+/**
+ * Swap the photo (and caption + buttons) of an existing photo message in
+ * place — used by the gallery viewer's ⬅️/➡️ navigation so browsing edits
+ * one message rather than spamming the chat. editMessageText does NOT work
+ * on media messages, hence editMessageMedia with an attached upload.
+ */
+export async function editMessageMedia(
+  token: string,
+  chatId: number | string,
+  messageId: number,
+  photo: ArrayBuffer | Uint8Array | Blob,
+  opts: {
+    caption?: string
+    parseMode?: "Markdown" | "MarkdownV2" | "HTML"
+    replyMarkup?: InlineKeyboardMarkup
+  } = {},
+): Promise<TelegramApiResult<TelegramMessage | true>> {
+  try {
+    const form = new FormData()
+    form.append("chat_id", String(chatId))
+    form.append("message_id", String(messageId))
+    const media: Record<string, unknown> = {
+      type: "photo",
+      media: "attach://photo",
+    }
+    if (opts.caption) media.caption = opts.caption
+    if (opts.parseMode) media.parse_mode = opts.parseMode
+    form.append("media", JSON.stringify(media))
+    if (opts.replyMarkup)
+      form.append("reply_markup", JSON.stringify(opts.replyMarkup))
+    const blob =
+      photo instanceof Blob
+        ? photo
+        : new Blob([photo as BlobPart], { type: "image/jpeg" })
+    form.append("photo", blob, "image.jpg")
+
+    const res = await fetch(`${API_BASE}/bot${token}/editMessageMedia`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(30_000),
+    })
+    const data = (await res.json()) as
+      | { ok: true; result: TelegramMessage | true }
+      | { ok: false; error_code?: number; description?: string }
+    if (data.ok) return { ok: true, result: data.result }
+    return {
+      ok: false,
+      error_code: data.error_code,
+      description: data.description ?? "Telegram editMessageMedia error",
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      description: err instanceof Error ? err.message : "Network error",
+    }
+  }
+}
+
 /** Edit an existing message in place. The user just tapped a button —
  *  we want to swap the message contents and buttons without dumping a
  *  new line in the chat. */
