@@ -174,12 +174,24 @@ export async function POST(
   // (handled by callbacks.ts) transcribe with the chosen language and
   // route the result to the user's chosen destination. This puts the
   // user in control per-message instead of relying on a global pref.
-  // Audio sent "as a file" arrives as a `document` with an audio/video mime
-  // type — Telegram only tags voice/audio/video_note when it recognises a
-  // playable track. Desktop "📎 → File" and many exported recordings come
-  // through as documents, so without this they'd be silently dropped.
+  // Audio sent "as a file" arrives as a `document` — Telegram only tags
+  // voice/audio/video_note when it recognises a playable track. Desktop
+  // "📎 → File" and many exported recordings come through as documents, so
+  // without this they'd be silently dropped.
+  //
+  // Detection is deliberately loose: a 3 MB OGG can show up with mime
+  // `audio/ogg`, `application/ogg`, `application/octet-stream`, or NO mime at
+  // all depending on the sending client — so we ALSO sniff the file
+  // extension. (mime alone missed real-world OGG/opus uploads.)
+  const AUDIO_VIDEO_EXT =
+    /\.(ogg|oga|opus|mp3|m4a|m4b|aac|wav|flac|wma|amr|3gp|3gpp|mka|mpga|mpeg|mp4|mov|webm|caf|aiff?)$/i
+  const docMime = msg.document?.mime_type ?? ""
+  const docName = msg.document?.file_name ?? ""
   const audioDoc =
-    msg.document && /^(audio|video)\//i.test(msg.document.mime_type ?? "")
+    msg.document &&
+    (/^(audio|video)\//i.test(docMime) ||
+      /^application\/ogg$/i.test(docMime) ||
+      AUDIO_VIDEO_EXT.test(docName))
       ? msg.document
       : null
   const voiceFileId =
